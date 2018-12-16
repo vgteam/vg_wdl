@@ -1,6 +1,7 @@
 task shardFastq{
     File fastq1
     File fastq2
+    Int diskGB
     
     command <<<
         fastq_splitter.sh ${fastq1} ${fastq2}}
@@ -9,7 +10,7 @@ task shardFastq{
     runtime{
         cpu: "8"
         memory : "4 GB"
-        disks : "local-disk 200 HDD"
+        disks : "local-disk " + diskGB + " HDD"
         docker: "erictdawson/fastq-splitter"
     }
 
@@ -42,6 +43,7 @@ task vg_map {
         memory: "160000 MB"
         disks: "local-disk 200 HDD"
         docker: "${vg_docker_image}"
+        preemptible : 3
     }
 
     output {
@@ -73,20 +75,13 @@ workflow vg_map_shards {
 
     File vg_index_tar
 
-    scatter (i in range(length(fastq1))) {
-        call vg_map {
-            input:
-                fastq1 = fastq1[i],
-                fastq2 = fastq2[i],
-                shard_number = i+1,
-                output_name = output_name,
-                vg_index_tar = vg_index_tar,
-        }
+    Int fqDiskSZ = ceil(size(fastq1, "GB") + size(fastq2, "GB") + 20)
+
+    call shardFastq{
+        input:
+            fastq1=fastq1,
+            fastq2=fastq2,
+            diskGB=fqDiskSZ
     }
 
-    call concat {
-        input:
-            shard_gam=vg_map.gam,
-            output_name=output_name
-    }
 }
