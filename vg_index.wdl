@@ -17,7 +17,7 @@ task vgIndexTask {
     runtime {
         cpu: "${threads}"
         memory: "${memory} GB"
-        disks: "local-disk " + diskGB "  HDD"
+        disks: "local-disk " + diskGB + "  HDD"
         docker: "${vg_docker}"
         preemptible : 0
     }
@@ -28,17 +28,19 @@ task vgIndexTask {
         File lcp = "${output_name}.lcp"
     }
 }
+
 workflow vgIndex {
     File vgFile
     Int? threads
+    Int? memory
     String? index_options
     String? vg_docker
     
     String output_name
 
-    Int vgDiskSZ = ceil(size(vgFile, "GB") + 1000;
+    Int vgDiskSZ = ceil(size(vgFile, "GB")) + 1000
 
-    call vgMapTask{
+    call vgIndexTask{
         input:
             vgFile=vgFile,
             diskGB=vgDiskSZ,
