@@ -4,7 +4,8 @@ task vgMapTask {
     Int diskGB
     Int? threads
     
-    File vg_index_tar
+    File gcsa_ind
+    File xg_ind
     String? map_options
     
     String output_name
@@ -12,7 +13,7 @@ task vgMapTask {
     command <<<
         set -ex -o pipefail
         tar xvf ${vg_index_tar} && rm ${vg_index_tar} && \
-        vg map -f ${fastq1} -f ${fastq2} -d vg/index -t ${threads} ${map_options} > ${output_name}.gam
+        vg map -f ${fastq1} -f ${fastq2} -g ${gcsa_ind} -x ${xg_ind} -t ${threads} ${map_options} > ${output_name}.gam
     >>>
 
     runtime {
