@@ -4,22 +4,22 @@ task vgMapTask {
     Int diskGB
     Int? threads
     
-    File gcsa_ind
-    File xg_ind
+    File gcsa_index
+    File xg_index
+    File lcp_index
     String? map_options
     
     String output_name
 
     command <<<
         set -ex -o pipefail
-        tar xvf ${vg_index_tar} && rm ${vg_index_tar} && \
-        vg map -f ${fastq1} -f ${fastq2} -g ${gcsa_ind} -x ${xg_ind} -t ${threads} ${map_options} > ${output_name}.gam
+        vg map -f ${fastq1} -f ${fastq2} -g ${gcsa_index} -x ${xg_index} -t ${threads} ${map_options} > ${output_name}.gam
     >>>
 
     runtime {
         cpu: "${threads}}"
         memory: "160000 MB"
-        disks: "local-disk " + diskGB "  HDD"
+        disks: "local-disk " + diskGB + "  HDD"
         docker: "variationgraphs/vg:latest"
         preemptible : 3
     }
@@ -36,9 +36,11 @@ workflow vg_map {
     
     String output_name
 
-    File vg_index_tar
+    File xg_index
+    File gcsa_index
+    File lcp_index
 
-    Int fqDiskSZ = ceil(size(fastq1, "GB") + size(fastq2, "GB") + 20) * 2;
+    Int fqDiskSZ = ceil(size(fastq1, "GB") + size(fastq2, "GB") + 20) * 2
 
     call vgMapTask{
         input:
@@ -48,7 +50,9 @@ workflow vg_map {
             threads=threads,
             output_name=output_name,
             map_options=map_options,
-            vg_index_tar=vg_index_tar
+            xg_index=xg_index,
+            gcsa_index=gcsa_index,
+            lcp_index=lcp_index
     }
 
 }
