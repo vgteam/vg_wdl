@@ -9,7 +9,8 @@ Workflow Description Language (WDL) scripts for common vg workflows
 
 ## Docker Containers
 WDL needs the runtime Docker image to be present on Dockerhub.  
-VG images are available at [ the variantgraphs Dockerhub](https://cloud.docker.com/u/variantgraphs/repository/docker/variantgraphs/vg),  
+VG images are available in [quay](https://quay.io/repository/vgteam/vg?tab=tags)
+and selected images are available in [ the variantgraphs Dockerhub](https://cloud.docker.com/u/variantgraphs/repository/docker/variantgraphs/vg),  
 and can be pulled with:  
 ```
     docker pull variantgraphs/vg  
