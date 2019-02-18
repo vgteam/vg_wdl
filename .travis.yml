@@ -10,6 +10,7 @@ install:
 - ./miniconda.sh -b
 - export PATH=/home/travis/miniconda3/bin:$PATH
 - conda update --yes conda
+- pip3 install wheel
 script:
-- pip3 install wheel miniwdl
+- pip3 install miniwdl
 - conda activate && tests/run_tests.sh
