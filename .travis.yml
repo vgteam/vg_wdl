@@ -3,12 +3,13 @@ language: cpp
 sudo: required
 dist: xenial
 install:
+- sudo apt-get update -y
+- sudo apt-get install -y python3-pip python3-setuptools
 - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 - chmod +x miniconda.sh
 - ./miniconda.sh -b
 - export PATH=/home/travis/miniconda3/bin:$PATH
 - conda update --yes conda
 script:
-- apt-get update -y && apt-get install -y python3-pip python3-setuptools
 - pip3 install miniwdl
 - sudo -E bash -c "conda activate && tests/run_tests.sh"
