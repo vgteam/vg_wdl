@@ -1,13 +1,6 @@
 #!/bin/bash
 set -ex -o pipefail
 
-if [ "$CI" == "true" ] && [ "$TRAVIS" == "true" ]; then
-    apt-get update
-    apt-get install -y python3-pip python3-setuptools
-    pip3 install miniwdl
-    export PATH=$PATH:$HOME/.local/bin
-fi
-
 ORIG_CWD="$(pwd)"
 cd "$(dirname $0)/ABOlocus"
 miniwdl check vg_ABOlocus_test.wdl 
