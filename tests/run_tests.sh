@@ -2,6 +2,7 @@
 set -ex -o pipefail
 
 if [ "$CI" == "true" ] && [ "$TRAVIS" == "true" ]; then
+    apt-get update
     apt-get install -y python3-pip shellcheck
     pip3 install miniwdl
     export PATH=$PATH:$HOME/.local/bin
