@@ -1,0 +1,7 @@
+
+language: cpp
+sudo: required
+dist: xenial
+install: true
+script:
+- sudo -E bash tests/run_tests.sh
