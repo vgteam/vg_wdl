@@ -1,0 +1,14 @@
+{
+  "vgPipeline.INPUT_READ_FILE_1": "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.tiny.fastq.gz", 
+  "vgPipeline.INPUT_READ_FILE_2": "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.tiny.fastq.gz",
+  "vgPipeline.SAMPLE_NAME": "HG002",
+  "vgPipeline.READS_PER_CHUNK": 500,
+  "vgPipeline.XG_FILE": "gs://cmarkell-vg-wdl-dev/snp1kg_maf0.1_decoys_minaf_0.1.xg",
+  "vgPipeline.GCSA_FILE": "gs://cmarkell-vg-wdl-dev/snp1kg_maf0.1_decoys_minaf_0.1.gcsa",
+  "vgPipeline.GCSA_LCP_FILE": "gs://cmarkell-vg-wdl-dev/snp1kg_maf0.1_decoys_minaf_0.1.gcsa.lcp",
+  "vgPipeline.GBWT_FILE": "gs://cmarkell-vg-wdl-dev/snp1kg_maf0.1_decoys_minaf_0.1.gbwt",
+  "vgPipeline.REF_FILE": "gs://cmarkell-vg-wdl-dev/hs37d5.fa",
+  "vgPipeline.REF_INDEX_FILE": "gs://cmarkell-vg-wdl-dev/hs37d5.fa.fai",
+  "vgPipeline.REF_DICT_FILE": "gs://cmarkell-vg-wdl-dev/hs37d5.dict",
+  "vgPipeline.VG_CONTAINER": "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run"
+}
