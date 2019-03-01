@@ -1,3 +1,18 @@
+version 1.0	
+
+ # Working example pipeline which uses VG to map and HaplotypeCaller to call variants.	
+# Tested on Googles Cloud Platorm "GCP" and works for VG container "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run".	
+# WDL pipeline works with JSON input file "vg_pipeline.workingexample_tiny.inputs.json"	
+# Steps in pipeline: 	
+# 1) Split reads into chunks.	
+#    500 READS_PER_CHUNK value recommended for HG002 tiny chr 21 dataset	
+#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.tiny.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.tiny.fastq.gz".	
+#    1000000 READS_PER_CHUNK value recommended for HG002 whole chr 21 dataset	
+#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.fastq.gz".	
+# 2) Align input paired-end reads to a VG graph using VG MPMAP algorithm.	
+# 3) Surject VG alignments from GAM format to BAM format.	
+# 4) Merge chunked BAM alignments and preprocess them for GATK compatibility.	
+# 5) Run GATK HaplotypeCaller on processed BAM data.
 workflow vgPipeline {
   File INPUT_READ_FILE_1
   File INPUT_READ_FILE_2
