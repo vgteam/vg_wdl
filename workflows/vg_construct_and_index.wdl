@@ -7,22 +7,22 @@ workflow vg_construct_and_index {
     input {
         String graph_name
         File ref_fasta_gz
-        File vcf_gz
         Array[String]+ contigs = [
              "1",  "2",  "3",  "4",  "5",  "6",
              "7",  "8",  "9", "10", "11", "12",
             "13", "14", "15", "16", "17", "18",
             "19", "20", "21", "22",  "X",  "Y"
         ]
+        Array[File]+ contigs_vcf_gz
         String vg_docker = "quay.io/vgteam/vg:v1.13.0"
     }
 
     # make graph for each reference contig
-    scatter (contig in contigs) {
+    scatter (i in range(length(contigs))) {
         call construct_graph { input:
             ref_fasta_gz = ref_fasta_gz,
-            vcf_gz = vcf_gz,
-            contig = contig,
+            vcf_gz = contigs_vcf_gz[i],
+            contig = contigs[i],
             vg_docker = vg_docker
         }
     }

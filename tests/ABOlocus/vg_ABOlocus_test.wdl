@@ -29,8 +29,8 @@ workflow vg_ABOlocus_test {
     call vg_construct_and_index.vg_construct_and_index as cons { input:
         graph_name = "ABOlocus",
         ref_fasta_gz = ABOlocus_fa_gz,
-        vcf_gz = ABOlocus_SV_vcf_gz,
         contigs = ["ABOlocus"],
+        contigs_vcf_gz = [ABOlocus_SV_vcf_gz],
         vg_docker = vg_docker
     }
 
