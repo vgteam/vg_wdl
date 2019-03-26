@@ -78,7 +78,7 @@ task construct_graph {
         set -ex -o pipefail
         pigz -dc ${ref_fasta_gz} > ref.fa
         tabix "${vcf_gz}"
-        vg construct -R "${contig}" -r ref.fa -v "${vcf_gz}" --region-is-chrom ${vg_construct_options} > "${contig}.vg"
+        vg construct -R "${contig}" -C -r ref.fa -v "${vcf_gz}" --region-is-chrom ${vg_construct_options} > "${contig}.vg"
     }
 
     output {
