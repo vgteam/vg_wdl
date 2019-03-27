@@ -127,7 +127,7 @@ task construct_graph {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         pigz -dc ${ref_fasta_gz} > ref.fa
         tabix "${vcf_gz}"
 
@@ -152,7 +152,7 @@ task combine_graphs {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         # we approach this in a particular way to ensure the output array contigs_uid_vg has the
         # same order as the input array contigs_vg (so we can't rely on glob patterns)
         mkdir vg/
@@ -186,7 +186,7 @@ task gbwt_index {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
@@ -211,7 +211,7 @@ task gbwt_merge {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         vg gbwt -m -f -o "~{graph_name}.gbwt" ~{sep=" " gbwts}
     }
 
@@ -234,7 +234,7 @@ task xg_index {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         vg index -x "${graph_name}.xg" ~{xg_options} "~{vg}"
     }
 
@@ -256,7 +256,7 @@ task prune_graph {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         nm=$(basename "${contig_vg}" .vg)
         vg prune -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
     }
@@ -281,7 +281,7 @@ task prune_graph_with_haplotypes {
     }
 
     command <<<
-        set -ex -o pipefail
+        set -exu -o pipefail
         cp "~{empty_id_map}" mapping
         paste -d ";" "~{write_lines(contigs_vg)}" "~{write_lines(contigs_gbwt)}" > inputs
         while IFS=';' read -ra p; do
@@ -314,7 +314,7 @@ task gcsa_index {
     }
 
     command {
-        set -ex -o pipefail
+        set -exu -o pipefail
         vg index -g "${graph_name}.gcsa" -f "${empty_id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
     }
 
