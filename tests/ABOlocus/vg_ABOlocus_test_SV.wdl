@@ -22,15 +22,15 @@ workflow vg_ABOlocus_test {
         File ABOlocus_fa_gz
         File ABOlocus_SV_vcf_gz
         File reads_bam
-        String vg_docker = "quay.io/vgteam/vg:v1.13.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.14.0"
     }
 
     # build & check the ABOlocus graph
     call vg_construct_and_index.vg_construct_and_index as cons { input:
-        graph_name = "ABOlocus",
+        graph_name = "ABOlocus_SV",
         ref_fasta_gz = ABOlocus_fa_gz,
-        vcf_gz = ABOlocus_SV_vcf_gz,
         contigs = ["ABOlocus"],
+        contigs_vcf_gz = [ABOlocus_SV_vcf_gz],
         vg_docker = vg_docker
     }
 

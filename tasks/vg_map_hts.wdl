@@ -7,6 +7,7 @@ task vg_map_hts {
         File xg
         File gcsa
         File gcsa_lcp
+        File? gbwt
         String vg_map_options = ""
         String vg_docker
     }
@@ -16,7 +17,7 @@ task vg_map_hts {
         ofn=$(basename "~{sam_bam_cram}" .sam)
         ofn=$(basename "$ofn" .bam)
         ofn=$(basename "$ofn" .cram)
-        vg map -t "$(nproc)" ~{vg_map_options} -x "~{xg}" -g "~{gcsa}" --hts-input "~{sam_bam_cram}" > "${ofn}.gam"
+        vg map -t "$(nproc)" ~{vg_map_options} --xg-name "~{xg}" --gcsa-name "~{gcsa}" ~{"--gbwt-name " + gbwt} --hts-input "~{sam_bam_cram}" > "${ofn}.gam"
     >>>
 
     runtime {
