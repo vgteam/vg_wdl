@@ -102,7 +102,7 @@ workflow vg_construct_and_index {
     call gcsa_index { input:
         graph_name = graph_name,
         contigs_pruned_vg = select_first([prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
-        empty_id_map = combine_graphs.empty_id_map,
+        id_map = select_first([prune_graph_with_haplotypes.pruned_id_map,combine_graphs.empty_id_map]),
         vg_docker = vg_docker
     }
 
@@ -296,6 +296,7 @@ task prune_graph_with_haplotypes {
 
     output {
         Array[File]+ contigs_pruned_vg=read_lines("contigs_pruned_vg")
+        File pruned_id_map = "mapping"
     }
 
     runtime {
@@ -308,14 +309,14 @@ task gcsa_index {
     input {
         String graph_name
         Array[File]+ contigs_pruned_vg
-        File empty_id_map
+        File id_map
         String gcsa_options = ""
         String vg_docker
     }
 
     command {
         set -exu -o pipefail
-        vg index -g "${graph_name}.gcsa" -f "${empty_id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
+        vg index -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
     }
 
     output {
