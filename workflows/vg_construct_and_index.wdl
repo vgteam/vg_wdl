@@ -1,47 +1,44 @@
 version 1.0
 
 # Construct variation graph from reference genome FASTA and VCF, then generate
-# xg and GCSA+lcp indices.
-# Based on https://github.com/vgteam/vg/wiki/Working-with-a-whole-genome-variation-graph
+# xg and GCSA+lcp indices. Optionally, create GBWT index for phased haplotypes
+# in the VCF.
+# References:
+#     https://github.com/vgteam/vg/wiki/Working-with-a-whole-genome-variation-graph
+#     https://github.com/vgteam/vg/wiki/Index-Construction
 workflow vg_construct_and_index {
     input {
+        # Overall name for the final graph (used in filenames)
         String graph_name
+
+        # Reference genome FASTA
         File ref_fasta_gz
+
+        # Desired reference genome contigs
         Array[String]+ contigs = [
              "1",  "2",  "3",  "4",  "5",  "6",
              "7",  "8",  "9", "10", "11", "12",
             "13", "14", "15", "16", "17", "18",
             "19", "20", "21", "22",  "X",  "Y"
         ]
+
+        # VCF for each contig
         Array[File]+ contigs_vcf_gz
+
+        # set true to GBWT index the VCF phased haplotypes
         Boolean use_haplotypes = false
+
+        # vg docker image tag
         String vg_docker = "quay.io/vgteam/vg:v1.14.0"
     }
 
-    # make graph for each reference contig
-    scatter (i in range(length(contigs))) {
+    # construct graph for each reference contig
+    scatter (p in zip(contigs, contigs_vcf_gz)) {
         call construct_graph { input:
             ref_fasta_gz = ref_fasta_gz,
-            vcf_gz = contigs_vcf_gz[i],
-            contig = contigs[i],
+            contig = p.left,
+            vcf_gz = p.right,
             use_haplotypes = use_haplotypes,
-            vg_docker = vg_docker
-        }
-
-        if (use_haplotypes) {
-            call gbwt_index { input:
-                vg = construct_graph.contig_vg,
-                vcf_gz = contigs_vcf_gz[i],
-                vg_docker = vg_docker
-            }
-        }
-    }
-
-    if (use_haplotypes) {
-        Array[File]+ gbwt_threads = select_all(gbwt_index.threads)
-        call gbwt_merge { input:
-            gbwts = select_all(gbwt_index.gbwt),
-            graph_name = graph_name,
             vg_docker = vg_docker
         }
     }
@@ -53,15 +50,37 @@ workflow vg_construct_and_index {
         vg_docker = vg_docker
     }
 
+    # make GBWT index, if so configured
+    if (use_haplotypes) {
+        scatter (p in zip(combine_graphs.contigs_uid_vg, contigs_vcf_gz)) {
+            call gbwt_index { input:
+                vg = p.left,
+                vcf_gz = p.right,
+                vg_docker = vg_docker
+            }
+        }
+        if (length(gbwt_index.gbwt) > 1) {
+            call gbwt_merge { input:
+                gbwts = gbwt_index.gbwt,
+                graph_name = graph_name,
+                vg_docker = vg_docker
+            }
+        }
+        File? final_gbwt = if (defined(gbwt_merge.gbwt)) then gbwt_merge.gbwt else gbwt_index.gbwt[0]
+    }
+
     # make xg index
     call xg_index { input:
         graph_name = graph_name,
         vg = combine_graphs.vg,
-        threads = gbwt_threads,
         vg_docker = vg_docker
     }
 
-    # prune the graph of repetitive sequences in preparation for GCSA indexing
+    # Prune the graph of repetitive sequences in preparation for GCSA indexing.
+    # The workflow bifurcates for this, as the necessary invocations differ
+    # significantly if we're using haplotypes or not.
+    # If setting prune_options, make sure to set prune_graph.prune_options or
+    # prune_graph_with_haplotypes.prune_options according to the desired path.
     if (!use_haplotypes) {
         scatter (contig_vg in combine_graphs.contigs_uid_vg) {
             call prune_graph { input:
@@ -73,7 +92,7 @@ workflow vg_construct_and_index {
     if (use_haplotypes) {
         call prune_graph_with_haplotypes { input:
             contigs_vg = combine_graphs.contigs_uid_vg,
-            contigs_gbwt = select_all(gbwt_index.gbwt),
+            contigs_gbwt = select_first([gbwt_index.gbwt]),
             empty_id_map = combine_graphs.empty_id_map,
             vg_docker = vg_docker
         }
@@ -90,9 +109,9 @@ workflow vg_construct_and_index {
     output {
         File vg = combine_graphs.vg
         File xg = xg_index.xg
-        File? gbwt = gbwt_merge.gbwt
         File gcsa = gcsa_index.gcsa
         File gcsa_lcp = gcsa_index.lcp
+        File? gbwt = final_gbwt
     }
 }
 
@@ -158,6 +177,7 @@ task combine_graphs {
     }
 }
 
+# construct the GBWT index of phased haplotypes
 task gbwt_index {
     input {
         File vg
@@ -168,12 +188,13 @@ task gbwt_index {
     command {
         set -ex -o pipefail
         nm=$(basename "~{vg}" .vg)
-        vg index -G "$nm.gbwt" -F "$nm.threads" -v "~{vcf_gz}" "~{vg}"
+        tabix "~{vcf_gz}"
+
+        vg index -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     }
 
     output {
         File gbwt = glob("*.gbwt")[0]
-        File threads = glob("*.threads")[0]
     }
 
     runtime {
@@ -181,6 +202,7 @@ task gbwt_index {
     }
 }
 
+# merge multiple GBWT indices (from disjoint contigs)
 task gbwt_merge {
     input {
         Array[File]+ gbwts
@@ -202,19 +224,18 @@ task gbwt_merge {
     }
 }
 
+# make xg index
 task xg_index {
     input {
         String graph_name
         File vg
         String xg_options = ""
-        Array[File]+? threads
         String vg_docker
     }
-    Array[File] threads_args = prefix("-F ", select_first([threads, []]))
 
     command {
         set -ex -o pipefail
-        vg index -x "${graph_name}.xg" ~{xg_options} ~{sep=" " threads_args} "~{vg}"
+        vg index -x "${graph_name}.xg" ~{xg_options} "~{vg}"
     }
 
     output {
@@ -226,6 +247,7 @@ task xg_index {
     }
 }
 
+# prune repetitive/complex regions from graph (non-haplotype version)
 task prune_graph {
     input {
         File contig_vg
@@ -248,6 +270,7 @@ task prune_graph {
     }
 }
 
+# prune repetitive/comlpex regions from graph (with haplotypes)
 task prune_graph_with_haplotypes {
     input {
         Array[File]+ contigs_vg
@@ -268,7 +291,7 @@ task prune_graph_with_haplotypes {
             contig_pruned_vg="${nm}.pruned.vg"
             vg prune -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
             echo "$contig_pruned_vg" >> contigs_pruned_vg
-        done <<< "inputs"
+        done < "inputs"
     >>>
 
     output {
@@ -280,6 +303,7 @@ task prune_graph_with_haplotypes {
     }
 }
 
+# make GCSA index
 task gcsa_index {
     input {
         String graph_name
