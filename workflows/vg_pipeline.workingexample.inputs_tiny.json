@@ -16,8 +16,6 @@
   "vgPipeline.REF_INDEX_FILE": "gs://cmarkell-vg-wdl-dev/hs37d5.fa.fai",
   "vgPipeline.REF_DICT_FILE": "gs://cmarkell-vg-wdl-dev/hs37d5.dict",
   "vgPipeline.VG_CONTAINER": "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run",
-  "vgPipeline.VGMPMAP_MODE": "true",
-  "vgPipeline.SURJECT_MODE": "false",
   "vgPipeline.SPLIT_READ_CORES": 8,
   "vgPipeline.SPLIT_READ_DISK": 10,
   "vgPipeline.MAP_CORES": 16,
@@ -26,10 +24,17 @@
   "vgPipeline.MERGE_GAM_CORES": 16,
   "vgPipeline.MERGE_GAM_DISK": 50,
   "vgPipeline.MERGE_GAM_MEM": 20,
+  "vgPipeline.MERGE_GAM_TIME": 2400,
   "vgPipeline.CHUNK_GAM_CORES": 16,
   "vgPipeline.CHUNK_GAM_DISK": 50,
   "vgPipeline.CHUNK_GAM_MEM": 20,
   "vgPipeline.VGCALL_CORES": 16,
   "vgPipeline.VGCALL_DISK": 50,
-  "vgPipeline.VGCALL_MEM": 20
+  "vgPipeline.VGCALL_MEM": 20,
+  "vgPipeline.DRAGEN_REF_INDEX_NAME": "hs37d5_v7",
+  "vgPipeline.UDPBINFO_PATH": "Udpwork/usr/markellocj",
+  "vgPipeline.HELIX_USERNAME": "markellocj",
+  "vgPipeline.RUN_VGMPMAP_ALGORITHM": "true",
+  "vgPipeline.RUN_LINEAR_CALLER": "true",
+  "vgPipeline.RUN_DRAGEN_CALLER": "false"
 }

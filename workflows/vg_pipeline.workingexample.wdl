@@ -2,24 +2,29 @@
 # Apparently cromwell 36.1 doesn't parse the version line in wdl files if the wdl version is a draft version.
 # Cromwell 36.1 wdl parser defaults to draft-2 if a `version` line is not given.
 
-# Working example pipeline which uses VG to map and HaplotypeCaller to call variants.	
-# Tested on Googles Cloud Platorm "GCP" and works for VG container "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run".	
-# WDL pipeline works with JSON input file "vg_pipeline.workingexample.inputs_tiny.json"	
-# Steps in pipeline: 	
-# 1) Split reads into chunks.	
-#    500 READS_PER_CHUNK value recommended for HG002 tiny chr 21 dataset	
-#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.tiny.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.tiny.fastq.gz".	
-#    1000000 READS_PER_CHUNK value recommended for HG002 whole chr 21 dataset	
-#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.fastq.gz".	
+# Working example pipeline which uses VG to map and HaplotypeCaller to call variants.   
+# Tested on Googles Cloud Platorm "GCP" and works for VG container "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run".  
+# WDL pipeline works with JSON input file "vg_pipeline.workingexample.inputs_tiny.json" 
+# Steps in pipeline:    
+# 1) Split reads into chunks.   
+#    500 READS_PER_CHUNK value recommended for HG002 tiny chr 21 dataset    
+#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.tiny.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.tiny.fastq.gz".   
+#    1000000 READS_PER_CHUNK value recommended for HG002 whole chr 21 dataset   
+#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.fastq.gz". 
 # 2) Align input paired-end reads to a VG graph using either VG MAP or VG MPMAP algorithms.
 #    Set vgPipeline.VGMPMAP_MODE to "true" to run the VG MPMAP algorithm on the read set.
 #    Set vgPipeline.VGMPMAP_MODE to "false" to run the VG MAP algorithm on the read set.
 # Either run GATK's HaplotypeCaller or use the graph-backed caller "VG Call".
-#    Set vgPipeline.SURJECT_MODE to "true" to run HaplotypeCaller on alignments.
+#    Set vgPipeline.SURJECT_MODE to "true" to run HaplotypeCaller or the Dragen modules caller on alignments.
 #       3) Surject VG alignments from GAM format to BAM format.
 #       4) Merge chunked BAM alignments and preprocess them for GATK compatibility.
-#       5) Run GATK HaplotypeCaller on processed BAM data.
-#    Set vgPipeline.SURJECT_MODE to "false" to run VG Call on alignments.	
+#       Either run HaplotypeCaller or use the Dragen module caller on the NIH Biowulf system.
+#           Set vgPipeline.RUN_DRAGEN_CALLER to "false" to run GATKs HaplotypeCaller on alignments.
+#               5) Run GATK HaplotypeCaller on processed BAM data.
+#           Set vgPipeline.RUN_DRAGEN_CALLER to "true" to run the Dragen modules caller on alignments.
+#           (Currently only works on NIH Biowulf system)
+#               5) Run Dragen variant caller on processed BAM data.
+#    Set vgPipeline.SURJECT_MODE to "false" to run VG Call on alignments.   
 #       3) Merge graph alignments into a single GAM file
 #       4) Chunk GAM file by path names as specified by the "vgPipeline.PATH_LIST_FILE"
 #          vgPipeline.PATH_LIST_FILE is a text file that lists path names one per row.
@@ -29,6 +34,12 @@
 #       6) Merge VCFs then compress and index the merged VCF.
 
 workflow vgPipeline {
+    Boolean? RUN_VGMPMAP_ALGORITHM
+    Boolean VGMPMAP_MODE = select_first([RUN_VGMPMAP_ALGORITHM, true])
+    Boolean? RUN_LINEAR_CALLER
+    Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
+    Boolean? RUN_DRAGEN_CALLER
+    Boolean DRAGEN_MODE = select_first([RUN_DRAGEN_CALLER, false])
     File INPUT_READ_FILE_1
     File INPUT_READ_FILE_2
     String SAMPLE_NAME
@@ -38,7 +49,6 @@ workflow vgPipeline {
     Int OVERLAP
     File PATH_LIST_FILE
     File PATH_LENGTH_FILE
-    File VG_FILE
     File XG_FILE
     File GCSA_FILE
     File GCSA_LCP_FILE
@@ -46,8 +56,6 @@ workflow vgPipeline {
     File REF_FILE
     File REF_INDEX_FILE
     File REF_DICT_FILE
-    Boolean VGMPMAP_MODE
-    Boolean SURJECT_MODE
     Int SPLIT_READ_CORES
     Int SPLIT_READ_DISK
     Int MAP_CORES
@@ -56,12 +64,16 @@ workflow vgPipeline {
     Int MERGE_GAM_CORES
     Int MERGE_GAM_DISK
     Int MERGE_GAM_MEM
+    Int MERGE_GAM_TIME
     Int CHUNK_GAM_CORES
     Int CHUNK_GAM_DISK
     Int CHUNK_GAM_MEM
     Int VGCALL_CORES
     Int VGCALL_DISK
     Int VGCALL_MEM
+    String DRAGEN_REF_INDEX_NAME
+    String UDPBINFO_PATH
+    String HELIX_USERNAME
     
     call splitReads as firstReadPair {
     input:
@@ -132,9 +144,12 @@ workflow vgPipeline {
         call mergeAlignmentBAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
+                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_reference_dict_file=REF_DICT_FILE
         }
-        call runGATKHaplotypeCaller {
+        call runPICARD {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
@@ -142,6 +157,39 @@ workflow vgPipeline {
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
+        }
+        call runGATKIndelRealigner {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_bam_file=runPICARD.mark_dupped_reordered_bam,
+                in_bam_file_index=runPICARD.mark_dupped_reordered_bam_index,
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_reference_dict_file=REF_DICT_FILE
+        }
+        if (!DRAGEN_MODE) {
+            call runGATKHaplotypeCaller {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                    in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+        }
+        if (DRAGEN_MODE) {
+            call runDragenCaller {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                    in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
+                    in_udpbinfo_path=UDPBINFO_PATH,
+                    in_helix_username=HELIX_USERNAME,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
         }
     }
     if (!SURJECT_MODE) {
@@ -152,14 +200,14 @@ workflow vgPipeline {
                 in_alignment_gam_chunk_files=vg_map_algorithm_chunk_gam_output,
                 in_merge_gam_cores=MERGE_GAM_CORES,
                 in_merge_gam_disk=MERGE_GAM_DISK,
-                in_merge_gam_mem=MERGE_GAM_MEM
+                in_merge_gam_mem=MERGE_GAM_MEM,
+                in_merge_gam_time=MERGE_GAM_TIME
         }
         call chunkAlignmentsByPathNames {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
                 in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
-                in_vg_file=VG_FILE,
                 in_xg_file=XG_FILE,
                 in_path_list_file=PATH_LIST_FILE,
                 in_chunk_bases=CHUNK_BASES,
@@ -234,8 +282,8 @@ task splitReads {
         Array[File] output_read_chunks = glob("fq_chunk_${in_pair_id}.part.*")
     }
     runtime {
-        cpu: "${in_split_read_cores}"
-        disks: "local-disk ${in_split_read_disk} SSD"
+        cpu: in_split_read_cores
+        disks: in_split_read_disk
         docker: in_vg_container
     }
 }
@@ -277,12 +325,10 @@ task runVGMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
-        memory: "${in_map_mem}G"
-        cpu: "${in_map_cores}"
-        disks: "local-disk ${in_map_disk} SSD"
+        memory: in_map_mem
+        cpu: in_map_cores
+        disks: in_map_disk
         docker: in_vg_container
-        zones: "us-west1-b"
-        maxRetries: 3
     }
 }
 
@@ -325,12 +371,10 @@ task runVGMPMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
-        memory: "${in_map_mem}G"
-        cpu: "${in_map_cores}"
-        disks: "local-disk ${in_map_disk} SSD"
+        memory: in_map_mem
+        cpu: in_map_cores
+        disks: in_map_disk
         docker: in_vg_container
-        zones: "us-west1-b"
-        maxRetries: 3
     }
 }
 
@@ -364,17 +408,19 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        memory: "100G"
-        cpu: "32"
-        disks: "local-disk 100 SSD"
+        memory: 100
+        cpu: 32
+        disks: 100
         docker: in_vg_container
-        zones: "us-west1-b"
     }
 }
 
 task mergeAlignmentBAMChunks {
     String in_sample_name
     Array[File] in_alignment_bam_chunk_files
+    File in_reference_file
+    File in_reference_index_file
+    File in_reference_dict_file
 
     String dollar = "$"
     command <<<
@@ -398,42 +444,143 @@ task mergeAlignmentBAMChunks {
           -n \
           -O BAM \
           -o ${in_sample_name}_merged.namesorted.bam \
+        && rm -f ${in_sample_name}_merged.bam \
         && samtools fixmate \
           -O BAM \
           ${in_sample_name}_merged.namesorted.bam \
           ${in_sample_name}_merged.namesorted.fixmate.bam \
+        && rm -f ${in_sample_name}_merged.namesorted.bam \
         && samtools sort \
           --threads 32 \
           ${in_sample_name}_merged.namesorted.fixmate.bam \
           -O BAM \
           -o ${in_sample_name}_merged.fixmate.positionsorted.bam \
+        && rm -f ${in_sample_name}_merged.namesorted.fixmate.bam \
         && samtools addreplacerg \
           -O BAM \
           -r ID:1 -r LB:lib1 -r SM:${in_sample_name} -r PL:illumina -r PU:unit1 \
           -o ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
           ${in_sample_name}_merged.fixmate.positionsorted.bam \
+        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.bam \
         && samtools view \
           -@ 32 \
           -h -O SAM \
           -o ${in_sample_name}_merged.fixmate.positionsorted.rg.sam \
           ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
+        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
         && samtools view \
           -@ 32 \
           -h -O BAM \
           -o ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
           ${in_sample_name}_merged.fixmate.positionsorted.rg.sam \
+        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.sam \
+        && samtools calmd \
+          -b \
+          ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
+          ${in_reference_file} \
+          > ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam \
+        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
         && samtools index \
-          ${in_sample_name}_merged.fixmate.positionsorted.rg.bam
+          ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam
     >>>
     output {
-        File merged_bam_file = "${in_sample_name}_merged.fixmate.positionsorted.rg.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.bam.bai"
+        File merged_bam_file = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam"
+        File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam.bai"
     }
     runtime {
-        memory: "100G"
-        cpu: "32"
-        disks: "local-disk 100 SSD"
+        memory: 100
+        cpu: 32
+        disks: 100
         docker: "biocontainers/samtools:v1.3_cv3"
+    }
+}
+
+task runPICARD {
+    String in_sample_name
+    File in_bam_file
+    File in_bam_file_index
+    File in_reference_file
+    File in_reference_index_file
+    File in_reference_dict_file
+
+    String dollar = "$"
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        java -Xmx4g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar MarkDuplicates \
+          VALIDATION_STRINGENCY=LENIENT \
+          I=${in_bam_file} \
+          O=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.bam \
+          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
+        && java -Xmx20g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar ReorderSam \
+            VALIDATION_STRINGENCY=LENIENT \
+            REFERENCE=${in_reference_file} \
+            INPUT=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.bam \
+            OUTPUT=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam \
+        && java -Xmx20g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar BuildBamIndex \
+            I=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam \
+            O=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai
+    >>>
+    output {
+        File mark_dupped_reordered_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam"
+        File mark_dupped_reordered_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai"
+    }
+    runtime {
+        memory: 100
+        cpu: 32
+        docker: "broadinstitute/picard:latest"
+    }
+}
+
+
+task runGATKIndelRealigner {
+    String in_sample_name
+    File in_bam_file
+    File in_bam_file_index
+    File in_reference_file
+    File in_reference_index_file
+    File in_reference_dict_file
+
+    String dollar = "$"
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          -R ${in_reference_file} \
+          -I ${in_bam_file} \
+          --out forIndelRealigner.intervals \
+        && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
+          -R ${in_reference_file} \
+          --targetIntervals forIndelRealigner.intervals \
+          -I ${in_bam_file} \
+          --out ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
+    >>>
+    output {
+        File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
+        File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
+    }
+    runtime {
+        memory: 100
+        cpu: 32
+        docker: "broadinstitute/gatk3:3.8-1"
     }
 }
 
@@ -467,9 +614,56 @@ task runGATKHaplotypeCaller {
         File genotyped_vcf = "${in_sample_name}.vcf"
     }
     runtime {
-        memory: "100G"
-        cpu: "32"
+        memory: 100
+        cpu: 32
         docker: "broadinstitute/gatk:latest"
+    }
+}
+
+task runDragenCaller {
+    String in_sample_name
+    File in_bam_file
+    String in_dragen_ref_index_name
+    String in_udpbinfo_path
+    String in_helix_username
+    File in_reference_file
+    File in_reference_index_file
+    File in_reference_dict_file
+    
+    String bam_file_name = basename(in_bam_file)
+    
+    String dollar = "$"
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace' 
+        
+        mkdir -p /data/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/ && \
+        cp ${in_bam_file} /data/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/ && \
+        DRAGEN_WORK_DIR_PATH="/staging/${in_helix_username}/${in_sample_name}" && \
+        TMP_DIR="/staging/${in_helix_username}/tmp" && \
+        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${dollar}{DRAGEN_WORK_DIR_PATH}" && \
+        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${dollar}{TMP_DIR}" && \
+        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/${in_dragen_ref_index_name} -b /staging/helix/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/${in_sample_name}_merged.fixmate.positionsorted.rg.sorted.dupmarked.reordered.mdtag.bam --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ${in_sample_name} --intermediate-results-dir ${dollar}{TMP_DIR} --output-directory ${dollar}{DRAGEN_WORK_DIR_PATH} --output-file-prefix ${in_sample_name}_dragen_genotyped" && \
+        mkdir /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper && \
+        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${dollar}{DRAGEN_WORK_DIR_PATH}/. /staging/helix/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper" && \
+        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${dollar}{DRAGEN_WORK_DIR_PATH}/" && \
+        mv /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper ${in_sample_name}_dragen_genotyper && \
+        rm -fr /data/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/
+    >>>
+    output {
+        File dragen_genotyped_vcf = "${in_sample_name}_dragen_genotyper/${in_sample_name}_dragen_genotyped.vcf.gz"
+    }
+    runtime {
+        memory: 100
+        cpu: 32
     }
 }
 
@@ -480,6 +674,7 @@ task mergeAlignmentGAMChunks {
     Int in_merge_gam_cores
     Int in_merge_gam_disk
     Int in_merge_gam_mem
+    Int in_merge_gam_time
 
     String dollar = "$"
     command <<<
@@ -505,12 +700,11 @@ task mergeAlignmentGAMChunks {
         File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
     }
     runtime {
-        memory: "${in_merge_gam_mem}G"
-        cpu: "${in_merge_gam_cores}"
-        disks: "local-disk ${in_merge_gam_mem} SSD"
+        memory: in_merge_gam_mem
+        cpu: in_merge_gam_cores
+        disks: in_merge_gam_mem
+        time: in_merge_gam_time
         docker: in_vg_container
-        zones: "us-west1-b"
-        maxRetries: 3
     }
 }
 
@@ -518,7 +712,6 @@ task chunkAlignmentsByPathNames {
     String in_sample_name
     File in_merged_sorted_gam
     File in_merged_sorted_gam_gai
-    File in_vg_file
     File in_xg_file
     File in_path_list_file
     Int in_chunk_bases
@@ -558,11 +751,10 @@ task chunkAlignmentsByPathNames {
         File output_bed_chunk_file = "output_bed_chunks.bed"
     }   
     runtime {
-        memory: "${in_chunk_gam_mem}G"
-        cpu: "${in_chunk_gam_cores}"
-        disks: "local-disk ${in_chunk_gam_disk} SSD"
+        memory: in_chunk_gam_mem
+        cpu: in_chunk_gam_cores
+        disks: in_chunk_gam_disk
         docker: in_vg_container
-        zones: "us-west1-b"
     }   
 }
 
@@ -674,11 +866,10 @@ task runVGCaller {
         String clip_string = read_lines("${chunk_tag}_clip_string.txt")[0]
     }
     runtime {
-        memory: "${in_vgcall_mem}G"
-        cpu: "${in_vgcall_cores}"
-        disks: "local-disk ${in_vgcall_disk} SSD"
+        memory: in_vgcall_mem
+        cpu: in_vgcall_cores
+        disks: in_vgcall_disk
         docker: in_vg_container
-        zones: "us-west1-b"
     }
 }
 
@@ -707,10 +898,9 @@ task runVCFClipper {
         File output_clipped_vcf = "${chunk_tag}.clipped.vcf"
     }
     runtime {
-        memory: "50G"
-        disks: "local-disk 100 SSD"
+        memory: 50
+        disks: 100
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
-        zones: "us-west1-b"
     }
 }
 
@@ -737,10 +927,9 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
-        memory: "50G"
-        disks: "local-disk 100 SSD"
+        memory: 50
+        disks: 100
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
-        zones: "us-west1-b"
     }
 }
 
@@ -770,10 +959,9 @@ task postprocessMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
-        memory: "50G"
-        disks: "local-disk 100 SSD"
+        memory: 50
+        disks: 100
         docker: in_vg_container
-        zones: "us-west1-b"
     }
 }
 
