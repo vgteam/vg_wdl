@@ -28,7 +28,7 @@ docker pull variantgraphs/vg:1.3.1
 #### Tiny chromosome 21 example
 cd into a directory with at least 200 GB of allocated Disk space
 ```
-cd /data/markellocj/wdl_dev_sandbox/vg_wdl_workflow_OFFICIAL
+cd /data/$USER
 ```
 
 Launch an interactive session on Biowulf:
@@ -76,7 +76,7 @@ java -Dconfig.file=custom_biowulf_cromwell_singularity.conf -jar ${CROMWELL_JAR}
 #### Whole genome example
 cd into a directory with at least 200 GB of allocated Disk space
 ```
-cd /data/markellocj/wdl_dev_sandbox/vg_wdl_workflow_OFFICIAL
+cd /data/$USER
 ```
 
 Launch an interactive session on Biowulf:
