@@ -40,6 +40,8 @@ workflow vgPipeline {
     Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
     Boolean? RUN_DRAGEN_CALLER
     Boolean DRAGEN_MODE = select_first([RUN_DRAGEN_CALLER, false])
+    Boolean? RUN_SNPEFF_ANNOTATION
+    Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
     File INPUT_READ_FILE_1
     File INPUT_READ_FILE_2
     String SAMPLE_NAME
@@ -56,6 +58,7 @@ workflow vgPipeline {
     File REF_FILE
     File REF_INDEX_FILE
     File REF_DICT_FILE
+    File SNPEFF_DATABASE
     Int SPLIT_READ_CORES
     Int SPLIT_READ_DISK
     Int MAP_CORES
@@ -177,6 +180,12 @@ workflow vgPipeline {
                     in_reference_index_file=REF_INDEX_FILE,
                     in_reference_dict_file=REF_DICT_FILE
             }
+            call bgzipMergedVCF as bgzipGATKCalledVCF { 
+                input: 
+                    in_sample_name=SAMPLE_NAME, 
+                    in_merged_vcf_file=runGATKHaplotypeCaller.genotyped_vcf, 
+                    in_vg_container=VG_CONTAINER 
+            }
         }
         if (DRAGEN_MODE) {
             call runDragenCaller {
@@ -185,10 +194,7 @@ workflow vgPipeline {
                     in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
                     in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                     in_udpbinfo_path=UDPBINFO_PATH,
-                    in_helix_username=HELIX_USERNAME,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_helix_username=HELIX_USERNAME
             }
         }
     }
@@ -245,12 +251,34 @@ workflow vgPipeline {
                 in_sample_name=SAMPLE_NAME, 
                 in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf 
         } 
-        call postprocessMergedVCF { 
+        call bgzipMergedVCF as bgzipVGCalledVCF { 
             input: 
                 in_sample_name=SAMPLE_NAME, 
                 in_merged_vcf_file=concatClippedVCFChunks.output_merged_vcf, 
                 in_vg_container=VG_CONTAINER 
         }
+    }
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf])
+    if (SNPEFF_ANNOTATION) {
+        call normalizeVCF {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_bgzip_vcf_file=variantcaller_vcf_output,
+        }
+        call snpEffAnnotateVCF {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_normalized_vcf_file=normalizeVCF.output_normalized_vcf,
+                in_snpeff_database=SNPEFF_DATABASE,
+        }
+    }
+    if (!SNPEFF_ANNOTATION) {
+        File final_vcf_output = variantcaller_vcf_output
+    }
+    output {
+        File output_vcf = select_first([snpEffAnnotateVCF.output_snpeff_annotated_vcf, final_vcf_output])
+        File? output_bam = runGATKIndelRealigner.indel_realigned_bam
+        File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
     }
 }
 
@@ -606,6 +634,7 @@ task runGATKHaplotypeCaller {
         #to turn off echo do 'set +o xtrace'
 
         gatk HaplotypeCaller \
+          -nct 16 \
           --reference ${in_reference_file} \
           --input ${in_bam_file} \
           --output ${in_sample_name}.vcf
@@ -626,9 +655,6 @@ task runDragenCaller {
     String in_dragen_ref_index_name
     String in_udpbinfo_path
     String in_helix_username
-    File in_reference_file
-    File in_reference_index_file
-    File in_reference_dict_file
     
     String bam_file_name = basename(in_bam_file)
     
@@ -651,7 +677,7 @@ task runDragenCaller {
         TMP_DIR="/staging/${in_helix_username}/tmp" && \
         ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${dollar}{DRAGEN_WORK_DIR_PATH}" && \
         ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${dollar}{TMP_DIR}" && \
-        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/${in_dragen_ref_index_name} -b /staging/helix/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/${in_sample_name}_merged.fixmate.positionsorted.rg.sorted.dupmarked.reordered.mdtag.bam --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ${in_sample_name} --intermediate-results-dir ${dollar}{TMP_DIR} --output-directory ${dollar}{DRAGEN_WORK_DIR_PATH} --output-file-prefix ${in_sample_name}_dragen_genotyped" && \
+        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/${in_dragen_ref_index_name} -b /staging/helix/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/${bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ${in_sample_name} --intermediate-results-dir ${dollar}{TMP_DIR} --output-directory ${dollar}{DRAGEN_WORK_DIR_PATH} --output-file-prefix ${in_sample_name}_dragen_genotyped" && \
         mkdir /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper && \
         ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${dollar}{DRAGEN_WORK_DIR_PATH}/. /staging/helix/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper" && \
         ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${dollar}{DRAGEN_WORK_DIR_PATH}/" && \
@@ -933,7 +959,7 @@ task concatClippedVCFChunks {
     }
 }
 
-task postprocessMergedVCF {
+task bgzipMergedVCF {
     String in_sample_name
     File in_merged_vcf_file
     String in_vg_container
@@ -965,4 +991,65 @@ task postprocessMergedVCF {
     }
 }
 
+task normalizeVCF {
+    String in_sample_name
+    File in_bgzip_vcf_file
+
+    String dollar = "$"
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        bcftools norm -m-both --threads 16 -o ${in_sample_name}.unrolled.vcf ${in_bgzip_vcf_file}
+    >>>
+    output {
+        File output_normalized_vcf = "${in_sample_name}.unrolled.vcf"
+    }
+    runtime {
+        cpu: 16
+        memory: 50
+        disks: 100
+        docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
+    }
+}
+
+task snpEffAnnotateVCF {
+    String in_sample_name
+    File in_normalized_vcf_file
+    File in_snpeff_database
+    
+    String dollar = "$"
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        
+        unzip ${in_snpeff_database}
+        snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${dollar}{PWD}/data GRCh37.75 ${in_normalized_vcf_file} > ${in_sample_name}.snpeff.unrolled.vcf
+    >>>
+    output {
+        File output_snpeff_annotated_vcf = "${in_sample_name}.snpeff.unrolled.vcf"
+    }
+    runtime {
+        cpu: 16
+        memory: 50
+        disks: 100
+        docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
+    }
+}
 
