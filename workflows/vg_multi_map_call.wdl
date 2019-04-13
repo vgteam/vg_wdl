@@ -1,6 +1,9 @@
+version 1.0
+
 #version draft-2
 # Apparently cromwell 36.1 doesn't parse the version line in wdl files if the wdl version is a draft version.
 # Cromwell 36.1 wdl parser defaults to draft-2 if a `version` line is not given.
+# https://gatkforums.broadinstitute.org/wdl/discussion/15519/escape-characters-in-draft-2-v-1-0
 
 # Working example pipeline which uses VG to map and HaplotypeCaller to call variants.   
 # Tested on Googles Cloud Platorm "GCP" and works for VG container "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run".  
@@ -33,69 +36,77 @@
 #             one per row.
 #       6) Merge VCFs then compress and index the merged VCF.
 
-workflow vgPipeline {
-    Boolean? RUN_VGMPMAP_ALGORITHM
-    Boolean VGMPMAP_MODE = select_first([RUN_VGMPMAP_ALGORITHM, true])
-    Boolean? RUN_LINEAR_CALLER
-    Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
-    Boolean? RUN_DRAGEN_CALLER
-    Boolean DRAGEN_MODE = select_first([RUN_DRAGEN_CALLER, false])
-    Boolean? RUN_SNPEFF_ANNOTATION
-    Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
-    File INPUT_READ_FILE_1
-    File INPUT_READ_FILE_2
-    String SAMPLE_NAME
-    String VG_CONTAINER
-    Int READS_PER_CHUNK
-    Int CHUNK_BASES
-    Int OVERLAP
-    File PATH_LIST_FILE
-    File PATH_LENGTH_FILE
-    File XG_FILE
-    File GCSA_FILE
-    File GCSA_LCP_FILE
-    File GBWT_FILE
-    File REF_FILE
-    File REF_INDEX_FILE
-    File REF_DICT_FILE
-    File SNPEFF_DATABASE
-    Int SPLIT_READ_CORES
-    Int SPLIT_READ_DISK
-    Int MAP_CORES
-    Int MAP_DISK
-    Int MAP_MEM
-    Int MERGE_GAM_CORES
-    Int MERGE_GAM_DISK
-    Int MERGE_GAM_MEM
-    Int MERGE_GAM_TIME
-    Int CHUNK_GAM_CORES
-    Int CHUNK_GAM_DISK
-    Int CHUNK_GAM_MEM
-    Int VGCALL_CORES
-    Int VGCALL_DISK
-    Int VGCALL_MEM
-    String DRAGEN_REF_INDEX_NAME
-    String UDPBINFO_PATH
-    String HELIX_USERNAME
+workflow vgMultiMapCall {
+    input {
+        Boolean? RUN_VGMPMAP_ALGORITHM
+        Boolean VGMPMAP_MODE = select_first([RUN_VGMPMAP_ALGORITHM, true])
+        Boolean? RUN_LINEAR_CALLER
+        Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
+        Boolean? RUN_DRAGEN_CALLER
+        Boolean DRAGEN_MODE = select_first([RUN_DRAGEN_CALLER, false])
+        Boolean? RUN_GVCF_OUTPUT
+        Boolean GVCF_MODE = select_first([RUN_GVCF_OUTPUT, false])
+        Boolean? RUN_SNPEFF_ANNOTATION
+        Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
+        File INPUT_READ_FILE_1
+        File INPUT_READ_FILE_2
+        String SAMPLE_NAME
+        String VG_CONTAINER
+        Int READS_PER_CHUNK
+        Int CHUNK_BASES
+        Int OVERLAP
+        File PATH_LIST_FILE
+        File PATH_LENGTH_FILE
+        File XG_FILE
+        File GCSA_FILE
+        File GCSA_LCP_FILE
+        File? GBWT_FILE
+        File? SNARLS_FILE
+        File REF_FILE
+        File REF_INDEX_FILE
+        File REF_DICT_FILE
+        File SNPEFF_DATABASE
+        Int SPLIT_READ_CORES
+        Int SPLIT_READ_DISK
+        Int MAP_CORES
+        Int MAP_DISK
+        Int MAP_MEM
+        Int MERGE_GAM_CORES
+        Int MERGE_GAM_DISK
+        Int MERGE_GAM_MEM
+        Int MERGE_GAM_TIME
+        Int CHUNK_GAM_CORES
+        Int CHUNK_GAM_DISK
+        Int CHUNK_GAM_MEM
+        Int VGCALL_CORES
+        Int VGCALL_DISK
+        Int VGCALL_MEM
+        String DRAGEN_REF_INDEX_NAME
+        String UDPBINFO_PATH
+        String HELIX_USERNAME
+    }
     
+    # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
-    input:
-        in_read_file=INPUT_READ_FILE_1,
-        in_pair_id="1",
-        in_vg_container=VG_CONTAINER,
-        in_reads_per_chunk=READS_PER_CHUNK,
-        in_split_read_cores=SPLIT_READ_CORES,
-        in_split_read_disk=SPLIT_READ_DISK
+        input:
+            in_read_file=INPUT_READ_FILE_1,
+            in_pair_id="1",
+            in_vg_container=VG_CONTAINER,
+            in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK
     }
     call splitReads as secondReadPair {
-    input:
-        in_read_file=INPUT_READ_FILE_2,
-        in_pair_id="2",
-        in_vg_container=VG_CONTAINER,
-        in_reads_per_chunk=READS_PER_CHUNK,
-        in_split_read_cores=SPLIT_READ_CORES,
-        in_split_read_disk=SPLIT_READ_DISK
+        input:
+            in_read_file=INPUT_READ_FILE_2,
+            in_pair_id="2",
+            in_vg_container=VG_CONTAINER,
+            in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK
     }
+
+    # Distribute vg mapping opperation over each chunked read pair
     Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
         if (VGMPMAP_MODE) {
@@ -108,6 +119,7 @@ workflow vgPipeline {
                     in_gcsa_file=GCSA_FILE,
                     in_gcsa_lcp_file=GCSA_LCP_FILE,
                     in_gbwt_file=GBWT_FILE,
+                    in_snarls_file=SNARLS_FILE,
                     in_sample_name=SAMPLE_NAME,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
@@ -123,13 +135,14 @@ workflow vgPipeline {
                     in_xg_file=XG_FILE,
                     in_gcsa_file=GCSA_FILE,
                     in_gcsa_lcp_file=GCSA_LCP_FILE,
-                    in_gbwt_file=GBWT_FILE,
                     in_sample_name=SAMPLE_NAME,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM
             }
         }
+        
+        # Surject GAM alignment files to BAM if SURJECT_MODE set to true
         File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file])
         if (SURJECT_MODE) {
             call runSurject {
@@ -144,19 +157,33 @@ workflow vgPipeline {
     if (SURJECT_MODE) {
         Array[File?] alignment_chunk_bam_files_maybes = runSurject.chunk_bam_file
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
-        call mergeAlignmentBAMChunks {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_reference_dict_file=REF_DICT_FILE
+        if (!VGMPMAP_MODE) {
+            call mergeAlignmentBAMChunksVGMAP {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
         }
+        if (VGMPMAP_MODE) {
+            call mergeAlignmentBAMChunksVGMPMAP {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+        }
+        File merged_bam_file_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file])
+        File merged_bam_file_index_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file_index, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file_index])
         call runPICARD {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-                in_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
+                in_bam_file=merged_bam_file_output,
+                in_bam_file_index=merged_bam_file_index_output,
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
@@ -171,30 +198,55 @@ workflow vgPipeline {
                 in_reference_dict_file=REF_DICT_FILE
         }
         if (!DRAGEN_MODE) {
-            call runGATKHaplotypeCaller {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
-                    in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+            if (!GVCF_MODE) {
+                call runGATKHaplotypeCaller {
+                    input:
+                        in_sample_name=SAMPLE_NAME,
+                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                        in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
+                        in_reference_file=REF_FILE,
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_reference_dict_file=REF_DICT_FILE
+                }
+                call bgzipMergedVCF as bgzipGATKCalledVCF { 
+                    input: 
+                        in_sample_name=SAMPLE_NAME, 
+                        in_merged_vcf_file=runGATKHaplotypeCaller.genotyped_vcf,
+                        in_vg_container=VG_CONTAINER 
+                }
             }
-            call bgzipMergedVCF as bgzipGATKCalledVCF { 
-                input: 
-                    in_sample_name=SAMPLE_NAME, 
-                    in_merged_vcf_file=runGATKHaplotypeCaller.genotyped_vcf, 
-                    in_vg_container=VG_CONTAINER 
+            if (GVCF_MODE) {
+                call runGATKHaplotypeCallerGVCF {
+                    input:
+                        in_sample_name=SAMPLE_NAME,
+                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                        in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
+                        in_reference_file=REF_FILE,
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_reference_dict_file=REF_DICT_FILE
+                }
             }
         }
         if (DRAGEN_MODE) {
-            call runDragenCaller {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
-                    in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                    in_udpbinfo_path=UDPBINFO_PATH,
-                    in_helix_username=HELIX_USERNAME
+            if (!GVCF_MODE) {
+                call runDragenCaller {
+                    input:
+                        in_sample_name=SAMPLE_NAME,
+                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                        in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
+                        in_udpbinfo_path=UDPBINFO_PATH,
+                        in_helix_username=HELIX_USERNAME
+                }
+            }
+            if (GVCF_MODE) {
+                call runDragenCallerGVCF {
+                    input:
+                        in_sample_name=SAMPLE_NAME,
+                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                        in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
+                        in_udpbinfo_path=UDPBINFO_PATH,
+                        in_helix_username=HELIX_USERNAME
+                }
             }
         }
     }
@@ -258,7 +310,7 @@ workflow vgPipeline {
                 in_vg_container=VG_CONTAINER 
         }
     }
-    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf])
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCaller.dragen_genotyped_vcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
     if (SNPEFF_ANNOTATION) {
         call normalizeVCF {
             input:
@@ -282,15 +334,17 @@ workflow vgPipeline {
     }
 }
 
+# Now works for WDL parser version 1.0
 task splitReads {
-    File in_read_file
-    String in_pair_id
-    String in_vg_container
-    Int in_reads_per_chunk
-    Int in_split_read_cores
-    Int in_split_read_disk
-
-    String dollar = "$" 
+    input {
+        File in_read_file
+        String in_pair_id
+        String in_vg_container
+        Int in_reads_per_chunk
+        Int in_split_read_cores
+        Int in_split_read_disk
+    }
+    
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -303,11 +357,11 @@ task splitReads {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        let CHUNK_LINES=${in_reads_per_chunk}*4
-        gzip -cd ${in_read_file} | split -l ${dollar}{CHUNK_LINES} --filter='pigz -p ${in_split_read_cores} > ${dollar}{FILE}.fq.gz' - fq_chunk_${in_pair_id}.part.
-    >>> 
+        CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
+        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
+    >>>
     output {
-        Array[File] output_read_chunks = glob("fq_chunk_${in_pair_id}.part.*")
+        Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
         cpu: in_split_read_cores
@@ -317,19 +371,19 @@ task splitReads {
 }
 
 task runVGMAP {
-    File in_left_read_pair_chunk_file
-    File in_right_read_pair_chunk_file
-    File in_xg_file
-    File in_gcsa_file
-    File in_gcsa_lcp_file
-    File in_gbwt_file
-    String in_vg_container
-    String in_sample_name
-    Int in_map_cores
-    Int in_map_disk
-    Int in_map_mem
-
-    String dollar = "$" 
+    input {
+        File in_left_read_pair_chunk_file
+        File in_right_read_pair_chunk_file
+        File in_xg_file
+        File in_gcsa_file
+        File in_gcsa_lcp_file
+        String in_vg_container
+        String in_sample_name
+        Int in_map_cores
+        Int in_map_disk
+        Int in_map_mem
+    }
+    
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -342,12 +396,12 @@ task runVGMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        READ_CHUNK_ID=($(ls ${in_left_read_pair_chunk_file} | awk -F'.' '{print ${dollar}3}'))
+        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
         vg map \
-          -x ${in_xg_file} \
-          -g ${in_gcsa_file} \
-          -f ${in_left_read_pair_chunk_file} -f ${in_right_read_pair_chunk_file} \
-          -t ${in_map_cores} > ${in_sample_name}.${dollar}{READ_CHUNK_ID}.gam
+          -x ~{in_xg_file} \
+          -g ~{in_gcsa_file} \
+          -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
     output {
         File chunk_gam_file = glob("*.gam")[0]
@@ -361,19 +415,23 @@ task runVGMAP {
 }
 
 task runVGMPMAP {
-    File in_left_read_pair_chunk_file
-    File in_right_read_pair_chunk_file
-    File in_xg_file
-    File in_gcsa_file
-    File in_gcsa_lcp_file
-    File in_gbwt_file
-    String in_vg_container
-    String in_sample_name
-    Int in_map_cores
-    Int in_map_disk
-    Int in_map_mem
+    input {
+        File in_left_read_pair_chunk_file
+        File in_right_read_pair_chunk_file
+        File in_xg_file
+        File in_gcsa_file
+        File in_gcsa_lcp_file
+        File? in_gbwt_file
+        File? in_snarls_file
+        String in_vg_container
+        String in_sample_name
+        Int in_map_cores
+        Int in_map_disk
+        Int in_map_mem
+    }
     
-    String dollar = "$" 
+    Boolean gbwt_options = defined(in_gbwt_file) && defined(in_snarls_file)
+    
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -386,14 +444,21 @@ task runVGMPMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        READ_CHUNK_ID=($(ls ${in_left_read_pair_chunk_file} | awk -F'.' '{print ${dollar}3}'))
+        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
+        if [ ~{gbwt_options} ]; then
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file}"
+        else
+          GBWT_OPTION_STRING=""
+        fi
         vg mpmap \
           -S \
-          -f ${in_left_read_pair_chunk_file} -f ${in_right_read_pair_chunk_file} \
-          -x ${in_xg_file} \
-          -g ${in_gcsa_file} \
-          --gbwt-name ${in_gbwt_file} \
-          --recombination-penalty 5.0 -t ${in_map_cores} > ${in_sample_name}.${dollar}{READ_CHUNK_ID}.gam
+          -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+          -x ~{in_xg_file} \
+          -g ~{in_gcsa_file} \
+          ${GBWT_OPTION_STRING} \
+          --read-group "ID:1\tLB:lib1\tSM:~{in_sample_name}\tPL:illumina\tPU:unit1" \
+          --sample "~{in_sample_name}" \
+          --recombination-penalty 5.0 -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
     output {
         File chunk_gam_file = glob("*.gam")[0]
@@ -407,12 +472,13 @@ task runVGMPMAP {
 }
 
 task runSurject {
-    File in_gam_chunk_file
-    File in_xg_file
-    String in_vg_container
-    String in_sample_name
-
-    String dollar = "$"
+    input {
+        File in_gam_chunk_file
+        File in_xg_file
+        String in_vg_container
+        String in_sample_name
+    }
+    
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -425,12 +491,12 @@ task runSurject {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        READ_CHUNK_ID=($(ls ${in_gam_chunk_file} | awk -F'.' '{print ${dollar}2}'))
+        READ_CHUNK_ID=($(ls ~{in_gam_chunk_file} | awk -F'.' '{print $(NF-1)}'))
         vg surject \
           -i \
-          -x ${in_xg_file} \
+          -x ~{in_xg_file} \
           -t 32 \
-          -b ${in_gam_chunk_file} > ${in_sample_name}.${dollar}{READ_CHUNK_ID}.bam
+          -b ~{in_gam_chunk_file} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
     >>>
     output {
         File chunk_bam_file = glob("*.bam")[0]
@@ -443,15 +509,16 @@ task runSurject {
     }
 }
 
-task mergeAlignmentBAMChunks {
-    String in_sample_name
-    Array[File] in_alignment_bam_chunk_files
-    File in_reference_file
-    File in_reference_index_file
-    File in_reference_dict_file
-
-    String dollar = "$"
-    command <<<
+task mergeAlignmentBAMChunksVGMAP {
+    input {
+        String in_sample_name
+        Array[File] in_alignment_bam_chunk_files
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -510,7 +577,7 @@ task mergeAlignmentBAMChunks {
         && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
         && samtools index \
           ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam
-    >>>
+    }
     output {
         File merged_bam_file = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam"
         File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam.bai"
@@ -523,16 +590,67 @@ task mergeAlignmentBAMChunks {
     }
 }
 
-task runPICARD {
-    String in_sample_name
-    File in_bam_file
-    File in_bam_file_index
-    File in_reference_file
-    File in_reference_index_file
-    File in_reference_dict_file
+task mergeAlignmentBAMChunksVGMPMAP {
+    input {
+        String in_sample_name
+        Array[File] in_alignment_bam_chunk_files
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        samtools merge \
+          -f --threads 32 \
+          ${in_sample_name}_merged.bam \
+          ${sep=" " in_alignment_bam_chunk_files} \
+        && samtools sort \
+          --threads 32 \
+          ${in_sample_name}_merged.bam \
+          -O BAM \
+          -o ${in_sample_name}_merged.positionsorted.bam \
+        && samtools calmd \
+          -b \
+          ${in_sample_name}_merged.positionsorted.bam \
+          ${in_reference_file} \
+          > ${in_sample_name}_merged.positionsorted.mdtag.bam \
+        && rm -f ${in_sample_name}_merged.positionsorted.bam \
+        && samtools index \
+          ${in_sample_name}_merged.positionsorted.mdtag.bam
+    }
+    output {
+        File merged_bam_file = "${in_sample_name}_merged.positionsorted.mdtag.bam"
+        File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.mdtag.bam.bai"
+    }
+    runtime {
+        memory: 100
+        cpu: 32
+        disks: 100
+        docker: "biocontainers/samtools:v1.3_cv3"
+    }
+}
 
-    String dollar = "$"
-    command <<<
+task runPICARD {
+    input {
+        String in_sample_name
+        File in_bam_file
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -557,7 +675,7 @@ task runPICARD {
         && java -Xmx20g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar BuildBamIndex \
             I=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam \
             O=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai
-    >>>
+    }
     output {
         File mark_dupped_reordered_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam"
         File mark_dupped_reordered_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai"
@@ -571,15 +689,16 @@ task runPICARD {
 
 
 task runGATKIndelRealigner {
-    String in_sample_name
-    File in_bam_file
-    File in_bam_file_index
-    File in_reference_file
-    File in_reference_index_file
-    File in_reference_dict_file
-
-    String dollar = "$"
-    command <<<
+    input {
+        String in_sample_name
+        File in_bam_file
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -600,7 +719,7 @@ task runGATKIndelRealigner {
           --targetIntervals forIndelRealigner.intervals \
           -I ${in_bam_file} \
           --out ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
-    >>>
+    }
     output {
         File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
         File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
@@ -613,15 +732,16 @@ task runGATKIndelRealigner {
 }
 
 task runGATKHaplotypeCaller {
-    String in_sample_name
-    File in_bam_file
-    File in_bam_file_index
-    File in_reference_file
-    File in_reference_index_file
-    File in_reference_dict_file
-
-    String dollar = "$"
-    command <<<
+    input {
+        String in_sample_name
+        File in_bam_file
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -634,31 +754,71 @@ task runGATKHaplotypeCaller {
         #to turn off echo do 'set +o xtrace'
 
         gatk HaplotypeCaller \
-          -nct 16 \
+          --native-pair-hmm-threads 32 \
           --reference ${in_reference_file} \
           --input ${in_bam_file} \
           --output ${in_sample_name}.vcf
-    >>>
+    }
     output {
         File genotyped_vcf = "${in_sample_name}.vcf"
     }
     runtime {
         memory: 100
         cpu: 32
-        docker: "broadinstitute/gatk:latest"
+        docker: "broadinstitute/gatk:4.1.1.0"
+    }
+}
+
+task runGATKHaplotypeCallerGVCF {
+    input {
+        String in_sample_name
+        File in_bam_file
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        gatk HaplotypeCaller \
+          --native-pair-hmm-threads 32 \
+          -ERC GVCF \
+          --reference ${in_reference_file} \
+          --input ${in_bam_file} \
+          --output ${in_sample_name}.rawLikelihoods.gvcf
+    }
+    output {
+        File rawLikelihoods_gvcf = "${in_sample_name}.rawLikelihoods.gvcf"
+    }
+    runtime {
+        memory: 100
+        cpu: 32
+        docker: "broadinstitute/gatk:4.1.1.0"
     }
 }
 
 task runDragenCaller {
-    String in_sample_name
-    File in_bam_file
-    String in_dragen_ref_index_name
-    String in_udpbinfo_path
-    String in_helix_username
-    
+    input {
+        String in_sample_name
+        File in_bam_file
+        String in_dragen_ref_index_name
+        String in_udpbinfo_path
+        String in_helix_username
+    }
+     
     String bam_file_name = basename(in_bam_file)
     
-    String dollar = "$"
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -671,39 +831,83 @@ task runDragenCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace' 
         
-        mkdir -p /data/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/ && \
-        cp ${in_bam_file} /data/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/ && \
-        DRAGEN_WORK_DIR_PATH="/staging/${in_helix_username}/${in_sample_name}" && \
-        TMP_DIR="/staging/${in_helix_username}/tmp" && \
-        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${dollar}{DRAGEN_WORK_DIR_PATH}" && \
-        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${dollar}{TMP_DIR}" && \
-        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/${in_dragen_ref_index_name} -b /staging/helix/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/${bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ${in_sample_name} --intermediate-results-dir ${dollar}{TMP_DIR} --output-directory ${dollar}{DRAGEN_WORK_DIR_PATH} --output-file-prefix ${in_sample_name}_dragen_genotyped" && \
-        mkdir /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper && \
-        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${dollar}{DRAGEN_WORK_DIR_PATH}/. /staging/helix/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper" && \
-        ssh -t ${in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${dollar}{DRAGEN_WORK_DIR_PATH}/" && \
-        mv /data/${in_udpbinfo_path}/${in_sample_name}_dragen_genotyper ${in_sample_name}_dragen_genotyper && \
-        rm -fr /data/${in_udpbinfo_path}/${in_sample_name}_surjected_bams/
+        mkdir -p /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
+        cp ~{in_bam_file} /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
+        DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
+        mkdir /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
+        mv /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
+        rm -fr /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/
     >>>
     output {
-        File dragen_genotyped_vcf = "${in_sample_name}_dragen_genotyper/${in_sample_name}_dragen_genotyped.vcf.gz"
+        File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
     }
     runtime {
         memory: 100
-        cpu: 32
+    }
+}
+
+task runDragenCallerGVCF {
+    input {
+        String in_sample_name
+        File in_bam_file
+        String in_dragen_ref_index_name
+        String in_udpbinfo_path
+        String in_helix_username
+    }
+    
+    String bam_file_name = basename(in_bam_file)
+    
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace' 
+        
+        mkdir -p /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
+        cp ~{in_bam_file} /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
+        DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
+        mkdir /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
+        mv /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
+        rm -fr /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/
+    >>>
+    output {
+        File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
+    }
+    runtime {
+        memory: 100
     }
 }
 
 task mergeAlignmentGAMChunks {
-    String in_sample_name
-    String in_vg_container
-    Array[File] in_alignment_gam_chunk_files
-    Int in_merge_gam_cores
-    Int in_merge_gam_disk
-    Int in_merge_gam_mem
-    Int in_merge_gam_time
-
-    String dollar = "$"
-    command <<<
+    input {
+        String in_sample_name
+        String in_vg_container
+        Array[File] in_alignment_gam_chunk_files
+        Int in_merge_gam_cores
+        Int in_merge_gam_disk
+        Int in_merge_gam_mem
+        Int in_merge_gam_time
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -720,7 +924,7 @@ task mergeAlignmentGAMChunks {
             ${in_sample_name}_merged.gam \
             -i ${in_sample_name}_merged.sorted.gam.gai \
             -t ${in_merge_gam_cores} > ${in_sample_name}_merged.sorted.gam
-    >>>
+    }
     output {
         File merged_sorted_gam_file = "${in_sample_name}_merged.sorted.gam"
         File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
@@ -735,20 +939,21 @@ task mergeAlignmentGAMChunks {
 }
 
 task chunkAlignmentsByPathNames {
-    String in_sample_name
-    File in_merged_sorted_gam
-    File in_merged_sorted_gam_gai
-    File in_xg_file
-    File in_path_list_file
-    Int in_chunk_bases
-    Int in_overlap
-    String in_vg_container
-    Int in_chunk_gam_cores
-    Int in_chunk_gam_disk
-    Int in_chunk_gam_mem
-
-    String dollar = "$" 
-    command <<< 
+    input {
+        String in_sample_name
+        File in_merged_sorted_gam
+        File in_merged_sorted_gam_gai
+        File in_xg_file
+        File in_path_list_file
+        Int in_chunk_bases
+        Int in_overlap
+        String in_vg_container
+        Int in_chunk_gam_cores
+        Int in_chunk_gam_disk
+        Int in_chunk_gam_mem
+    }
+    
+    command { 
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -770,7 +975,7 @@ task chunkAlignmentsByPathNames {
             -b call_chunk \
             -t ${in_chunk_gam_cores} \
             -E output_bed_chunks.bed -f
-    >>> 
+    }
     output {
         Array[File] output_vg_chunks = glob("call_chunk*.vg")
         Array[File] output_gam_chunks = glob("call_chunk*.gam")
@@ -785,20 +990,21 @@ task chunkAlignmentsByPathNames {
 }
 
 task runVGCaller {
-    String in_sample_name
-    File in_chunk_bed_file
-    File in_vg_file
-    File in_gam_file
-    File in_path_length_file
-    Int in_chunk_bases
-    Int in_overlap
-    String in_vg_container
-    Int in_vgcall_cores
-    Int in_vgcall_disk
-    Int in_vgcall_mem
-
+    input {
+        String in_sample_name
+        File in_chunk_bed_file
+        File in_vg_file
+        File in_gam_file
+        File in_path_length_file
+        Int in_chunk_bases
+        Int in_overlap
+        String in_vg_container
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+    }
+    
     String chunk_tag = basename(in_vg_file, ".vg")
-    String dollar = "$" 
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -811,85 +1017,85 @@ task runVGCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PATH_NAME=${dollar}(echo ${chunk_tag} | cut -f 4 -d '_')
+        PATH_NAME=$(echo ~{chunk_tag} | cut -f 4 -d '_')
         OFFSET=""
         BED_CHUNK_LINE_RECORD=""
         FIRST_Q=""
         LAST_Q=""
-        while IFS=${dollar}'\t' read -ra bed_chunk_line; do
-            bed_line_chunk_tag=${dollar}(echo ${dollar}{bed_chunk_line[3]} | cut -f 1 -d '.')
-            if [ "${chunk_tag}" = "${dollar}{bed_line_chunk_tag}" ]; then
-                OFFSET=${dollar}(( bed_chunk_line[1] + 1 ))
-                BED_CHUNK_LINE_RECORD="${dollar}{bed_chunk_line[@]//${dollar}'\t'/ }"
+        while IFS=$'\t' read -ra bed_chunk_line; do
+            bed_line_chunk_tag=$(echo ${bed_chunk_line[3]} | cut -f 1 -d '.')
+            if [ "~{chunk_tag}" = "${bed_line_chunk_tag}" ]; then
+                OFFSET=$(( bed_chunk_line[1] + 1 ))
+                BED_CHUNK_LINE_RECORD="${bed_chunk_line[@]//$'\t'/ }"
             fi
-            bed_line_path_name=${dollar}(echo ${dollar}{bed_line_chunk_tag} | cut -f 4 -d '_')
-            if [ "${dollar}{PATH_NAME}" = "${dollar}{bed_line_path_name}" ]; then
-                if [ "${dollar}{FIRST_Q}" = "" ]; then
-                    FIRST_Q="${dollar}{bed_chunk_line[@]//${dollar}'\t'/ }"
+            bed_line_path_name=$(echo ${bed_line_chunk_tag} | cut -f 4 -d '_')
+            if [ "${PATH_NAME}" = "${bed_line_path_name}" ]; then
+                if [ "${FIRST_Q}" = "" ]; then
+                    FIRST_Q="${bed_chunk_line[@]//$'\t'/ }"
                 fi
-                LAST_Q="${dollar}{bed_chunk_line[@]//${dollar}'\t'/ }"
+                LAST_Q="${bed_chunk_line[@]//$'\t'/ }"
             fi
-        done < ${in_chunk_bed_file}
+        done < ~{in_chunk_bed_file}
 
         CHR_LENGTH=""
-        while IFS=${dollar}'\t' read -ra path_length_line; do
-            path_length_line_name=${dollar}{path_length_line[0]}
-            if [ "${dollar}{PATH_NAME}" = "${dollar}{path_length_line_name}" ]; then
-                CHR_LENGTH=${dollar}{path_length_line[1]}
+        while IFS=$'\t' read -ra path_length_line; do
+            path_length_line_name=${path_length_line[0]}
+            if [ "${PATH_NAME}" = "${path_length_line_name}" ]; then
+                CHR_LENGTH=${path_length_line[1]}
             fi
-        done < ${in_path_length_file}
+        done < ~{in_path_length_file}
 
         vg index \
-            ${in_vg_file} \
-            -x ${chunk_tag}.xg \
-            -t ${in_vgcall_cores} && \
+            ~{in_vg_file} \
+            -x ~{chunk_tag}.xg \
+            -t ~{in_vgcall_cores} && \
         vg filter \
-            ${in_gam_file} \
+            ~{in_gam_file} \
             -t 1 -r 0.9 -fu -s 1000 -m 1 -q 15 -D 999 \
-            -x ${chunk_tag}.xg > ${chunk_tag}.filtered.gam && \
+            -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam && \
         vg augment \
-            ${in_vg_file} \
-            ${chunk_tag}.filtered.gam \
-            -t ${in_vgcall_cores} -q 10 -a pileup \
-            -Z ${chunk_tag}.trans \
-            -S ${chunk_tag}.support > ${chunk_tag}.aug.vg && \
+            ~{in_vg_file} \
+            ~{chunk_tag}.filtered.gam \
+            -t ~{in_vgcall_cores} -q 10 -a pileup \
+            -Z ~{chunk_tag}.trans \
+            -S ~{chunk_tag}.support > ~{chunk_tag}.aug.vg && \
         vg call \
-            ${chunk_tag}.aug.vg \
-            -t ${in_vgcall_cores} \
-            -S ${in_sample_name} \
-            -z ${chunk_tag}.trans \
-            -s ${chunk_tag}.support \
-            -b ${in_vg_file} \
-            -r ${dollar}{PATH_NAME} \
-            -c ${dollar}{PATH_NAME} \
-            -l ${dollar}{CHR_LENGTH} \
-            -o ${dollar}{OFFSET} > ${chunk_tag}.vcf && \
-        head -10000 ${chunk_tag}.vcf | grep "^#" >> ${chunk_tag}.sorted.vcf && \
-        if [ "$(cat ${chunk_tag}.vcf | grep -v '^#')" ]; then
-            cat ${chunk_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ${chunk_tag}.sorted.vcf
+            ~{chunk_tag}.aug.vg \
+            -t ~{in_vgcall_cores} \
+            -S ~{in_sample_name} \
+            -z ~{chunk_tag}.trans \
+            -s ~{chunk_tag}.support \
+            -b ~{in_vg_file} \
+            -r ${PATH_NAME} \
+            -c ${PATH_NAME} \
+            -l ${CHR_LENGTH} \
+            -o ${OFFSET} > ~{chunk_tag}.vcf && \
+        head -10000 ~{chunk_tag}.vcf | grep "^#" >> ~{chunk_tag}.sorted.vcf && \
+        if [ "~(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
+            cat ~{chunk_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{chunk_tag}.sorted.vcf
         fi && \
-        bgzip ${chunk_tag}.sorted.vcf && \
-        tabix -f -p vcf ${chunk_tag}.sorted.vcf.gz && \
+        bgzip ~{chunk_tag}.sorted.vcf && \
+        tabix -f -p vcf ~{chunk_tag}.sorted.vcf.gz && \
 
         # Compile clipping string
-        chunk_tag_index=${dollar}(echo ${chunk_tag} | cut -f 3 -d '_') && \
-        clipped_chunk_offset=${dollar}(( ${dollar}{chunk_tag_index} * ${in_chunk_bases} - ${dollar}{chunk_tag_index} * ${in_overlap} )) && \
-        if [ "${dollar}{BED_CHUNK_LINE_RECORD}" = "${dollar}{FIRST_Q}" ]; then
-          START=${dollar}(( clipped_chunk_offset + 1 ))
+        chunk_tag_index=$(echo ~{chunk_tag} | cut -f 3 -d '_') && \
+        clipped_chunk_offset=$(( ${chunk_tag_index} * ~{in_chunk_bases} - ${chunk_tag_index} * ~{in_overlap} )) && \
+        if [ "${BED_CHUNK_LINE_RECORD}" = "${FIRST_Q}" ]; then
+          START=$(( clipped_chunk_offset + 1 ))
         else
-          START=${dollar}(( clipped_chunk_offset + ${in_overlap}/2 ))
+          START=$(( clipped_chunk_offset + ~{in_overlap}/2 ))
         fi
-        if [ "${dollar}{BED_CHUNK_LINE_RECORD}" = "${dollar}{LAST_Q}" ]; then
-          END=${dollar}(( clipped_chunk_offset + ${in_chunk_bases} - 1 ))
+        if [ "${BED_CHUNK_LINE_RECORD}" = "${LAST_Q}" ]; then
+          END=$(( clipped_chunk_offset + ~{in_chunk_bases} - 1 ))
         else
-          END=${dollar}(( clipped_chunk_offset + ${in_chunk_bases} - (${in_overlap}/2) ))
+          END=$(( clipped_chunk_offset + ~{in_chunk_bases} - (~{in_overlap}/2) ))
         fi
-        echo "${dollar}{PATH_NAME}:${dollar}{START}-${dollar}{END}" > ${chunk_tag}_clip_string.txt
+        echo "${PATH_NAME}:${START}-${END}" > ~{chunk_tag}_clip_string.txt
     >>>
     output {
-        File output_vcf = "${chunk_tag}.sorted.vcf.gz"
-        File output_vcf_index = "${chunk_tag}.sorted.vcf.gz.tbi"
-        String clip_string = read_lines("${chunk_tag}_clip_string.txt")[0]
+        File output_vcf = "~{chunk_tag}.sorted.vcf.gz"
+        File output_vcf_index = "~{chunk_tag}.sorted.vcf.gz.tbi"
+        String clip_string = read_lines("~{chunk_tag}_clip_string.txt")[0]
     }
     runtime {
         memory: in_vgcall_mem
@@ -900,13 +1106,14 @@ task runVGCaller {
 }
 
 task runVCFClipper {
-    File in_chunk_vcf
-    File in_chunk_vcf_index
-    String in_chunk_clip_string
-
+    input {
+        File in_chunk_vcf
+        File in_chunk_vcf_index
+        String in_chunk_clip_string
+    }
+    
     String chunk_tag = basename(in_chunk_vcf, ".sorted.vcf.gz")
-    String dollar = "$"
-    command <<<
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -919,7 +1126,7 @@ task runVCFClipper {
         #to turn off echo do 'set +o xtrace'
 
         bcftools view ${in_chunk_vcf} -t ${in_chunk_clip_string} > ${chunk_tag}.clipped.vcf
-    >>>
+    }
     output {
         File output_clipped_vcf = "${chunk_tag}.clipped.vcf"
     }
@@ -931,11 +1138,12 @@ task runVCFClipper {
 }
 
 task concatClippedVCFChunks {
-    String in_sample_name
-    Array[File] in_clipped_vcf_chunk_files
-
-    String dollar = "$"
-    command <<<
+    input {
+        String in_sample_name
+        Array[File] in_clipped_vcf_chunk_files
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -948,7 +1156,7 @@ task concatClippedVCFChunks {
         #to turn off echo do 'set +o xtrace'
 
         bcftools concat ${sep=" " in_clipped_vcf_chunk_files} > ${in_sample_name}_merged.vcf
-    >>>
+    }
     output {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
@@ -960,12 +1168,15 @@ task concatClippedVCFChunks {
 }
 
 task bgzipMergedVCF {
-    String in_sample_name
-    File in_merged_vcf_file
-    String in_vg_container
-
-    String dollar = "$"
-    command <<<
+    input {
+        String in_sample_name
+        File in_merged_vcf_file
+        String in_vg_container
+    }
+    
+    # TODO:
+    #   If GVCF in in_merged_vcf_file then output_vcf_extension="gvcf" else output_vcf_extension="vcf"
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -979,7 +1190,7 @@ task bgzipMergedVCF {
 
         bgzip -c ${in_merged_vcf_file} > ${in_sample_name}_merged.vcf.gz && \
         tabix -f -p vcf ${in_sample_name}_merged.vcf.gz
-    >>>
+    }
     output {
         File output_merged_vcf = "${in_sample_name}_merged.vcf.gz"
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
@@ -992,11 +1203,12 @@ task bgzipMergedVCF {
 }
 
 task normalizeVCF {
-    String in_sample_name
-    File in_bgzip_vcf_file
-
-    String dollar = "$"
-    command <<<
+    input {
+        String in_sample_name
+        File in_bgzip_vcf_file
+    }
+    
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -1009,7 +1221,7 @@ task normalizeVCF {
         #to turn off echo do 'set +o xtrace'
 
         bcftools norm -m-both --threads 16 -o ${in_sample_name}.unrolled.vcf ${in_bgzip_vcf_file}
-    >>>
+    }
     output {
         File output_normalized_vcf = "${in_sample_name}.unrolled.vcf"
     }
@@ -1022,11 +1234,12 @@ task normalizeVCF {
 }
 
 task snpEffAnnotateVCF {
-    String in_sample_name
-    File in_normalized_vcf_file
-    File in_snpeff_database
+    input {
+        String in_sample_name
+        File in_normalized_vcf_file
+        File in_snpeff_database
+    }
     
-    String dollar = "$"
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1039,11 +1252,11 @@ task snpEffAnnotateVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        unzip ${in_snpeff_database}
-        snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${dollar}{PWD}/data GRCh37.75 ${in_normalized_vcf_file} > ${in_sample_name}.snpeff.unrolled.vcf
+        unzip ~{in_snpeff_database}
+        snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${PWD}/data GRCh37.75 ~{in_normalized_vcf_file} > ~{in_sample_name}.snpeff.unrolled.vcf
     >>>
     output {
-        File output_snpeff_annotated_vcf = "${in_sample_name}.snpeff.unrolled.vcf"
+        File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
     }
     runtime {
         cpu: 16
