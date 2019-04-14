@@ -445,7 +445,7 @@ task runVGMPMAP {
         #to turn off echo do 'set +o xtrace'
 
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
-        if [ ~{gbwt_options} ]; then
+        if [ ~{gbwt_options} == true ]; then
           GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file}"
         else
           GBWT_OPTION_STRING=""

@@ -6,13 +6,7 @@ version 1.0
 # TODO:
 # - Use subworkflow functionality in new vg_trio_sub.wdl workflow
 #   - DOCS: https://cromwell.readthedocs.io/en/stable/SubWorkflows/
-#   - Implement GVCF output mode in vg_multi_map_call.wdl
-# - import vg_multi_map_call.wdl
-# - import vg_graph_construct_index.wdl
-# - define workflow
-# - define GATK haplotype caller GVCF task
-# - define Dragen GVCF task
-# - define joint genotype task
+# - define DRAGEN joint genotypeing task
 # - possibly define genotype phasing task
 #     - Start with just the regular mpmap gcsa and xg construction
 
@@ -109,7 +103,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             RUN_VGMPMAP_ALGORITHM=RUN_VGMPMAP_ALGORITHM,
-            RUN_DRAGEN_CALLER=RUN_DRAGEN_CALLER,
+            RUN_DRAGEN_CALLER=false,
             RUN_LINEAR_CALLER=true,
             RUN_GVCF_OUTPUT=true,
             RUN_SNPEFF_ANNOTATION=false
@@ -153,7 +147,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             RUN_VGMPMAP_ALGORITHM=RUN_VGMPMAP_ALGORITHM,
-            RUN_DRAGEN_CALLER=RUN_DRAGEN_CALLER,
+            RUN_DRAGEN_CALLER=false,
             RUN_LINEAR_CALLER=true,
             RUN_GVCF_OUTPUT=true,
             RUN_SNPEFF_ANNOTATION=false
@@ -197,7 +191,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             RUN_VGMPMAP_ALGORITHM=RUN_VGMPMAP_ALGORITHM,
-            RUN_DRAGEN_CALLER=RUN_DRAGEN_CALLER,
+            RUN_DRAGEN_CALLER=false,
             RUN_LINEAR_CALLER=true,
             RUN_GVCF_OUTPUT=true,
             RUN_SNPEFF_ANNOTATION=false
@@ -303,8 +297,7 @@ task runGATKCombineGenotypeGVCFs {
         File in_reference_dict_file
     }
     
-    String dollar = "$"
-    command <<<
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -324,7 +317,7 @@ task runGATKCombineGenotypeGVCFs {
           --reference ${in_reference_file} \
           --variant ${in_sample_name}_cohort.combined.gvcf \
           --output ${in_sample_name}_cohort.jointgenotyped.vcf
-    >>>
+    }
     output {
         File joint_genotyped_vcf = "${in_sample_name}_cohort.jointgenotyped.vcf"
     }
@@ -345,7 +338,6 @@ task runSplitJointGenotypedVCF {
         Array[String]+ contigs
     }
 
-    String dollar = "$"
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
