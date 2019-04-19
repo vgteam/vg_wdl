@@ -456,7 +456,7 @@ task runVGMPMAP {
           -x ~{in_xg_file} \
           -g ~{in_gcsa_file} \
           ${GBWT_OPTION_STRING} \
-          --read-group "ID:1\tLB:lib1\tSM:~{in_sample_name}\tPL:illumina\tPU:unit1" \
+          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
           --recombination-penalty 5.0 -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>

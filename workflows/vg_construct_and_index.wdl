@@ -27,7 +27,10 @@ workflow vg_construct_and_index {
 
         # set true to GBWT index the VCF phased haplotypes
         Boolean use_haplotypes = false
-
+        
+        # set true to generate SNARLS index of VG graph
+        Boolean make_snarls = false
+        
         # vg docker image tag
         String vg_docker = "quay.io/vgteam/vg:v1.14.0"
     }
@@ -68,7 +71,16 @@ workflow vg_construct_and_index {
         }
         File? final_gbwt = if (defined(gbwt_merge.gbwt)) then gbwt_merge.gbwt else gbwt_index.gbwt[0]
     }
-
+    
+    # make snarls index
+    if (make_snarls) {
+        call snarls_index { input:
+            vg = combine_graphs.vg,
+            graph_name = graph_name,
+            vg_docker = vg_docker
+        }
+    }
+    
     # make xg index
     call xg_index { input:
         graph_name = graph_name,
@@ -112,6 +124,7 @@ workflow vg_construct_and_index {
         File gcsa = gcsa_index.gcsa
         File gcsa_lcp = gcsa_index.lcp
         File? gbwt = final_gbwt
+        File? snarls = snarls_index.snarls
     }
 }
 
@@ -122,7 +135,7 @@ task construct_graph {
         File vcf_gz
         String contig
         Boolean use_haplotypes
-        String vg_construct_options="--node-max 32 --handle-sv"
+        String vg_construct_options="--node-max 32"
         String vg_docker
     }
 
@@ -131,7 +144,7 @@ task construct_graph {
         pigz -dc ${ref_fasta_gz} > ref.fa
         tabix "${vcf_gz}"
 
-        vg construct -R "${contig}" -C -r ref.fa -v "${vcf_gz}" --region-is-chrom ${vg_construct_options} ${if use_haplotypes then "-a" else ""} > "${contig}.vg"
+        vg construct --threads 32 -R "${contig}" -C -r ref.fa -v "${vcf_gz}" --region-is-chrom ${vg_construct_options} ${if use_haplotypes then "-a" else ""} > "${contig}.vg"
     }
 
     output {
@@ -139,6 +152,7 @@ task construct_graph {
     }
 
     runtime {
+        cpu: 32
         docker: vg_docker
     }
 }
@@ -190,7 +204,7 @@ task gbwt_index {
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
-        vg index -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
+        vg index --threads 32 -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     }
 
     output {
@@ -198,6 +212,7 @@ task gbwt_index {
     }
 
     runtime {
+        cpu: 32
         docker: vg_docker
     }
 }
@@ -224,6 +239,28 @@ task gbwt_merge {
     }
 }
 
+# construct the Snarls index from the VG graph
+task snarls_index {
+    input {
+        File vg
+        String graph_name
+        String vg_docker
+    }
+    
+    command {
+        set -exu -o pipefail
+        vg snarls -t ~{vg} > "~{graph_name}.snarls"
+    }
+    
+    output {
+        File snarls = "~{graph_name}.snarls"
+    }
+     
+    runtime {
+        docker: vg_docker
+    }
+}
+
 # make xg index
 task xg_index {
     input {
@@ -235,7 +272,7 @@ task xg_index {
 
     command {
         set -exu -o pipefail
-        vg index -x "${graph_name}.xg" ~{xg_options} "~{vg}"
+        vg index --threads 32 -x "${graph_name}.xg" ~{xg_options} "~{vg}"
     }
 
     output {
@@ -243,6 +280,7 @@ task xg_index {
     }
 
     runtime {
+        cpu: 32
         docker: vg_docker
     }
 }
@@ -258,7 +296,7 @@ task prune_graph {
     command {
         set -exu -o pipefail
         nm=$(basename "${contig_vg}" .vg)
-        vg prune -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
+        vg prune --threads 32 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
     }
 
     output {
@@ -266,6 +304,7 @@ task prune_graph {
     }
 
     runtime {
+        cpu: 32
         docker: vg_docker
     }
 }
@@ -289,7 +328,7 @@ task prune_graph_with_haplotypes {
             contig_gbwt="${p[1]}"
             nm=$(basename "${contig_vg}" .vg)
             contig_pruned_vg="${nm}.pruned.vg"
-            vg prune -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
+            vg prune --threads 16 -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
             echo "$contig_pruned_vg" >> contigs_pruned_vg
         done < "inputs"
     >>>
@@ -300,6 +339,7 @@ task prune_graph_with_haplotypes {
     }
 
     runtime {
+        cpu: 32
         docker: vg_docker
     }
 }
@@ -316,7 +356,7 @@ task gcsa_index {
 
     command {
         set -exu -o pipefail
-        vg index -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
+        vg index --threads 32 -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
     }
 
     output {
@@ -325,6 +365,7 @@ task gcsa_index {
     }
 
     runtime {
+        cpu: 32
         docker: vg_docker
     }
 }
