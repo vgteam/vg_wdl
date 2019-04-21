@@ -61,7 +61,11 @@ workflow vgTrioPipeline {
         Boolean RUN_DRAGEN_CALLER
         Array[String]+ CONTIGS = ["20", "21"]
         File REF_FASTA_GZ
-        Boolean USE_HAPLOTYPES = false
+        File PED_FILE
+        File GEN_MAP_FILES
+        String GRAPH_NAME
+        Boolean USE_HAPLOTYPES = true
+        Boolean MAKE_SNARLS = true
     }
     
     call vgMultiMapCallWorkflow.vgMultiMapCall as maternalMapCallWorkflow {
@@ -214,25 +218,62 @@ workflow vgTrioPipeline {
             in_vg_container=VG_CONTAINER
     }
     
-    call runSplitJointGenotypedVCF {
+    call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
         input:
             in_proband_sample_name=SAMPLE_NAME_PROBAND,
             in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
             in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
             joint_genotyped_vcf=bgzipGATKGVCF.output_merged_vcf,
             joint_genotyped_vcf_index=bgzipGATKGVCF.output_merged_vcf_index,
-            contigs=CONTIGS
+            contigs=CONTIGS,
+            filter_parents=false
+    }
+    scatter (contig_pair in zip(CONTIGS, splitJointGenotypedVCF.contig_vcfs)) {
+        call runWhatsHapPhasing {
+            input:
+                in_cohort_sample_name=SAMPLE_NAME_PROBAND,
+                joint_genotyped_vcf=contig_pair.right,
+                in_maternal_bam=maternalMapCallWorkflow.output_bam,
+                in_maternal_bam_index=maternalMapCallWorkflow.output_bam_index,
+                in_paternal_bam=paternalMapCallWorkflow.output_bam,
+                in_paternal_bam_index=paternalMapCallWorkflow.output_bam_index,
+                in_proband_bam=probandMapCallWorkflow.output_bam,
+                in_proband_bam_index=probandMapCallWorkflow.output_bam_index,
+                in_ped_file=PED_FILE,
+                in_genetic_map=GEN_MAP_FILES,
+                in_contig=contig_pair.left
+        }
+    }
+    call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
+        input:
+            in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
+            in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
+    }
+    call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
+        input:
+            in_sample_name=SAMPLE_NAME_PROBAND,
+            in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
+            in_vg_container=VG_CONTAINER
+    }
+    call runSplitJointGenotypedVCF as splitPhasedVCF {
+        input:
+            in_proband_sample_name=SAMPLE_NAME_PROBAND,
+            in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
+            in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
+            joint_genotyped_vcf=bgzipCohortPhasedVCF.output_merged_vcf,
+            joint_genotyped_vcf_index=bgzipCohortPhasedVCF.output_merged_vcf_index,
+            contigs=CONTIGS,
+            filter_parents=true
     }
     call vgConstructWorkflow.vg_construct_and_index as constructGraphIndexWorkflow {
         input:
-            graph_name="parental_graph",
+            graph_name=GRAPH_NAME,
             ref_fasta_gz=REF_FASTA_GZ,
             contigs=CONTIGS,
-            contigs_vcf_gz=runSplitJointGenotypedVCF.contig_vcfs,
+            contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
             use_haplotypes=USE_HAPLOTYPES,
             vg_docker=VG_CONTAINER
     }
-
     call vgMultiMapCallWorkflow.vgMultiMapCall as probandMapCallWorkflow2ndIteration {
         input:
             INPUT_READ_FILE_1=PROBAND_INPUT_READ_FILE_1,
@@ -247,6 +288,8 @@ workflow vgTrioPipeline {
             XG_FILE=constructGraphIndexWorkflow.xg,
             GCSA_FILE=constructGraphIndexWorkflow.gcsa,
             GCSA_LCP_FILE=constructGraphIndexWorkflow.gcsa_lcp,
+            GBWT_FILE=constructGraphIndexWorkflow.gbwt,
+            SNARLS_FILE=constructGraphIndexWorkflow.snarls,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
@@ -336,6 +379,7 @@ task runSplitJointGenotypedVCF {
         File joint_genotyped_vcf
         File joint_genotyped_vcf_index
         Array[String]+ contigs
+        Boolean filter_parents
     }
 
     command <<<
@@ -350,8 +394,14 @@ task runSplitJointGenotypedVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
+        if [ ~{filter_parents} == true ]; then
+          SAMPLE_FILTER_STRING="-s ~{in_maternal_sample_name},~{in_paternal_sample_name}"
+        else
+          SAMPLE_FILTER_STRING=""
+        fi
+
         while read -r contig; do
-            bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name},~{in_paternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+            bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
             echo "${contig}.vcf.gz" >> contig_vcf_list.txt
         done < "~{write_lines(contigs)}"
     >>>
@@ -364,4 +414,49 @@ task runSplitJointGenotypedVCF {
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
+
+task runWhatsHapPhasing {
+    input {
+        String in_cohort_sample_name
+        File joint_genotyped_vcf
+        File? in_maternal_bam
+        File? in_maternal_bam_index
+        File? in_paternal_bam
+        File? in_paternal_bam_index
+        File? in_proband_bam
+        File? in_proband_bam_index
+        File in_ped_file
+        File in_genetic_map
+        String in_contig
+    }
+
+    command <<<
+        set -exu -o pipefail
+
+        tar -xvf ~{in_genetic_map}
+        if [[ ~{in_contig} == "Y" || ~{in_contig} == "MT" ]]; then
+            GENMAP_OPTION_STRING=""
+        elif [ ~{in_contig} == "X" ]; then
+            GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chrX_nonPAR_combined_b37.txt --chromosome X"
+        else
+            GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chr~{in_contig}_combined_b37.txt --chromosome ~{in_contig}"
+        fi
+        whatshap phase \
+            --indels \
+            --ped ~{in_ped_file} \
+            ${GENMAP_OPTION_STRING} \
+            -o ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf \
+            ~{joint_genotyped_vcf} ~{in_proband_bam} ~{in_maternal_bam} ~{in_paternal_bam}
+    >>>
+
+    output {
+        File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf"
+    }
+    runtime {
+        memory: 50
+        disks: 100
+        docker: "quay.io/biocontainers/whatshap:0.18--py37h6bb024c_0"
+    }
+}
+
 
