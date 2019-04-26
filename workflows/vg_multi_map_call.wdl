@@ -48,6 +48,8 @@ workflow vgMultiMapCall {
         Boolean GVCF_MODE = select_first([RUN_GVCF_OUTPUT, false])
         Boolean? RUN_SNPEFF_ANNOTATION
         Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
+        Boolean? RUN_SV_CALLER
+        Boolean SV_CALLER_MODE = select_first([RUN_SV_CALLER, false])
         File INPUT_READ_FILE_1
         File INPUT_READ_FILE_2
         String SAMPLE_NAME
@@ -135,6 +137,7 @@ workflow vgMultiMapCall {
                     in_xg_file=XG_FILE,
                     in_gcsa_file=GCSA_FILE,
                     in_gcsa_lcp_file=GCSA_LCP_FILE,
+                    in_gbwt_file=GBWT_FILE,
                     in_sample_name=SAMPLE_NAME,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
@@ -261,52 +264,104 @@ workflow vgMultiMapCall {
                 in_merge_gam_mem=MERGE_GAM_MEM,
                 in_merge_gam_time=MERGE_GAM_TIME
         }
-        call chunkAlignmentsByPathNames {
-            input:
+        if (!SV_CALLER_MODE) {
+            call chunkAlignmentsByPathNames as chunkAlignmentsDefault {
+                input:
                 in_sample_name=SAMPLE_NAME,
                 in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
                 in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
                 in_xg_file=XG_FILE,
                 in_path_list_file=PATH_LIST_FILE,
+                in_chunk_context=50,
                 in_chunk_bases=CHUNK_BASES,
                 in_overlap=OVERLAP,
                 in_vg_container=VG_CONTAINER,
                 in_chunk_gam_cores=CHUNK_GAM_CORES,
                 in_chunk_gam_disk=CHUNK_GAM_DISK,
                 in_chunk_gam_mem=CHUNK_GAM_MEM
-        }
-        Array[Pair[File,File]] vg_caller_input_files_list = zip(chunkAlignmentsByPathNames.output_vg_chunks, chunkAlignmentsByPathNames.output_gam_chunks) 
-        scatter (vg_caller_input_files in vg_caller_input_files_list) { 
-            call runVGCaller { 
+            }
+            Array[Pair[File,File]] vg_caller_input_files_list_default = zip(chunkAlignmentsDefault.output_vg_chunks, chunkAlignmentsDefault.output_gam_chunks) 
+            scatter (vg_caller_input_files in vg_caller_input_files_list_default) { 
+                call runVGCaller as VGCallerDefault { 
+                    input: 
+                        in_sample_name=SAMPLE_NAME, 
+                        in_chunk_bed_file=chunkAlignmentsDefault.output_bed_chunk_file, 
+                        in_vg_file=vg_caller_input_files.left, 
+                        in_gam_file=vg_caller_input_files.right, 
+                        in_path_length_file=PATH_LENGTH_FILE, 
+                        in_chunk_bases=CHUNK_BASES, 
+                        in_overlap=OVERLAP, 
+                        in_vg_container=VG_CONTAINER,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM,
+                        in_sv_mode=false
+                } 
+                call runVCFClipper as VCFClipperDefault { 
+                    input: 
+                        in_chunk_vcf=VGCallerDefault.output_vcf, 
+                        in_chunk_vcf_index=VGCallerDefault.output_vcf_index, 
+                        in_chunk_clip_string=VGCallerDefault.clip_string 
+                } 
+            } 
+            call concatClippedVCFChunks as concatVCFChunksDefault { 
                 input: 
                     in_sample_name=SAMPLE_NAME, 
-                    in_chunk_bed_file=chunkAlignmentsByPathNames.output_bed_chunk_file, 
-                    in_vg_file=vg_caller_input_files.left, 
-                    in_gam_file=vg_caller_input_files.right, 
-                    in_path_length_file=PATH_LENGTH_FILE, 
-                    in_chunk_bases=CHUNK_BASES, 
-                    in_overlap=OVERLAP, 
-                    in_vg_container=VG_CONTAINER,
-                    in_vgcall_cores=VGCALL_CORES,
-                    in_vgcall_disk=VGCALL_DISK,
-                    in_vgcall_mem=VGCALL_MEM
+                    in_clipped_vcf_chunk_files=VCFClipperDefault.output_clipped_vcf 
             } 
-            call runVCFClipper { 
+        }
+        # Run recall options and larger vg chunk context for calling structural variants
+        if (SV_CALLER_MODE) {
+            call chunkAlignmentsByPathNames as chunkAlignmentsSV {
+                input:
+                in_sample_name=SAMPLE_NAME,
+                in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
+                in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
+                in_xg_file=XG_FILE,
+                in_path_list_file=PATH_LIST_FILE,
+                in_chunk_context=2500,
+                in_chunk_bases=CHUNK_BASES,
+                in_overlap=OVERLAP,
+                in_vg_container=VG_CONTAINER,
+                in_chunk_gam_cores=CHUNK_GAM_CORES,
+                in_chunk_gam_disk=CHUNK_GAM_DISK,
+                in_chunk_gam_mem=CHUNK_GAM_MEM
+            }
+            Array[Pair[File,File]] vg_caller_input_files_list_SV = zip(chunkAlignmentsSV.output_vg_chunks, chunkAlignmentsSV.output_gam_chunks) 
+            scatter (vg_caller_input_files in vg_caller_input_files_list_SV) { 
+                call runVGCaller as VGCallerSV { 
+                    input: 
+                        in_sample_name=SAMPLE_NAME, 
+                        in_chunk_bed_file=chunkAlignmentsSV.output_bed_chunk_file, 
+                        in_vg_file=vg_caller_input_files.left, 
+                        in_gam_file=vg_caller_input_files.right, 
+                        in_path_length_file=PATH_LENGTH_FILE, 
+                        in_chunk_bases=CHUNK_BASES, 
+                        in_overlap=OVERLAP, 
+                        in_vg_container=VG_CONTAINER,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM,
+                        in_sv_mode=true
+                } 
+                call runVCFClipper as VCFClipperSV { 
+                    input: 
+                        in_chunk_vcf=VGCallerSV.output_vcf, 
+                        in_chunk_vcf_index=VGCallerSV.output_vcf_index, 
+                        in_chunk_clip_string=VGCallerSV.clip_string 
+                } 
+            } 
+            call concatClippedVCFChunks as concatVCFChunksSV { 
                 input: 
-                    in_chunk_vcf=runVGCaller.output_vcf, 
-                    in_chunk_vcf_index=runVGCaller.output_vcf_index, 
-                    in_chunk_clip_string=runVGCaller.clip_string 
+                    in_sample_name=SAMPLE_NAME, 
+                    in_clipped_vcf_chunk_files=VCFClipperSV.output_clipped_vcf 
             } 
-        } 
-        call concatClippedVCFChunks { 
-            input: 
-                in_sample_name=SAMPLE_NAME, 
-                in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf 
-        } 
+        }
+        File concatted_vcf = select_first([concatVCFChunksDefault.output_merged_vcf, concatVCFChunksSV.output_merged_vcf])
         call bgzipMergedVCF as bgzipVGCalledVCF { 
             input: 
                 in_sample_name=SAMPLE_NAME, 
-                in_merged_vcf_file=concatClippedVCFChunks.output_merged_vcf, 
+                in_merged_vcf_file=concatted_vcf,
                 in_vg_container=VG_CONTAINER 
         }
     }
@@ -365,7 +420,8 @@ task splitReads {
     }
     runtime {
         cpu: in_split_read_cores
-        disks: in_split_read_disk
+        memory: "40 GB"
+        disks: "local-disk " + in_split_read_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -377,12 +433,15 @@ task runVGMAP {
         File in_xg_file
         File in_gcsa_file
         File in_gcsa_lcp_file
+        File? in_gbwt_file
         String in_vg_container
         String in_sample_name
         Int in_map_cores
         Int in_map_disk
-        Int in_map_mem
+        String in_map_mem
     }
+    
+    Boolean gbwt_options = defined(in_gbwt_file)
     
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
@@ -397,9 +456,14 @@ task runVGMAP {
         #to turn off echo do 'set +o xtrace'
 
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
+        GBWT_OPTION_STRING=""
+        if [ ~{gbwt_options} == true ]; then
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file}"
+        fi
         vg map \
           -x ~{in_xg_file} \
           -g ~{in_gcsa_file} \
+          ${GBWT_OPTION_STRING} \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
           -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
@@ -407,9 +471,9 @@ task runVGMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
-        memory: in_map_mem
+        memory: in_map_mem + " GB"
         cpu: in_map_cores
-        disks: in_map_disk
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -427,10 +491,11 @@ task runVGMPMAP {
         String in_sample_name
         Int in_map_cores
         Int in_map_disk
-        Int in_map_mem
+        String in_map_mem
     }
     
-    Boolean gbwt_options = defined(in_gbwt_file) && defined(in_snarls_file)
+    Boolean gbwt_options = defined(in_gbwt_file)
+    Boolean snarl_options = defined(in_snarls_file)
     
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
@@ -443,12 +508,13 @@ task runVGMPMAP {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
+        
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
-        if [ ~{gbwt_options} == true ]; then
+        GBWT_OPTION_STRING=""
+        if [ ~{gbwt_options} == true ] && [ ~{snarl_options} == false ]; then
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file}"
+        elif [ ~{gbwt_options} == true ] && [ ~{snarl_options} == true ]; then
           GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file}"
-        else
-          GBWT_OPTION_STRING=""
         fi
         vg mpmap \
           -S \
@@ -464,9 +530,9 @@ task runVGMPMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
-        memory: in_map_mem
+        memory: in_map_mem + " GB"
         cpu: in_map_cores
-        disks: in_map_disk
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -502,9 +568,9 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
-        disks: 100
+        disks: "local-disk 100 SSD"
         docker: in_vg_container
     }
 }
@@ -583,9 +649,9 @@ task mergeAlignmentBAMChunksVGMAP {
         File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam.bai"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
-        disks: 100
+        disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
@@ -633,9 +699,9 @@ task mergeAlignmentBAMChunksVGMPMAP {
         File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.mdtag.bam.bai"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
-        disks: 100
+        disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
@@ -682,7 +748,7 @@ task runPICARD {
         File mark_dupped_reordered_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/picard:latest"
     }
@@ -726,7 +792,7 @@ task runGATKIndelRealigner {
         File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk3:3.8-1"
     }
@@ -764,7 +830,7 @@ task runGATKHaplotypeCaller {
         File genotyped_vcf = "${in_sample_name}.vcf"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk:4.1.1.0"
     }
@@ -803,7 +869,7 @@ task runGATKHaplotypeCallerGVCF {
         File rawLikelihoods_gvcf = "${in_sample_name}.rawLikelihoods.gvcf"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk:4.1.1.0"
     }
@@ -849,7 +915,8 @@ task runDragenCaller {
         File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
     }
     runtime {
-        memory: 100
+        docker: "ubuntu:latest"
+        memory: 50 + " GB"
     }
 }
 
@@ -893,7 +960,8 @@ task runDragenCallerGVCF {
         File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
     }
     runtime {
-        memory: 100
+        docker: "ubuntu:latest"
+        memory: 50 + " GB"
     }
 }
 
@@ -931,9 +999,9 @@ task mergeAlignmentGAMChunks {
         File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
     }
     runtime {
-        memory: in_merge_gam_mem
+        memory: in_merge_gam_mem + " GB"
         cpu: in_merge_gam_cores
-        disks: in_merge_gam_mem
+        disks: "local-disk " + in_merge_gam_disk  + " SSD"
         time: in_merge_gam_time
         docker: in_vg_container
     }
@@ -945,7 +1013,8 @@ task chunkAlignmentsByPathNames {
         File in_merged_sorted_gam
         File in_merged_sorted_gam_gai
         File in_xg_file
-        File in_path_list_file
+        Int in_chunk_context
+    File in_path_list_file
         Int in_chunk_bases
         Int in_overlap
         String in_vg_container
@@ -969,7 +1038,7 @@ task chunkAlignmentsByPathNames {
         vg chunk \
             -x ${in_xg_file} \
             -a ${in_merged_sorted_gam} \
-            -c 50 \
+            -c ${in_chunk_context} \
             -P ${in_path_list_file} \
             -g \
             -s ${in_chunk_bases} -o ${in_overlap} \
@@ -983,9 +1052,9 @@ task chunkAlignmentsByPathNames {
         File output_bed_chunk_file = "output_bed_chunks.bed"
     }   
     runtime {
-        memory: in_chunk_gam_mem
+        memory: in_chunk_gam_mem + " GB"
         cpu: in_chunk_gam_cores
-        disks: in_chunk_gam_disk
+        disks: "local-disk " + in_chunk_gam_disk + " SSD"
         docker: in_vg_container
     }   
 }
@@ -1003,6 +1072,7 @@ task runVGCaller {
         Int in_vgcall_cores
         Int in_vgcall_disk
         Int in_vgcall_mem
+        Boolean in_sv_mode
     }
     
     String chunk_tag = basename(in_vg_file, ".vg")
@@ -1017,6 +1087,17 @@ task runVGCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+        
+        VG_FILTER_COMMAND=""
+        VG_AUGMENT_SV_OPTIONS=""
+        VG_CALL_SV_OPTIONS=""
+        if [ ~{in_sv_mode} == false ]; then
+            VG_FILTER_COMMAND="vg filter ~{in_gam_file} -t 1 -r 0.9 -fu -s 1000 -m 1 -q 15 -D 999 -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam && \\"
+            VG_AUGMENT_SV_OPTIONS="~{chunk_tag}.filtered_gam"
+        else
+            VG_AUGMENT_SV_OPTIONS="~{in_gam_file} --recall"
+            VG_CALL_SV_OPTIONS="-u -n 0 -e 1000"
+        fi
 
         PATH_NAME=$(echo ~{chunk_tag} | cut -f 4 -d '_')
         OFFSET=""
@@ -1050,13 +1131,10 @@ task runVGCaller {
             ~{in_vg_file} \
             -x ~{chunk_tag}.xg \
             -t ~{in_vgcall_cores} && \
-        vg filter \
-            ~{in_gam_file} \
-            -t 1 -r 0.9 -fu -s 1000 -m 1 -q 15 -D 999 \
-            -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam && \
+        ${VG_FILTER_COMMAND}
         vg augment \
             ~{in_vg_file} \
-            ~{chunk_tag}.filtered.gam \
+            ${VG_AUGMENT_SV_OPTIONS} \
             -t ~{in_vgcall_cores} -q 10 -a pileup \
             -Z ~{chunk_tag}.trans \
             -S ~{chunk_tag}.support > ~{chunk_tag}.aug.vg && \
@@ -1070,6 +1148,7 @@ task runVGCaller {
             -r ${PATH_NAME} \
             -c ${PATH_NAME} \
             -l ${CHR_LENGTH} \
+            ${VG_CALL_SV_OPTIONS} \
             -o ${OFFSET} > ~{chunk_tag}.vcf && \
         head -10000 ~{chunk_tag}.vcf | grep "^#" >> ~{chunk_tag}.sorted.vcf && \
         if [ "~(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
@@ -1099,9 +1178,9 @@ task runVGCaller {
         String clip_string = read_lines("~{chunk_tag}_clip_string.txt")[0]
     }
     runtime {
-        memory: in_vgcall_mem
+        memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
-        disks: in_vgcall_disk
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -1132,8 +1211,8 @@ task runVCFClipper {
         File output_clipped_vcf = "${chunk_tag}.clipped.vcf"
     }
     runtime {
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -1162,8 +1241,8 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -1197,8 +1276,8 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: in_vg_container
     }
 }
@@ -1228,8 +1307,8 @@ task normalizeVCF {
     }
     runtime {
         cpu: 16
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -1261,8 +1340,8 @@ task snpEffAnnotateVCF {
     }
     runtime {
         cpu: 16
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
     }
 }

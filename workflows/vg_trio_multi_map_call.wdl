@@ -66,6 +66,8 @@ workflow vgTrioPipeline {
         String GRAPH_NAME
         Boolean USE_HAPLOTYPES = true
         Boolean MAKE_SNARLS = true
+        Boolean USE_DECOYS = true
+        String DECOY_REGEX = ">GL"
     }
     
     call vgMultiMapCallWorkflow.vgMultiMapCall as maternalMapCallWorkflow {
@@ -272,6 +274,9 @@ workflow vgTrioPipeline {
             contigs=CONTIGS,
             contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
             use_haplotypes=USE_HAPLOTYPES,
+            make_snarls=MAKE_SNARLS,
+            use_decoys=USE_DECOYS,
+            decoy_regex=DECOY_REGEX,
             vg_docker=VG_CONTAINER
     }
     call vgMultiMapCallWorkflow.vgMultiMapCall as probandMapCallWorkflow2ndIteration {
@@ -365,12 +370,13 @@ task runGATKCombineGenotypeGVCFs {
         File joint_genotyped_vcf = "${in_sample_name}_cohort.jointgenotyped.vcf"
     }
     runtime {
-        memory: 100
+        memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk:4.1.1.0"
     }
 }
 
+# Split a vcf into a list of vcfs each representing a contig
 task runSplitJointGenotypedVCF {
     input {
         String in_proband_sample_name
@@ -383,17 +389,8 @@ task runSplitJointGenotypedVCF {
     }
 
     command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
+        set -exu -o pipefail
+        
         if [ ~{filter_parents} == true ]; then
           SAMPLE_FILTER_STRING="-s ~{in_maternal_sample_name},~{in_paternal_sample_name}"
         else
@@ -409,8 +406,8 @@ task runSplitJointGenotypedVCF {
         Array[File]+ contig_vcfs = read_lines("contig_vcf_list.txt")
     }
     runtime {
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -419,12 +416,12 @@ task runWhatsHapPhasing {
     input {
         String in_cohort_sample_name
         File joint_genotyped_vcf
-        File? in_maternal_bam
-        File? in_maternal_bam_index
-        File? in_paternal_bam
-        File? in_paternal_bam_index
-        File? in_proband_bam
-        File? in_proband_bam_index
+        File in_maternal_bam
+        File in_maternal_bam_index
+        File in_paternal_bam
+        File in_paternal_bam_index
+        File in_proband_bam
+        File in_proband_bam_index
         File in_ped_file
         File in_genetic_map
         String in_contig
@@ -453,10 +450,9 @@ task runWhatsHapPhasing {
         File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf"
     }
     runtime {
-        memory: 50
-        disks: 100
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/whatshap:0.18--py37h6bb024c_0"
     }
 }
-
 
