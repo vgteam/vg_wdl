@@ -38,3 +38,15 @@ task concat {
     }
 }
 
+task falseTouchFile{
+    File input
+
+    command <<<
+        touch ${input}
+    >>>
+
+    output{
+        File output = "${input}
+    }
+
+}
