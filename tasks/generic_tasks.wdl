@@ -12,11 +12,12 @@ task shard_fastq {
         memory : "4 GB"
         disks : "local-disk " + diskGB + " HDD"
         docker: "erictdawson/fastq-splitter"
+        preemptible : 3
     }
 
     output{
-        Array[File] firstSplits = glob("*")
-        Array[File] secondSplits = glob("*")
+        Array[File] firstSplits = glob("*_1.fastq.part*")
+        Array[File] secondSplits = glob("*_2.fastq.part*")
     }
 }
 
@@ -24,13 +25,18 @@ task shard_fastq {
 task concat {
     Array[File] shard_gam
     String output_name
+    Int diskGB
 
     command <<<
         cat ${sep=" " shard_gam} > "${output_name}.gam"
     >>>
 
     runtime {
-        disks: "local-disk 400 HDD"
+        docker : "erictdawson/base"
+        cpu : 1
+        memory : "1 GB"
+        disks: "local-disk " + diskGB + "  HDD"
+        preemptible : 4
     }
 
     output {
@@ -40,13 +46,26 @@ task concat {
 
 task falseTouchFile{
     File input
+    Int diskGB
 
     command <<<
         touch ${input}
     >>>
 
+    runtime{
+        docker : "erictdawson/base"
+        cpu : 1
+        memory : "1 GB"
+        disks : "local-disk " + diskGB + " HDD
+        preemptible : 7
+    }
+
     output{
         File output = "${input}
     }
+
+}
+
+workflow strawman_flow{
 
 }
