@@ -49,7 +49,7 @@ workflow vgMultiMapCall {
         Boolean? RUN_SNPEFF_ANNOTATION
         Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
         Boolean? RUN_SV_CALLER
-        Boolean SV_CALLER_MODE = select_first([RUN_SV_CALLER, false])
+        Boolean SV_CALLER_MODE = select_first([RUN_SV_CALLER, true])
         File INPUT_READ_FILE_1
         File INPUT_READ_FILE_2
         String SAMPLE_NAME
@@ -57,8 +57,7 @@ workflow vgMultiMapCall {
         Int READS_PER_CHUNK
         Int CHUNK_BASES
         Int OVERLAP
-        File PATH_LIST_FILE
-        File PATH_LENGTH_FILE
+        File? PATH_LIST_FILE
         File XG_FILE
         File GCSA_FILE
         File GCSA_LCP_FILE
@@ -83,9 +82,9 @@ workflow vgMultiMapCall {
         Int VGCALL_CORES
         Int VGCALL_DISK
         Int VGCALL_MEM
-        String DRAGEN_REF_INDEX_NAME
-        String UDPBINFO_PATH
-        String HELIX_USERNAME
+        String? DRAGEN_REF_INDEX_NAME
+        String? UDPBINFO_PATH
+        String? HELIX_USERNAME
     }
     
     # Split input reads into chunks for parallelized mapping
@@ -107,7 +106,15 @@ workflow vgMultiMapCall {
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
     }
-
+    
+    # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
+    call extractPathNames {
+        input:
+            in_xg_file=XG_FILE,
+            in_vg_container=VG_CONTAINER
+    }
+    File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
+    
     # Distribute vg mapping opperation over each chunked read pair
     Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
@@ -155,10 +162,27 @@ workflow vgMultiMapCall {
                     in_vg_container=VG_CONTAINER,
                     in_sample_name=SAMPLE_NAME
             }
+            call sortBAMFile {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_bam_chunk_file=runSurject.chunk_bam_file
+            }
+            call runPICARD {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_bam_file=sortBAMFile.sorted_bam_file,
+                    in_bam_file_index=sortBAMFile.sorted_bam_file_index,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
         }
     }
+    
+    # Run the linear alignment calling procedure
     if (SURJECT_MODE) {
-        Array[File?] alignment_chunk_bam_files_maybes = runSurject.chunk_bam_file
+        # Merge chunked alignments from surjected GAM files
+        Array[File?] alignment_chunk_bam_files_maybes = runPICARD.mark_dupped_reordered_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
         if (!VGMPMAP_MODE) {
             call mergeAlignmentBAMChunksVGMAP {
@@ -182,78 +206,108 @@ workflow vgMultiMapCall {
         }
         File merged_bam_file_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file])
         File merged_bam_file_index_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file_index, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file_index])
-        call runPICARD {
+        
+        # Split merged alignment by contigs list
+        call splitBAMbyPath {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_bam_file=merged_bam_file_output,
-                in_bam_file_index=merged_bam_file_index_output,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_reference_dict_file=REF_DICT_FILE
+                in_merged_bam_file=merged_bam_file_output,
+                in_merged_bam_file_index=merged_bam_file_index_output,
+                in_path_list_file=pipeline_path_list_file
         }
-        call runGATKIndelRealigner {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_bam_file=runPICARD.mark_dupped_reordered_bam,
-                in_bam_file_index=runPICARD.mark_dupped_reordered_bam_index,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_reference_dict_file=REF_DICT_FILE
-        }
-        if (!DRAGEN_MODE) {
-            if (!GVCF_MODE) {
-                call runGATKHaplotypeCaller {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
-                        in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
-                        in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
-                }
-                call bgzipMergedVCF as bgzipGATKCalledVCF { 
-                    input: 
-                        in_sample_name=SAMPLE_NAME, 
-                        in_merged_vcf_file=runGATKHaplotypeCaller.genotyped_vcf,
-                        in_vg_container=VG_CONTAINER 
-                }
+        #Array[Pair[File,File]] gatk_caller_input_files_list = zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index) 
+        # Run distributed variant calling
+        scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
+            call runGATKIndelRealigner {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_bam_file=gatk_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
             }
-            if (GVCF_MODE) {
+            # Run regular VCF genotypers
+            if (!GVCF_MODE) {
+                if (!DRAGEN_MODE) {
+                    call runGATKHaplotypeCaller {
+                        input:
+                            in_sample_name=SAMPLE_NAME,
+                            in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                            in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
+                            in_reference_file=REF_FILE,
+                            in_reference_index_file=REF_INDEX_FILE,
+                            in_reference_dict_file=REF_DICT_FILE
+                    }
+                }
+                if (DRAGEN_MODE) {
+                    call runDragenCaller {
+                        input:
+                            in_sample_name=SAMPLE_NAME,
+                            in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                            in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
+                            in_udpbinfo_path=UDPBINFO_PATH,
+                            in_helix_username=HELIX_USERNAME
+                    }
+                }
+            
+                File final_contig_vcf_output = select_first([runGATKHaplotypeCaller.genotyped_vcf, runDragenCaller.dragen_genotyped_vcf])
+            }
+        }
+        # Merge Indel Realigned BAM
+        Array[File?] indel_realigned_bam_files_maybes = runGATKIndelRealigner.indel_realigned_bam
+        Array[File] indel_realigned_bam_files = select_all(indel_realigned_bam_files_maybes)
+        call mergeIndelRealignedBAMs {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_alignment_bam_chunk_files=indel_realigned_bam_files
+        }
+        # Merge linear-based called VCFs
+        if (!GVCF_MODE) {
+            Array[File] final_contig_vcf_output_list = select_all(final_contig_vcf_output)
+            call concatClippedVCFChunks as concatLinearVCFChunks {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_clipped_vcf_chunk_files=final_contig_vcf_output_list
+            }
+            call bgzipMergedVCF as bgzipGATKCalledVCF { 
+                input: 
+                    in_sample_name=SAMPLE_NAME, 
+                    in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
+                    in_vg_container=VG_CONTAINER 
+            }
+        }
+        # Run GVCF variant calling procedure
+        if (GVCF_MODE) {
+            # Run GVCF genotypers
+            if (!DRAGEN_MODE) {
                 call runGATKHaplotypeCallerGVCF {
                     input:
                         in_sample_name=SAMPLE_NAME,
-                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
-                        in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
+                        in_bam_file=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file,
+                        in_bam_file_index=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file_index,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_reference_dict_file=REF_DICT_FILE
                 }
             }
-        }
-        if (DRAGEN_MODE) {
-            if (!GVCF_MODE) {
-                call runDragenCaller {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
-                        in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                        in_udpbinfo_path=UDPBINFO_PATH,
-                        in_helix_username=HELIX_USERNAME
-                }
-            }
-            if (GVCF_MODE) {
+            if (DRAGEN_MODE) {
                 call runDragenCallerGVCF {
                     input:
                         in_sample_name=SAMPLE_NAME,
-                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
+                        in_bam_file=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file,
                         in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                         in_udpbinfo_path=UDPBINFO_PATH,
                         in_helix_username=HELIX_USERNAME
                 }
             }
+            
+            File final_gvcf_output = select_first([runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
         }
     }
+    
+    # Run the VG calling procedure
     if (!SURJECT_MODE) {
+        # Merge chunked graph alignments
         call mergeAlignmentGAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
@@ -264,14 +318,16 @@ workflow vgMultiMapCall {
                 in_merge_gam_mem=MERGE_GAM_MEM,
                 in_merge_gam_time=MERGE_GAM_TIME
         }
+        # Run normal variant graph calling procedure
         if (!SV_CALLER_MODE) {
+            # Chunk GAM alignments by contigs list
             call chunkAlignmentsByPathNames as chunkAlignmentsDefault {
                 input:
                 in_sample_name=SAMPLE_NAME,
                 in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
                 in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
                 in_xg_file=XG_FILE,
-                in_path_list_file=PATH_LIST_FILE,
+                in_path_list_file=pipeline_path_list_file,
                 in_chunk_context=50,
                 in_chunk_bases=CHUNK_BASES,
                 in_overlap=OVERLAP,
@@ -281,6 +337,7 @@ workflow vgMultiMapCall {
                 in_chunk_gam_mem=CHUNK_GAM_MEM
             }
             Array[Pair[File,File]] vg_caller_input_files_list_default = zip(chunkAlignmentsDefault.output_vg_chunks, chunkAlignmentsDefault.output_gam_chunks) 
+            # Run distributed graph-based variant calling
             scatter (vg_caller_input_files in vg_caller_input_files_list_default) { 
                 call runVGCaller as VGCallerDefault { 
                     input: 
@@ -288,7 +345,6 @@ workflow vgMultiMapCall {
                         in_chunk_bed_file=chunkAlignmentsDefault.output_bed_chunk_file, 
                         in_vg_file=vg_caller_input_files.left, 
                         in_gam_file=vg_caller_input_files.right, 
-                        in_path_length_file=PATH_LENGTH_FILE, 
                         in_chunk_bases=CHUNK_BASES, 
                         in_overlap=OVERLAP, 
                         in_vg_container=VG_CONTAINER,
@@ -304,22 +360,25 @@ workflow vgMultiMapCall {
                         in_chunk_clip_string=VGCallerDefault.clip_string 
                 } 
             } 
+            # Merge distributed variant called VCFs
             call concatClippedVCFChunks as concatVCFChunksDefault { 
                 input: 
                     in_sample_name=SAMPLE_NAME, 
                     in_clipped_vcf_chunk_files=VCFClipperDefault.output_clipped_vcf 
             } 
         }
+        # Run structural variant graph calling procedure
         # Run recall options and larger vg chunk context for calling structural variants
         if (SV_CALLER_MODE) {
+            # Chunk GAM alignments by contigs list
             call chunkAlignmentsByPathNames as chunkAlignmentsSV {
                 input:
                 in_sample_name=SAMPLE_NAME,
                 in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
                 in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
                 in_xg_file=XG_FILE,
-                in_path_list_file=PATH_LIST_FILE,
-                in_chunk_context=2500,
+                in_path_list_file=pipeline_path_list_file,
+                in_chunk_context=200,
                 in_chunk_bases=CHUNK_BASES,
                 in_overlap=OVERLAP,
                 in_vg_container=VG_CONTAINER,
@@ -327,45 +386,50 @@ workflow vgMultiMapCall {
                 in_chunk_gam_disk=CHUNK_GAM_DISK,
                 in_chunk_gam_mem=CHUNK_GAM_MEM
             }
-            Array[Pair[File,File]] vg_caller_input_files_list_SV = zip(chunkAlignmentsSV.output_vg_chunks, chunkAlignmentsSV.output_gam_chunks) 
-            scatter (vg_caller_input_files in vg_caller_input_files_list_SV) { 
-                call runVGCaller as VGCallerSV { 
-                    input: 
-                        in_sample_name=SAMPLE_NAME, 
-                        in_chunk_bed_file=chunkAlignmentsSV.output_bed_chunk_file, 
-                        in_vg_file=vg_caller_input_files.left, 
-                        in_gam_file=vg_caller_input_files.right, 
-                        in_path_length_file=PATH_LENGTH_FILE, 
-                        in_chunk_bases=CHUNK_BASES, 
-                        in_overlap=OVERLAP, 
+            Array[Pair[File,File]] vg_caller_input_files_list_SV = zip(chunkAlignmentsSV.output_vg_chunks, chunkAlignmentsSV.output_gam_chunks)
+            # Run distributed graph-based variant calling
+            scatter (vg_caller_input_files in vg_caller_input_files_list_SV) {
+                call runVGCaller as VGCallerSV {
+                    input:
+                        in_sample_name=SAMPLE_NAME,
+                        in_chunk_bed_file=chunkAlignmentsSV.output_bed_chunk_file,
+                        in_vg_file=vg_caller_input_files.left,
+                        in_gam_file=vg_caller_input_files.right,
+                        in_chunk_bases=CHUNK_BASES,
+                        in_overlap=OVERLAP,
                         in_vg_container=VG_CONTAINER,
                         in_vgcall_cores=VGCALL_CORES,
                         in_vgcall_disk=VGCALL_DISK,
                         in_vgcall_mem=VGCALL_MEM,
                         in_sv_mode=true
-                } 
-                call runVCFClipper as VCFClipperSV { 
-                    input: 
-                        in_chunk_vcf=VGCallerSV.output_vcf, 
-                        in_chunk_vcf_index=VGCallerSV.output_vcf_index, 
-                        in_chunk_clip_string=VGCallerSV.clip_string 
-                } 
-            } 
-            call concatClippedVCFChunks as concatVCFChunksSV { 
-                input: 
-                    in_sample_name=SAMPLE_NAME, 
-                    in_clipped_vcf_chunk_files=VCFClipperSV.output_clipped_vcf 
-            } 
+                }
+                call runVCFClipper as VCFClipperSV {
+                    input:
+                        in_chunk_vcf=VGCallerSV.output_vcf,
+                        in_chunk_vcf_index=VGCallerSV.output_vcf_index,
+                        in_chunk_clip_string=VGCallerSV.clip_string
+                }
+            }
+            # Merge distributed variant called VCFs
+            call concatClippedVCFChunks as concatVCFChunksSV {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_clipped_vcf_chunk_files=VCFClipperSV.output_clipped_vcf
+            }
         }
+        # Extract either the normal or structural variant based VCFs and compress them
         File concatted_vcf = select_first([concatVCFChunksDefault.output_merged_vcf, concatVCFChunksSV.output_merged_vcf])
-        call bgzipMergedVCF as bgzipVGCalledVCF { 
-            input: 
-                in_sample_name=SAMPLE_NAME, 
+        call bgzipMergedVCF as bgzipVGCalledVCF {
+            input:
+                in_sample_name=SAMPLE_NAME,
                 in_merged_vcf_file=concatted_vcf,
-                in_vg_container=VG_CONTAINER 
+                in_vg_container=VG_CONTAINER
         }
     }
-    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCaller.dragen_genotyped_vcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
+    
+    # Extract either the linear-based or graph-based VCF
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, final_gvcf_output])
+    # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION) {
         call normalizeVCF {
             input:
@@ -384,7 +448,8 @@ workflow vgMultiMapCall {
     }
     output {
         File output_vcf = select_first([snpEffAnnotateVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        File? output_bam = runGATKIndelRealigner.indel_realigned_bam
+        File? output_bam = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
+        File? output_bam_index = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file_index
         File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
     }
 }
@@ -422,6 +487,29 @@ task splitReads {
         cpu: in_split_read_cores
         memory: "40 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
+        docker: in_vg_container
+    }
+}
+
+task extractPathNames {
+    input {
+        File in_xg_file
+        String in_vg_container
+    }
+
+    command {
+        set -eux -o pipefail
+
+        vg paths \
+            --list \
+            --xg ${in_xg_file} > path_list.txt
+    }
+    output {
+        File output_path_list = "path_list.txt"
+    }
+    runtime {
+        memory: "50 GB"
+        disks: "local-disk 50 SSD"
         docker: in_vg_container
     }
 }
@@ -575,6 +663,93 @@ task runSurject {
     }
 }
 
+task sortBAMFile {
+    input {
+        String in_sample_name
+        File in_bam_chunk_file
+    }
+    
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        samtools sort \
+          --threads 32 \
+          ${in_bam_chunk_file} \
+          -O BAM \
+          -o ${in_sample_name}_positionsorted.bam \
+        && samtools index \
+          ${in_sample_name}_positionsorted.bam
+    }
+    output {
+        File sorted_bam_file = "${in_sample_name}_positionsorted.bam"
+        File sorted_bam_file_index = "${in_sample_name}_positionsorted.bam.bai"
+    }
+    runtime {
+        memory: 50 + " GB"
+        cpu: 32
+        disks: "local-disk 50 SSD"
+        docker: "biocontainers/samtools:v1.3_cv3"
+    }
+}
+
+task runPICARD {
+    input {
+        String in_sample_name
+        File in_bam_file
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+    
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar MarkDuplicates \
+          VALIDATION_STRINGENCY=LENIENT \
+          I=${in_bam_file} \
+          O=${in_sample_name}.mdtag.dupmarked.bam \
+          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
+        && java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar ReorderSam \
+            VALIDATION_STRINGENCY=LENIENT \
+            REFERENCE=${in_reference_file} \
+            INPUT=${in_sample_name}.mdtag.dupmarked.bam \
+            OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
+        && java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar BuildBamIndex \
+            VALIDATION_STRINGENCY=LENIENT \
+            I=${in_sample_name}.mdtag.dupmarked.reordered.bam \
+            O=${in_sample_name}.mdtag.dupmarked.reordered.bam.bai \
+        && rm -f ${in_sample_name}.mdtag.dupmarked.bam
+    }
+    output {
+        File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
+        File mark_dupped_reordered_bam_index = "${in_sample_name}.mdtag.dupmarked.reordered.bam.bai"
+    }
+    runtime {
+        time: 600
+        memory: 100 + " GB"
+        cpu: 32
+        docker: "broadinstitute/picard:latest"
+    }
+}
+
 task mergeAlignmentBAMChunksVGMAP {
     input {
         String in_sample_name
@@ -596,51 +771,34 @@ task mergeAlignmentBAMChunksVGMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
-          ${in_sample_name}_merged.bam \
+          -f -u --threads 32 \
+          - \
           ${sep=" " in_alignment_bam_chunk_files} \
-        && samtools sort \
-          --threads 32 \
-          ${in_sample_name}_merged.bam \
-          -n \
+        | samtools fixmate \
           -O BAM \
-          -o ${in_sample_name}_merged.namesorted.bam \
-        && rm -f ${in_sample_name}_merged.bam \
-        && samtools fixmate \
-          -O BAM \
-          ${in_sample_name}_merged.namesorted.bam \
+          - \
           ${in_sample_name}_merged.namesorted.fixmate.bam \
-        && rm -f ${in_sample_name}_merged.namesorted.bam \
-        && samtools sort \
+        | samtools sort \
           --threads 32 \
-          ${in_sample_name}_merged.namesorted.fixmate.bam \
+          - \
           -O BAM \
-          -o ${in_sample_name}_merged.fixmate.positionsorted.bam \
-        && rm -f ${in_sample_name}_merged.namesorted.fixmate.bam \
-        && samtools addreplacerg \
+        | samtools addreplacerg \
           -O BAM \
           -r ID:1 -r LB:lib1 -r SM:${in_sample_name} -r PL:illumina -r PU:unit1 \
-          -o ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
-          ${in_sample_name}_merged.fixmate.positionsorted.bam \
-        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.bam \
-        && samtools view \
+          - \
+        | samtools view \
           -@ 32 \
           -h -O SAM \
-          -o ${in_sample_name}_merged.fixmate.positionsorted.rg.sam \
-          ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
-        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
-        && samtools view \
+          - \
+        | samtools view \
           -@ 32 \
           -h -O BAM \
-          -o ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
-          ${in_sample_name}_merged.fixmate.positionsorted.rg.sam \
-        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.sam \
-        && samtools calmd \
+          - \
+        | samtools calmd \
           -b \
-          ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
+          - \
           ${in_reference_file} \
           > ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam \
-        && rm -f ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
         && samtools index \
           ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam
     }
@@ -677,20 +835,14 @@ task mergeAlignmentBAMChunksVGMPMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
-          ${in_sample_name}_merged.bam \
+          -f -u --threads 56 \
+          - \
           ${sep=" " in_alignment_bam_chunk_files} \
-        && samtools sort \
-          --threads 32 \
-          ${in_sample_name}_merged.bam \
-          -O BAM \
-          -o ${in_sample_name}_merged.positionsorted.bam \
-        && samtools calmd \
+        | samtools calmd \
           -b \
-          ${in_sample_name}_merged.positionsorted.bam \
+          - \
           ${in_reference_file} \
           > ${in_sample_name}_merged.positionsorted.mdtag.bam \
-        && rm -f ${in_sample_name}_merged.positionsorted.bam \
         && samtools index \
           ${in_sample_name}_merged.positionsorted.mdtag.bam
     }
@@ -700,66 +852,50 @@ task mergeAlignmentBAMChunksVGMPMAP {
     }
     runtime {
         memory: 100 + " GB"
+        cpu: 56
+        disks: "local-disk 100 SSD"
+        docker: "biocontainers/samtools:v1.3_cv3"
+    }
+}
+
+task splitBAMbyPath {
+    input {
+        String in_sample_name
+        File in_merged_bam_file
+        File in_merged_bam_file_index
+        File in_path_list_file
+    }
+    
+    command <<<
+        set -eux -o pipefail
+        
+        while IFS=$'\t' read -ra path_list_line; do
+            path_name="${path_list_line[0]}"
+            samtools view \
+              -@ 32 \
+              -h -O BAM \
+              ~{in_merged_bam_file} ${path_name} > ~{in_sample_name}.${path_name}.bam \
+            && samtools index \
+              ~{in_sample_name}.${path_name}.bam
+        done < ~{in_path_list_file}
+    >>>
+    output {
+        Array[File] bam_contig_files = glob("~{in_sample_name}.*.bam")
+        Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai") 
+        Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
+    }
+    runtime {
+        memory: 100 + " GB"
         cpu: 32
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
 
-task runPICARD {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-    }
-    
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        java -Xmx4g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar MarkDuplicates \
-          VALIDATION_STRINGENCY=LENIENT \
-          I=${in_bam_file} \
-          O=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.bam \
-          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && java -Xmx20g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar ReorderSam \
-            VALIDATION_STRINGENCY=LENIENT \
-            REFERENCE=${in_reference_file} \
-            INPUT=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.bam \
-            OUTPUT=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam \
-        && java -Xmx20g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar BuildBamIndex \
-            VALIDATION_STRINGENCY=LENIENT \
-            I=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam \
-            O=${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai
-    }
-    output {
-        File mark_dupped_reordered_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam"
-        File mark_dupped_reordered_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.bam.bai"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        docker: "broadinstitute/picard:latest"
-    }
-}
-
-
 task runGATKIndelRealigner {
     input {
         String in_sample_name
-        File in_bam_file
-        File in_bam_file_index
+        Pair[File, File] in_bam_file
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
@@ -776,15 +912,18 @@ task runGATKIndelRealigner {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
+        
+        ln -s ${in_bam_file.left} input_bam_file.bam
+        ln -s ${in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          -nt 32 \
           -R ${in_reference_file} \
-          -I ${in_bam_file} \
+          -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
           -R ${in_reference_file} \
           --targetIntervals forIndelRealigner.intervals \
-          -I ${in_bam_file} \
+          -I input_bam_file.bam \
           --out ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
     }
     output {
@@ -792,9 +931,46 @@ task runGATKIndelRealigner {
         File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
     }
     runtime {
+        time: 1200
         memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk3:3.8-1"
+    }
+}
+
+task mergeIndelRealignedBAMs {
+    input {
+        String in_sample_name
+        Array[File] in_alignment_bam_chunk_files
+    }
+    
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        samtools merge \
+          -f -u --threads 56 \
+          - \
+          ${sep=" " in_alignment_bam_chunk_files} > ${in_sample_name}_merged.indel_realigned.bam \
+        && samtools index \
+          ${in_sample_name}_merged.indel_realigned.bam
+    }
+    output {
+        File merged_indel_realigned_bam_file = "${in_sample_name}_merged.indel_realigned.bam"
+        File merged_indel_realigned_bam_file_index = "${in_sample_name}_merged.indel_realigned.bam.bai"
+    }
+    runtime {
+        memory: 100 + " GB"
+        cpu: 56
+        disks: "local-disk 100 SSD"
+        docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
 
@@ -824,10 +1000,11 @@ task runGATKHaplotypeCaller {
           --native-pair-hmm-threads 32 \
           --reference ${in_reference_file} \
           --input ${in_bam_file} \
-          --output ${in_sample_name}.vcf
+          --output ${in_sample_name}.vcf \
+        && bgzip ${in_sample_name}.vcf
     }
     output {
-        File genotyped_vcf = "${in_sample_name}.vcf"
+        File genotyped_vcf = "${in_sample_name}.vcf.gz"
     }
     runtime {
         memory: 100 + " GB"
@@ -1014,7 +1191,7 @@ task chunkAlignmentsByPathNames {
         File in_merged_sorted_gam_gai
         File in_xg_file
         Int in_chunk_context
-    File in_path_list_file
+        File in_path_list_file
         Int in_chunk_bases
         Int in_overlap
         String in_vg_container
@@ -1052,6 +1229,7 @@ task chunkAlignmentsByPathNames {
         File output_bed_chunk_file = "output_bed_chunks.bed"
     }   
     runtime {
+        time: 900
         memory: in_chunk_gam_mem + " GB"
         cpu: in_chunk_gam_cores
         disks: "local-disk " + in_chunk_gam_disk + " SSD"
@@ -1065,7 +1243,6 @@ task runVGCaller {
         File in_chunk_bed_file
         File in_vg_file
         File in_gam_file
-        File in_path_length_file
         Int in_chunk_bases
         Int in_overlap
         String in_vg_container
@@ -1074,68 +1251,57 @@ task runVGCaller {
         Int in_vgcall_mem
         Boolean in_sv_mode
     }
-    
+
     String chunk_tag = basename(in_vg_file, ".vg")
-    command <<< 
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
+    command <<<
+        set -eux -o pipefail
+
+        VG_INDEX_XG_COMMAND=""
         VG_FILTER_COMMAND=""
         VG_AUGMENT_SV_OPTIONS=""
         VG_CALL_SV_OPTIONS=""
         if [ ~{in_sv_mode} == false ]; then
+            VG_INDEX_XG_COMMAND="vg index ~{in_vg_file} -x ~{chunk_tag}.xg -t ~{in_vgcall_cores} && \\"
             VG_FILTER_COMMAND="vg filter ~{in_gam_file} -t 1 -r 0.9 -fu -s 1000 -m 1 -q 15 -D 999 -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam && \\"
             VG_AUGMENT_SV_OPTIONS="~{chunk_tag}.filtered_gam"
         else
             VG_AUGMENT_SV_OPTIONS="~{in_gam_file} --recall"
-            VG_CALL_SV_OPTIONS="-u -n 0 -e 1000"
+            VG_CALL_SV_OPTIONS="-u -n 0 -e 1000 -G 3"
         fi
 
-        PATH_NAME=$(echo ~{chunk_tag} | cut -f 4 -d '_')
+        PATH_NAME="$(echo ~{chunk_tag} | cut -f 4 -d '_')"
         OFFSET=""
         BED_CHUNK_LINE_RECORD=""
         FIRST_Q=""
         LAST_Q=""
+        CHUNK_INDEX_COUNTER="0"
+        CHUNK_TAG_INDEX="0"
+        CHR_LENGTH=""
         while IFS=$'\t' read -ra bed_chunk_line; do
-            bed_line_chunk_tag=$(echo ${bed_chunk_line[3]} | cut -f 1 -d '.')
+            bed_line_chunk_tag="$(echo ${bed_chunk_line[3]} | cut -f 1 -d '.')"
             if [ "~{chunk_tag}" = "${bed_line_chunk_tag}" ]; then
-                OFFSET=$(( bed_chunk_line[1] + 1 ))
+                OFFSET="${bed_chunk_line[1]}"
                 BED_CHUNK_LINE_RECORD="${bed_chunk_line[@]//$'\t'/ }"
+                CHUNK_TAG_INDEX="${CHUNK_INDEX_COUNTER}"
             fi
-            bed_line_path_name=$(echo ${bed_line_chunk_tag} | cut -f 4 -d '_')
+            bed_line_path_name="$(echo ${bed_line_chunk_tag} | cut -f 4 -d '_')"
             if [ "${PATH_NAME}" = "${bed_line_path_name}" ]; then
                 if [ "${FIRST_Q}" = "" ]; then
                     FIRST_Q="${bed_chunk_line[@]//$'\t'/ }"
                 fi
                 LAST_Q="${bed_chunk_line[@]//$'\t'/ }"
+                CHUNK_INDEX_COUNTER="$(( ${CHUNK_INDEX_COUNTER} + 1 ))"
+                CHR_LENGTH="${bed_chunk_line[2]}"
             fi
         done < ~{in_chunk_bed_file}
-
-        CHR_LENGTH=""
-        while IFS=$'\t' read -ra path_length_line; do
-            path_length_line_name=${path_length_line[0]}
-            if [ "${PATH_NAME}" = "${path_length_line_name}" ]; then
-                CHR_LENGTH=${path_length_line[1]}
-            fi
-        done < ~{in_path_length_file}
-
-        vg index \
-            ~{in_vg_file} \
-            -x ~{chunk_tag}.xg \
-            -t ~{in_vgcall_cores} && \
+        
+        ${VG_INDEX_XG_COMMAND}
         ${VG_FILTER_COMMAND}
         vg augment \
             ~{in_vg_file} \
             ${VG_AUGMENT_SV_OPTIONS} \
-            -t ~{in_vgcall_cores} -q 10 -a pileup \
+            -t ~{in_vgcall_cores} \
+            -a pileup \
             -Z ~{chunk_tag}.trans \
             -S ~{chunk_tag}.support > ~{chunk_tag}.aug.vg && \
         vg call \
@@ -1151,24 +1317,23 @@ task runVGCaller {
             ${VG_CALL_SV_OPTIONS} \
             -o ${OFFSET} > ~{chunk_tag}.vcf && \
         head -10000 ~{chunk_tag}.vcf | grep "^#" >> ~{chunk_tag}.sorted.vcf && \
-        if [ "~(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
+        if [ "$(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
             cat ~{chunk_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{chunk_tag}.sorted.vcf
-        fi && \
+        fi
         bgzip ~{chunk_tag}.sorted.vcf && \
-        tabix -f -p vcf ~{chunk_tag}.sorted.vcf.gz && \
+        tabix -f -p vcf ~{chunk_tag}.sorted.vcf.gz
 
         # Compile clipping string
-        chunk_tag_index=$(echo ~{chunk_tag} | cut -f 3 -d '_') && \
-        clipped_chunk_offset=$(( ${chunk_tag_index} * ~{in_chunk_bases} - ${chunk_tag_index} * ~{in_overlap} )) && \
+        clipped_chunk_offset="$(( (${CHUNK_TAG_INDEX} * ~{in_chunk_bases}) - (${CHUNK_TAG_INDEX} * ~{in_overlap}) ))"
         if [ "${BED_CHUNK_LINE_RECORD}" = "${FIRST_Q}" ]; then
-          START=$(( clipped_chunk_offset + 1 ))
+          START="$(( ${clipped_chunk_offset} + 1 ))"
         else
-          START=$(( clipped_chunk_offset + ~{in_overlap}/2 ))
+          START="$(( ${clipped_chunk_offset} + 1 + ~{in_overlap}/2 ))"
         fi
         if [ "${BED_CHUNK_LINE_RECORD}" = "${LAST_Q}" ]; then
-          END=$(( clipped_chunk_offset + ~{in_chunk_bases} - 1 ))
+          END="$(( ${clipped_chunk_offset} + ~{in_chunk_bases}))"
         else
-          END=$(( clipped_chunk_offset + ~{in_chunk_bases} - (~{in_overlap}/2) ))
+          END="$(( ${clipped_chunk_offset} + ~{in_chunk_bases} - (~{in_overlap}/2) ))"
         fi
         echo "${PATH_NAME}:${START}-${END}" > ~{chunk_tag}_clip_string.txt
     >>>
@@ -1191,7 +1356,7 @@ task runVCFClipper {
         File in_chunk_vcf_index
         String in_chunk_clip_string
     }
-    
+
     String chunk_tag = basename(in_chunk_vcf, ".sorted.vcf.gz")
     command {
         # Set the exit code of a pipeline to that of the rightmost command
@@ -1205,10 +1370,10 @@ task runVCFClipper {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bcftools view ${in_chunk_vcf} -t ${in_chunk_clip_string} > ${chunk_tag}.clipped.vcf
+        bcftools view -O b ${in_chunk_vcf} -t ${in_chunk_clip_string} > ${chunk_tag}.clipped.vcf.gz
     }
     output {
-        File output_clipped_vcf = "${chunk_tag}.clipped.vcf"
+        File output_clipped_vcf = "${chunk_tag}.clipped.vcf.gz"
     }
     runtime {
         memory: 50 + " GB"
@@ -1222,7 +1387,7 @@ task concatClippedVCFChunks {
         String in_sample_name
         Array[File] in_clipped_vcf_chunk_files
     }
-    
+
     command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1235,7 +1400,10 @@ task concatClippedVCFChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bcftools concat ${sep=" " in_clipped_vcf_chunk_files} > ${in_sample_name}_merged.vcf
+        for vcf_file in ${sep=" " in_clipped_vcf_chunk_files} ; do
+            bcftools index "$vcf_file"
+        done
+        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort - > ${in_sample_name}_merged.vcf
     }
     output {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
@@ -1253,7 +1421,7 @@ task bgzipMergedVCF {
         File in_merged_vcf_file
         String in_vg_container
     }
-    
+
     # TODO:
     #   If GVCF in in_merged_vcf_file then output_vcf_extension="gvcf" else output_vcf_extension="vcf"
     command {
