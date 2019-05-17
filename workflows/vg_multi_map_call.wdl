@@ -181,16 +181,19 @@ workflow vgMultiMapCall {
                     in_vg_container=VG_CONTAINER,
                     in_sample_name=SAMPLE_NAME
             }
-            call sortBAMFile {
+            call sortMDTagBAMFile {
                 input:
                     in_sample_name=SAMPLE_NAME,
-                    in_bam_chunk_file=runSurject.chunk_bam_file
+                    in_bam_chunk_file=runSurject.chunk_bam_file,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
             }
             call runPICARD {
                 input:
                     in_sample_name=SAMPLE_NAME,
-                    in_bam_file=sortBAMFile.sorted_bam_file,
-                    in_bam_file_index=sortBAMFile.sorted_bam_file_index,
+                    in_bam_file=sortMDTagBAMFile.sorted_bam_file,
+                    in_bam_file_index=sortMDTagBAMFile.sorted_bam_file_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_reference_dict_file=REF_DICT_FILE
@@ -199,14 +202,14 @@ workflow vgMultiMapCall {
             if (GOOGLE_CLEANUP_MODE) {
                 call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                     input:
-                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortBAMFile.sorted_bam_file, sortBAMFile.sorted_bam_file_index],
+                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
                         current_task_output = runPICARD.mark_dupped_reordered_bam
                 }
             }
             if (!GOOGLE_CLEANUP_MODE) {
                 call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                     input:
-                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortBAMFile.sorted_bam_file, sortBAMFile.sorted_bam_file_index],
+                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
                         current_task_output = runPICARD.mark_dupped_reordered_bam
                 }
             }
@@ -224,20 +227,14 @@ workflow vgMultiMapCall {
             call mergeAlignmentBAMChunksVGMAP {
                 input:
                     in_sample_name=SAMPLE_NAME,
-                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
             }
         }
         if (VGMPMAP_MODE) {
             call mergeAlignmentBAMChunksVGMPMAP {
                 input:
                     in_sample_name=SAMPLE_NAME,
-                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
             }
         }
         File merged_bam_file_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file])
@@ -774,10 +771,13 @@ task runSurject {
     }
 }
 
-task sortBAMFile {
+task sortMDTagBAMFile {
     input {
         String in_sample_name
         File in_bam_chunk_file
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
     }
     
     command {
@@ -795,13 +795,18 @@ task sortBAMFile {
           --threads 32 \
           ${in_bam_chunk_file} \
           -O BAM \
-          -o ${in_sample_name}_positionsorted.bam \
+          - \
+        | samtools calmd \
+          -b \
+          - \
+          ${in_reference_file} \
+          > ${in_sample_name}_positionsorted.mdtag.bam \
         && samtools index \
-          ${in_sample_name}_positionsorted.bam
+          ${in_sample_name}_positionsorted.mdtag.bam
     }
     output {
-        File sorted_bam_file = "${in_sample_name}_positionsorted.bam"
-        File sorted_bam_file_index = "${in_sample_name}_positionsorted.bam.bai"
+        File sorted_bam_file = "${in_sample_name}_positionsorted.mdtag.bam"
+        File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
         memory: 50 + " GB"
@@ -865,9 +870,6 @@ task mergeAlignmentBAMChunksVGMAP {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
     }
     
     command {
@@ -905,17 +907,13 @@ task mergeAlignmentBAMChunksVGMAP {
           -@ 32 \
           -h -O BAM \
           - \
-        | samtools calmd \
-          -b \
-          - \
-          ${in_reference_file} \
-          > ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam \
+          > ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
         && samtools index \
-          ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam
+          ${in_sample_name}_merged.fixmate.positionsorted.rg.bam
     }
     output {
-        File merged_bam_file = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.bam.bai"
+        File merged_bam_file = "${in_sample_name}_merged.fixmate.positionsorted.rg.bam"
+        File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.bam.bai"
     }
     runtime {
         memory: 100 + " GB"
@@ -929,9 +927,6 @@ task mergeAlignmentBAMChunksVGMPMAP {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
     }
     
     command {
@@ -946,24 +941,20 @@ task mergeAlignmentBAMChunksVGMPMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -u --threads 56 \
+          -f --threads 32 \
           - \
           ${sep=" " in_alignment_bam_chunk_files} \
-        | samtools calmd \
-          -b \
-          - \
-          ${in_reference_file} \
-          > ${in_sample_name}_merged.positionsorted.mdtag.bam \
+          > ${in_sample_name}_merged.positionsorted.bam \
         && samtools index \
-          ${in_sample_name}_merged.positionsorted.mdtag.bam
+          ${in_sample_name}_merged.positionsorted.bam
     }
     output {
-        File merged_bam_file = "${in_sample_name}_merged.positionsorted.mdtag.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.mdtag.bam.bai"
+        File merged_bam_file = "${in_sample_name}_merged.positionsorted.bam"
+        File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
         memory: 100 + " GB"
-        cpu: 56
+        cpu: 32
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
