@@ -50,6 +50,8 @@ workflow vgMultiMapCall {
         Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
         Boolean? RUN_SV_CALLER
         Boolean SV_CALLER_MODE = select_first([RUN_SV_CALLER, true])
+        Boolean? GOOGLE_STORE_CLEANUP
+        Boolean GOOGLE_CLEANUP_MODE = select_first([GOOGLE_STORE_CLEANUP, false])
         File INPUT_READ_FILE_1
         File INPUT_READ_FILE_2
         String SAMPLE_NAME
@@ -82,9 +84,9 @@ workflow vgMultiMapCall {
         Int VGCALL_CORES
         Int VGCALL_DISK
         Int VGCALL_MEM
-        String? DRAGEN_REF_INDEX_NAME
-        String? UDPBINFO_PATH
-        String? HELIX_USERNAME
+        String DRAGEN_REF_INDEX_NAME
+        String UDPBINFO_PATH
+        String HELIX_USERNAME
     }
     
     # Split input reads into chunks for parallelized mapping
@@ -115,7 +117,9 @@ workflow vgMultiMapCall {
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
     
-    # Distribute vg mapping opperation over each chunked read pair
+    ################################################################
+    # Distribute vg mapping opperation over each chunked read pair #
+    ################################################################
     Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
         if (VGMPMAP_MODE) {
@@ -154,6 +158,21 @@ workflow vgMultiMapCall {
         
         # Surject GAM alignment files to BAM if SURJECT_MODE set to true
         File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file])
+        # Cleanup input reads after use
+        if (GOOGLE_CLEANUP_MODE) {
+            call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
+                input:
+                    previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
+                    current_task_output = vg_map_algorithm_chunk_gam_output
+            }
+        }
+        if (!GOOGLE_CLEANUP_MODE) {
+            call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
+                input:
+                    previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
+                    current_task_output = vg_map_algorithm_chunk_gam_output
+            }
+        }
         if (SURJECT_MODE) {
             call runSurject {
                 input:
@@ -176,10 +195,27 @@ workflow vgMultiMapCall {
                     in_reference_index_file=REF_INDEX_FILE,
                     in_reference_dict_file=REF_DICT_FILE
             }
+            # Cleanup intermediate surject files after use
+            if (GOOGLE_CLEANUP_MODE) {
+                call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
+                    input:
+                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortBAMFile.sorted_bam_file, sortBAMFile.sorted_bam_file_index],
+                        current_task_output = runPICARD.mark_dupped_reordered_bam
+                }
+            }
+            if (!GOOGLE_CLEANUP_MODE) {
+                call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
+                    input:
+                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortBAMFile.sorted_bam_file, sortBAMFile.sorted_bam_file_index],
+                        current_task_output = runPICARD.mark_dupped_reordered_bam
+                }
+            }
         }
     }
     
-    # Run the linear alignment calling procedure
+    ##############################################
+    # Run the linear alignment calling procedure #
+    ##############################################
     if (SURJECT_MODE) {
         # Merge chunked alignments from surjected GAM files
         Array[File?] alignment_chunk_bam_files_maybes = runPICARD.mark_dupped_reordered_bam
@@ -215,7 +251,6 @@ workflow vgMultiMapCall {
                 in_merged_bam_file_index=merged_bam_file_index_output,
                 in_path_list_file=pipeline_path_list_file
         }
-        #Array[Pair[File,File]] gatk_caller_input_files_list = zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index) 
         # Run distributed variant calling
         scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
             call runGATKIndelRealigner {
@@ -245,12 +280,27 @@ workflow vgMultiMapCall {
                             in_sample_name=SAMPLE_NAME,
                             in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
                             in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                            in_udpbinfo_path=UDPBINFO_PATH,
+                            in_udp_data_dir=UDPBINFO_PATH,
                             in_helix_username=HELIX_USERNAME
                     }
                 }
             
                 File final_contig_vcf_output = select_first([runGATKHaplotypeCaller.genotyped_vcf, runDragenCaller.dragen_genotyped_vcf])
+            }
+            # Cleanup intermediate variant calling files after use
+            if (GOOGLE_CLEANUP_MODE) {
+                call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
+                    input:
+                        previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
+                }
+            }
+            if (!GOOGLE_CLEANUP_MODE) {
+                call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
+                    input:
+                        previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
+                }
             }
         }
         # Merge Indel Realigned BAM
@@ -296,16 +346,33 @@ workflow vgMultiMapCall {
                         in_sample_name=SAMPLE_NAME,
                         in_bam_file=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file,
                         in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                        in_udpbinfo_path=UDPBINFO_PATH,
+                        in_udp_data_dir=UDPBINFO_PATH,
                         in_helix_username=HELIX_USERNAME
                 }
             }
             
             File final_gvcf_output = select_first([runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
         }
+        # Cleanup indel realigned bam files after use
+        if (GOOGLE_CLEANUP_MODE) {
+            call cleanUpGoogleFilestore as cleanUpIndelRealignedBamsGoogle {
+                input:
+                    previous_task_outputs = indel_realigned_bam_files,
+                    current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
+            }
+        }
+        if (!GOOGLE_CLEANUP_MODE) {
+            call cleanUpUnixFilesystem as cleanUpIndelRealignedBamsUnix {
+                input:
+                    previous_task_outputs = indel_realigned_bam_files,
+                    current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
+            }
+        }
     }
     
-    # Run the VG calling procedure
+    ################################
+    # Run the VG calling procedure #
+    ################################
     if (!SURJECT_MODE) {
         # Merge chunked graph alignments
         call mergeAlignmentGAMChunks {
@@ -317,6 +384,21 @@ workflow vgMultiMapCall {
                 in_merge_gam_disk=MERGE_GAM_DISK,
                 in_merge_gam_mem=MERGE_GAM_MEM,
                 in_merge_gam_time=MERGE_GAM_TIME
+        }
+        # Cleanup gam chunk files after use
+        if (GOOGLE_CLEANUP_MODE) {
+            call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
+                input:
+                    previous_task_outputs = vg_map_algorithm_chunk_gam_output,
+                    current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+            }
+        }
+        if (!GOOGLE_CLEANUP_MODE) {
+            call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
+                input:
+                    previous_task_outputs = vg_map_algorithm_chunk_gam_output,
+                    current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+            }
         }
         # Run normal variant graph calling procedure
         if (!SV_CALLER_MODE) {
@@ -454,7 +536,36 @@ workflow vgMultiMapCall {
     }
 }
 
-# Now works for WDL parser version 1.0
+########################
+### TASK DEFINITIONS ###
+########################
+
+# Tasks for intermediate file cleanup
+task cleanUpUnixFilesystem {
+    input {
+        Array[String] previous_task_outputs
+        String current_task_output
+    }
+    command <<<
+        set -eux -o pipefail
+        cat ~{write_lines(previous_task_outputs)} | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
+    >>>
+}
+
+task cleanUpGoogleFilestore {
+    input {
+        Array[String] previous_task_outputs
+        String current_task_output
+    }
+    command {
+        set -eux -o pipefail
+        gsutil rm -f < ${write_lines(previous_task_outputs)}
+    }
+    runtime {
+        docker: "google/cloud-sdk"
+    }
+}
+
 task splitReads {
     input {
         File in_read_file
@@ -956,9 +1067,9 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -u --threads 56 \
-          - \
-          ${sep=" " in_alignment_bam_chunk_files} > ${in_sample_name}_merged.indel_realigned.bam \
+          -f --threads 32 \
+          ${in_sample_name}_merged.indel_realigned.bam \
+          ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
           ${in_sample_name}_merged.indel_realigned.bam
     }
@@ -968,7 +1079,7 @@ task mergeIndelRealignedBAMs {
     }
     runtime {
         memory: 100 + " GB"
-        cpu: 56
+        cpu: 32
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
@@ -1040,10 +1151,11 @@ task runGATKHaplotypeCallerGVCF {
           -ERC GVCF \
           --reference ${in_reference_file} \
           --input ${in_bam_file} \
-          --output ${in_sample_name}.rawLikelihoods.gvcf
+          --output ${in_sample_name}.rawLikelihoods.gvcf \
+        && bgzip ${in_sample_name}.rawLikelihoods.gvcf
     }
     output {
-        File rawLikelihoods_gvcf = "${in_sample_name}.rawLikelihoods.gvcf"
+        File rawLikelihoods_gvcf = "${in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
         memory: 100 + " GB"
@@ -1057,7 +1169,7 @@ task runDragenCaller {
         String in_sample_name
         File in_bam_file
         String in_dragen_ref_index_name
-        String in_udpbinfo_path
+        String in_udp_data_dir
         String in_helix_username
     }
      
@@ -1075,18 +1187,19 @@ task runDragenCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace' 
         
-        mkdir -p /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
-        cp ~{in_bam_file} /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
+        UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
+        mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
+        cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
         TMP_DIR="/staging/~{in_helix_username}/tmp" && \
         ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
-        mkdir /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
+        mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
-        mv /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -fr /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/
+        mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
+        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
     >>>
     output {
         File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
@@ -1102,7 +1215,7 @@ task runDragenCallerGVCF {
         String in_sample_name
         File in_bam_file
         String in_dragen_ref_index_name
-        String in_udpbinfo_path
+        String in_udp_data_dir
         String in_helix_username
     }
     
@@ -1120,18 +1233,19 @@ task runDragenCallerGVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace' 
         
-        mkdir -p /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
-        cp ~{in_bam_file} /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/ && \
+        UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
+        mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
+        cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
         TMP_DIR="/staging/~{in_helix_username}/tmp" && \
         ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
-        mkdir /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper" && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
+        mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
+        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
-        mv /data/~{in_udpbinfo_path}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -fr /data/~{in_udpbinfo_path}/~{in_sample_name}_surjected_bams/
+        mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
+        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
     >>>
     output {
         File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
