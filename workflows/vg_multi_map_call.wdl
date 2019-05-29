@@ -523,7 +523,7 @@ task cleanUpGoogleFilestore {
     }
     command {
         set -eux -o pipefail
-        gsutil rm -f < ${write_lines(previous_task_outputs)}
+        gsutil rm -I < ${write_lines(previous_task_outputs)}
     }
     runtime {
         docker: "google/cloud-sdk"
@@ -583,7 +583,7 @@ task extractPathNames {
         File output_path_list = "path_list.txt"
     }
     runtime {
-        memory: "50 GB"
+        memory: "20 GB"
         disks: "local-disk 50 SSD"
         docker: in_vg_container
     }
@@ -762,7 +762,6 @@ task sortMDTagBAMFile {
           --threads 32 \
           ${in_bam_chunk_file} \
           -O BAM \
-          - \
         | samtools calmd \
           -b \
           - \
