@@ -34,6 +34,9 @@ workflow vg_construct_and_index {
         # set true to include decoy sequences from reference genome FASTA into VG graph construction
         Boolean use_decoys = false
         
+        # set true to include the mitochondrian sequence from the reference genome FASTA
+        Boolean include_mt = false
+        
         # regex to use in grep for extracting decoy contig names from reference FASTA
         String decoy_regex = ">GL"
         
@@ -48,7 +51,8 @@ workflow vg_construct_and_index {
             contig = p.left,
             vcf_gz = p.right,
             use_haplotypes = use_haplotypes,
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            construct_cores = 16
         }
     }
     
@@ -57,14 +61,16 @@ workflow vg_construct_and_index {
         call extract_decoys { input:
             ref_fasta_gz = ref_fasta_gz,
             decoy_regex = decoy_regex,
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            include_mt = include_mt
         }
         scatter (contig in extract_decoys.decoy_contig_ids) {
             call construct_graph as construct_decoy_graph { input:
                 ref_fasta_gz = ref_fasta_gz,
                 contig = contig,
                 use_haplotypes = false,
-                vg_docker = vg_docker
+                vg_docker = vg_docker,
+                construct_cores = 8
             }
         }
         call concat as concat_vg_graph_lists { input:
@@ -179,13 +185,17 @@ task extract_decoys {
         File ref_fasta_gz
         String decoy_regex
         String vg_docker
+        Boolean include_mt
     }
     
-    command {
+    command <<<
         set -exu -o pipefail
-        
-        zcat ${ref_fasta_gz} | grep "${decoy_regex}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
-    }
+        GREP_REGEX="~{decoy_regex}"
+        if [ ~{include_mt} == true ]; then
+            GREP_REGEX="~{decoy_regex}\|>MT"
+        fi
+        zcat ~{ref_fasta_gz} | grep "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
+    >>>
     output {
         Array[String] decoy_contig_ids = read_lines("decoy_contig_ids.txt")
     }
@@ -203,6 +213,7 @@ task construct_graph {
         Boolean use_haplotypes
         String vg_construct_options="--node-max 32 --handle-sv"
         String vg_docker
+        Int construct_cores
     }
     
     Boolean use_vcf = defined(vcf_gz)
@@ -216,7 +227,7 @@ task construct_graph {
             VCF_OPTION_STRING="-v ~{vcf_gz} --region-is-chrom"
         fi
 
-        vg construct --threads 32 -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg"
+        vg construct --threads ~{construct_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg"
     >>>
 
     output {
@@ -224,9 +235,9 @@ task construct_graph {
     }
 
     runtime {
-        cpu: 32
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: construct_cores
+        memory: 20 + " GB"
+        disks: "local-disk 50 SSD"
         docker: vg_docker
     }
 }

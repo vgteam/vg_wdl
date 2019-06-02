@@ -15,12 +15,14 @@ import "./vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
     input {
-        File MATERNAL_INPUT_READ_FILE_1
-        File MATERNAL_INPUT_READ_FILE_2
-        File PATERNAL_INPUT_READ_FILE_1
-        File PATERNAL_INPUT_READ_FILE_2
         File PROBAND_INPUT_READ_FILE_1
         File PROBAND_INPUT_READ_FILE_2
+        File MATERNAL_INPUT_BAM_FILE
+        File MATERNAL_INPUT_BAM_FILE_INDEX
+        File PATERNAL_INPUT_BAM_FILE
+        File PATERNAL_INPUT_BAM_FILE_INDEX
+        File PROBAND_INPUT_BAM_FILE
+        File PROBAND_INPUT_BAM_FILE_INDEX
         String SAMPLE_NAME_MATERNAL
         String SAMPLE_NAME_PATERNAL
         String SAMPLE_NAME_PROBAND
@@ -69,101 +71,13 @@ workflow vgTrioPipeline {
         String DECOY_REGEX = ">GL"
     }
     
-    ###################################
-    ## Run mapping workflows on Trio ##
-    ###################################
-    call vgMultiMapWorkflow.vgMultiMapCall as maternalMapWorkflow {
-        input:
-            INPUT_READ_FILE_1=MATERNAL_INPUT_READ_FILE_1,
-            INPUT_READ_FILE_2=MATERNAL_INPUT_READ_FILE_2,
-            SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
-            VG_CONTAINER=VG_CONTAINER,
-            READS_PER_CHUNK=READS_PER_CHUNK,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            GCSA_FILE=GCSA_FILE,
-            GCSA_LCP_FILE=GCSA_LCP_FILE,
-            GBWT_FILE=GBWT_FILE,
-            SNARLS_FILE=SNARLS_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            SPLIT_READ_CORES=SPLIT_READ_CORES,
-            SPLIT_READ_DISK=SPLIT_READ_DISK,
-            MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM,
-            MERGE_GAM_CORES=MERGE_GAM_CORES,
-            MERGE_GAM_DISK=MERGE_GAM_DISK,
-            MERGE_GAM_MEM=MERGE_GAM_MEM,
-            MERGE_GAM_TIME=MERGE_GAM_TIME,
-            RUN_VGMPMAP_ALGORITHM=RUN_VGMPMAP_ALGORITHM,
-            RUN_LINEAR_CALLER=true
-    }
-    call vgMultiMapWorkflow.vgMultiMapCall as paternalMapWorkflow {
-        input:
-            INPUT_READ_FILE_1=PATERNAL_INPUT_READ_FILE_1,
-            INPUT_READ_FILE_2=PATERNAL_INPUT_READ_FILE_2,
-            SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
-            VG_CONTAINER=VG_CONTAINER,
-            READS_PER_CHUNK=READS_PER_CHUNK,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            GCSA_FILE=GCSA_FILE,
-            GCSA_LCP_FILE=GCSA_LCP_FILE,
-            GBWT_FILE=GBWT_FILE,
-            SNARLS_FILE=SNARLS_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            SPLIT_READ_CORES=SPLIT_READ_CORES,
-            SPLIT_READ_DISK=SPLIT_READ_DISK,
-            MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM,
-            MERGE_GAM_CORES=MERGE_GAM_CORES,
-            MERGE_GAM_DISK=MERGE_GAM_DISK,
-            MERGE_GAM_MEM=MERGE_GAM_MEM,
-            MERGE_GAM_TIME=MERGE_GAM_TIME,
-            RUN_VGMPMAP_ALGORITHM=RUN_VGMPMAP_ALGORITHM,
-            RUN_LINEAR_CALLER=true
-    }
-    call vgMultiMapWorkflow.vgMultiMapCall as probandMapWorkflow {
-        input:
-            INPUT_READ_FILE_1=PROBAND_INPUT_READ_FILE_1,
-            INPUT_READ_FILE_2=PROBAND_INPUT_READ_FILE_2,
-            SAMPLE_NAME=SAMPLE_NAME_PROBAND,
-            VG_CONTAINER=VG_CONTAINER,
-            READS_PER_CHUNK=READS_PER_CHUNK,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            GCSA_FILE=GCSA_FILE,
-            GCSA_LCP_FILE=GCSA_LCP_FILE,
-            GBWT_FILE=GBWT_FILE,
-            SNARLS_FILE=SNARLS_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            SPLIT_READ_CORES=SPLIT_READ_CORES,
-            SPLIT_READ_DISK=SPLIT_READ_DISK,
-            MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM,
-            MERGE_GAM_CORES=MERGE_GAM_CORES,
-            MERGE_GAM_DISK=MERGE_GAM_DISK,
-            MERGE_GAM_MEM=MERGE_GAM_MEM,
-            MERGE_GAM_TIME=MERGE_GAM_TIME,
-            RUN_VGMPMAP_ALGORITHM=RUN_VGMPMAP_ALGORITHM,
-            RUN_LINEAR_CALLER=true
-    }
-    
     ###########################################
     ## Run variant calling workflows on Trio ##
     ###########################################
     call vgMultiCallWorkflow.vgMultiMapCall as maternalCallWorkflow {
         input:
-            INPUT_BAM_FILE=maternalMapWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=maternalMapWorkflow.output_bam_index,
+            INPUT_BAM_FILE=MATERNAL_INPUT_BAM_FILE,
+            INPUT_BAM_FILE_INDEX=MATERNAL_INPUT_BAM_FILE_INDEX,
             SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
             VG_CONTAINER=VG_CONTAINER,
             CHUNK_BASES=CHUNK_BASES,
@@ -190,8 +104,8 @@ workflow vgTrioPipeline {
     }
     call vgMultiCallWorkflow.vgMultiMapCall as paternalCallWorkflow {
         input:
-            INPUT_BAM_FILE=paternalMapWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=paternalMapWorkflow.output_bam_index,
+            INPUT_BAM_FILE=PATERNAL_INPUT_BAM_FILE,
+            INPUT_BAM_FILE_INDEX=PATERNAL_INPUT_BAM_FILE,
             SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
             VG_CONTAINER=VG_CONTAINER,
             CHUNK_BASES=CHUNK_BASES,
@@ -219,8 +133,8 @@ workflow vgTrioPipeline {
     }
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
         input:
-            INPUT_BAM_FILE=probandMapWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=probandMapWorkflow.output_bam_index,
+            INPUT_BAM_FILE=PROBAND_INPUT_BAM_FILE,
+            INPUT_BAM_FILE_INDEX=PROBAND_INPUT_BAM_FILE,
             SAMPLE_NAME=SAMPLE_NAME_PROBAND,
             VG_CONTAINER=VG_CONTAINER,
             CHUNK_BASES=CHUNK_BASES,
@@ -301,15 +215,18 @@ workflow vgTrioPipeline {
             input:
                 in_cohort_sample_name=SAMPLE_NAME_PROBAND,
                 joint_genotyped_vcf=contig_pair.right,
-                in_maternal_bam=maternalMapWorkflow.output_bam,
-                in_maternal_bam_index=maternalMapWorkflow.output_bam_index,
-                in_paternal_bam=paternalMapWorkflow.output_bam,
-                in_paternal_bam_index=paternalMapWorkflow.output_bam_index,
-                in_proband_bam=probandMapWorkflow.output_bam,
-                in_proband_bam_index=probandMapWorkflow.output_bam_index,
+                in_maternal_bam=MATERNAL_INPUT_BAM_FILE,
+                in_maternal_bam_index=MATERNAL_INPUT_BAM_FILE_INDEX,
+                in_paternal_bam=PATERNAL_INPUT_BAM_FILE,
+                in_paternal_bam_index=PATERNAL_INPUT_BAM_FILE_INDEX,
+                in_proband_bam=PROBAND_INPUT_BAM_FILE,
+                in_proband_bam_index=PROBAND_INPUT_BAM_FILE_INDEX,
                 in_ped_file=PED_FILE,
                 in_genetic_map=GEN_MAP_FILES,
-                in_contig=contig_pair.left
+                in_contig=contig_pair.left,
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_reference_dict_file=REF_DICT_FILE
         }
     }
     call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
@@ -317,7 +234,7 @@ workflow vgTrioPipeline {
             in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
             in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
     }
-    call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
+    call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipConcatPhasedVCF {
         input:
             in_sample_name=SAMPLE_NAME_PROBAND,
             in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
@@ -328,12 +245,11 @@ workflow vgTrioPipeline {
             in_proband_sample_name=SAMPLE_NAME_PROBAND,
             in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
             in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
-            joint_genotyped_vcf=bgzipCohortPhasedVCF.output_merged_vcf,
-            joint_genotyped_vcf_index=bgzipCohortPhasedVCF.output_merged_vcf_index,
+            joint_genotyped_vcf=bgzipConcatPhasedVCF.output_merged_vcf,
+            joint_genotyped_vcf_index=bgzipConcatPhasedVCF.output_merged_vcf_index,
             contigs=CONTIGS,
             filter_parents=true
     }
-    
     call vgConstructWorkflow.vg_construct_and_index as constructGraphIndexWorkflow {
         input:
             graph_name=GRAPH_NAME,
@@ -343,6 +259,7 @@ workflow vgTrioPipeline {
             use_haplotypes=USE_HAPLOTYPES,
             make_snarls=MAKE_SNARLS,
             use_decoys=USE_DECOYS,
+            include_mt=USE_DECOYS,
             decoy_regex=DECOY_REGEX,
             vg_docker=VG_CONTAINER
     }
@@ -396,12 +313,6 @@ workflow vgTrioPipeline {
     
     output {
         File output_cohort_vcf = output_joint_genotyped_vcf
-        File? output_maternal_bam = maternalMapWorkflow.output_bam
-        File? output_maternal_bam_index = maternalMapWorkflow.output_bam_index
-        File? output_paternal_bam = paternalMapWorkflow.output_bam
-        File? output_paternal_bam_index = paternalMapWorkflow.output_bam_index
-        File? output_proband_bam = probandMapWorkflow.output_bam
-        File? output_proband_bam_index = probandMapWorkflow.output_bam_index
         File output_final_proband_vcf = probandMapCallWorkflow2ndIteration.output_vcf
         File? output_final_proband_bam = probandMapCallWorkflow2ndIteration.output_bam
         File? output_final_proband_bam_index = probandMapCallWorkflow2ndIteration.output_bam_index
@@ -474,7 +385,7 @@ task runDragenJointGenotyper {
     String maternal_gvcf_file_name = basename(in_gvcf_file_maternal)
     String paternal_gvcf_file_name = basename(in_gvcf_file_paternal)
     String proband_gvcf_file_name = basename(in_gvcf_file_proband)
-
+    
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -560,6 +471,9 @@ task runWhatsHapPhasing {
         File in_ped_file
         File in_genetic_map
         String in_contig
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
     }
 
     command <<<
@@ -574,15 +488,17 @@ task runWhatsHapPhasing {
             GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chr~{in_contig}_combined_b37.txt --chromosome ~{in_contig}"
         fi
         whatshap phase \
+            --reference ~{in_reference_file} \
             --indels \
             --ped ~{in_ped_file} \
             ${GENMAP_OPTION_STRING} \
             -o ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf \
-            ~{joint_genotyped_vcf} ~{in_proband_bam} ~{in_maternal_bam} ~{in_paternal_bam}
+            ~{joint_genotyped_vcf} ~{in_proband_bam} ~{in_maternal_bam} ~{in_paternal_bam} \
+        && bgzip ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf
     >>>
 
     output {
-        File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf"
+        File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf.gz"
     }
     runtime {
         memory: 50 + " GB"
@@ -590,4 +506,5 @@ task runWhatsHapPhasing {
         docker: "quay.io/biocontainers/whatshap:0.18--py37h6bb024c_0"
     }
 }
+
 

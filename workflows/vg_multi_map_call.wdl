@@ -239,7 +239,21 @@ workflow vgMultiMapCall {
         }
         File merged_bam_file_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file])
         File merged_bam_file_index_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file_index, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file_index])
-        
+        if (GOOGLE_CLEANUP_MODE) {
+            call cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
+                input:
+                    previous_task_outputs = alignment_chunk_bam_files_valid,
+                    current_task_output = merged_bam_file_output
+            }
+        }
+        if (!GOOGLE_CLEANUP_MODE) {
+            call cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
+                input:
+                    previous_task_outputs = alignment_chunk_bam_files_valid,
+                    current_task_output = merged_bam_file_output
+            }
+        }
+         
         # Split merged alignment by contigs list
         call splitBAMbyPath {
             input:
@@ -247,6 +261,21 @@ workflow vgMultiMapCall {
                 in_merged_bam_file=merged_bam_file_output,
                 in_merged_bam_file_index=merged_bam_file_index_output,
                 in_path_list_file=pipeline_path_list_file
+        }
+        # Cleanup merged bam chunk files after use
+        if (GOOGLE_CLEANUP_MODE) {
+            call cleanUpGoogleFilestore as cleanUpMergeAlignmentBAMChunksGoogle {
+                input:
+                    previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
+                    current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
+            }
+        }
+        if (!GOOGLE_CLEANUP_MODE) {
+            call cleanUpUnixFilesystem as cleanUpMergeAlignmentBAMChunksUnix {
+                input:
+                    previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
+                    current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
+            }
         }
         # Run distributed GATK linear variant calling
         scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
@@ -470,7 +499,7 @@ workflow vgMultiMapCall {
     }
     
     # Extract either the linear-based or graph-based VCF
-    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, final_gvcf_output])
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf, final_gvcf_output])
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION) {
         call normalizeVCF {
@@ -583,7 +612,7 @@ task extractPathNames {
         File output_path_list = "path_list.txt"
     }
     runtime {
-        memory: "20 GB"
+        memory: "50 GB"
         disks: "local-disk 50 SSD"
         docker: in_vg_container
     }
@@ -1162,7 +1191,6 @@ task runDragenCaller {
         File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
     }
     runtime {
-        docker: "ubuntu:latest"
         memory: 50 + " GB"
     }
 }
@@ -1208,7 +1236,6 @@ task runDragenCallerGVCF {
         File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
     }
     runtime {
-        docker: "ubuntu:latest"
         memory: 50 + " GB"
     }
 }

@@ -5,6 +5,8 @@ version 1.0
 
 # TODO:
 # - Use subworkflow functionality in new vg_trio_sub.wdl workflow
+#   - DOCS: https://cromwell.readthedocs.io/en/stable/SubWorkflows/
+# - define DRAGEN joint genotypeing task
 # - possibly define genotype phasing task
 #     - Start with just the regular mpmap gcsa and xg construction
 
@@ -29,6 +31,7 @@ workflow vgTrioPipeline {
         Int CHUNK_BASES
         Int OVERLAP
         File PATH_LIST_FILE
+        File PATH_LENGTH_FILE
         File XG_FILE
         File GCSA_FILE
         File GCSA_LCP_FILE
@@ -88,6 +91,7 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
+            SNPEFF_DATABASE=SNPEFF_DATABASE,
             SPLIT_READ_CORES=SPLIT_READ_CORES,
             SPLIT_READ_DISK=SPLIT_READ_DISK,
             MAP_CORES=MAP_CORES,
@@ -116,6 +120,7 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
+            SNPEFF_DATABASE=SNPEFF_DATABASE,
             SPLIT_READ_CORES=SPLIT_READ_CORES,
             SPLIT_READ_DISK=SPLIT_READ_DISK,
             MAP_CORES=MAP_CORES,
@@ -144,6 +149,7 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
+            SNPEFF_DATABASE=SNPEFF_DATABASE,
             SPLIT_READ_CORES=SPLIT_READ_CORES,
             SPLIT_READ_DISK=SPLIT_READ_DISK,
             MAP_CORES=MAP_CORES,
@@ -169,6 +175,7 @@ workflow vgTrioPipeline {
             CHUNK_BASES=CHUNK_BASES,
             OVERLAP=OVERLAP,
             PATH_LIST_FILE=PATH_LIST_FILE,
+            PATH_LENGTH_FILE=PATH_LENGTH_FILE,
             XG_FILE=XG_FILE,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
@@ -184,7 +191,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             RUN_LINEAR_CALLER=true,
-            RUN_DRAGEN_CALLER=RUN_DRAGEN_CALLER,
+            RUN_DRAGEN_CALLER=true,
             RUN_GVCF_OUTPUT=true,
             RUN_SNPEFF_ANNOTATION=false
     }
@@ -197,6 +204,7 @@ workflow vgTrioPipeline {
             CHUNK_BASES=CHUNK_BASES,
             OVERLAP=OVERLAP,
             PATH_LIST_FILE=PATH_LIST_FILE,
+            PATH_LENGTH_FILE=PATH_LENGTH_FILE,
             XG_FILE=XG_FILE,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
@@ -212,10 +220,10 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             RUN_LINEAR_CALLER=true,
-            RUN_DRAGEN_CALLER=RUN_DRAGEN_CALLER,
+            RUN_DRAGEN_CALLER=true,
             RUN_GVCF_OUTPUT=true,
             RUN_SNPEFF_ANNOTATION=false,
-            PREVIOUS_WORKFLOW_OUTPUT= if RUN_DRAGEN_CALLER then maternalCallWorkflow.output_vcf else "null"
+            PREVIOUS_WORKFLOW_OUTPUT=maternalCallWorkflow.output_vcf
     }
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
         input:
@@ -226,6 +234,7 @@ workflow vgTrioPipeline {
             CHUNK_BASES=CHUNK_BASES,
             OVERLAP=OVERLAP,
             PATH_LIST_FILE=PATH_LIST_FILE,
+            PATH_LENGTH_FILE=PATH_LENGTH_FILE,
             XG_FILE=XG_FILE,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
@@ -241,58 +250,43 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             RUN_LINEAR_CALLER=true,
-            RUN_DRAGEN_CALLER=RUN_DRAGEN_CALLER,
+            RUN_DRAGEN_CALLER=true,
             RUN_GVCF_OUTPUT=true,
             RUN_SNPEFF_ANNOTATION=false,
-            PREVIOUS_WORKFLOW_OUTPUT= if RUN_DRAGEN_CALLER then paternalCallWorkflow.output_vcf else "null"
+            PREVIOUS_WORKFLOW_OUTPUT=paternalCallWorkflow.output_vcf
     }
     
     ###############################
     ## Run trio joint genotyping ##
     ###############################
-    if (!RUN_DRAGEN_CALLER) {
-        call runGATKCombineGenotypeGVCFs {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
-                in_gvcf_file_proband=probandCallWorkflow.output_vcf,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_reference_dict_file=REF_DICT_FILE
-        }
-        call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipGATKGVCF {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_merged_vcf_file=runGATKCombineGenotypeGVCFs.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
-        }
-    }
-    if (RUN_DRAGEN_CALLER) {
-        call runDragenJointGenotyper {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
-                in_gvcf_file_proband=probandCallWorkflow.output_vcf,
-                in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                in_udp_data_dir=UDPBINFO_PATH,
-                in_helix_username=HELIX_USERNAME
-        }
+    call runGATKCombineGenotypeGVCFs {
+        input:
+            in_sample_name=SAMPLE_NAME_PROBAND,
+            in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
+            in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
+            in_gvcf_file_proband=probandCallWorkflow.output_vcf,
+            in_reference_file=REF_FILE,
+            in_reference_index_file=REF_INDEX_FILE,
+            in_reference_dict_file=REF_DICT_FILE
+    
+    }   
+    call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipGATKGVCF {
+        input:
+            in_sample_name=SAMPLE_NAME_PROBAND,
+            in_merged_vcf_file=runGATKCombineGenotypeGVCFs.joint_genotyped_vcf,
+            in_vg_container=VG_CONTAINER
     }
     
     #####################################
     ## Run parental graph construction ##
     #####################################
-    File output_joint_genotyped_vcf = select_first([bgzipGATKGVCF.output_merged_vcf, runDragenJointGenotyper.dragen_joint_genotyped_vcf])
-    File output_joint_genotyped_vcf_index = select_first([bgzipGATKGVCF.output_merged_vcf_index, runDragenJointGenotyper.dragen_joint_genotyped_vcf_index])
     call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
         input:
             in_proband_sample_name=SAMPLE_NAME_PROBAND,
             in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
             in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
-            joint_genotyped_vcf=output_joint_genotyped_vcf,
-            joint_genotyped_vcf_index=output_joint_genotyped_vcf_index,
+            joint_genotyped_vcf=bgzipGATKGVCF.output_merged_vcf,
+            joint_genotyped_vcf_index=bgzipGATKGVCF.output_merged_vcf_index,
             contigs=CONTIGS,
             filter_parents=false
     }
@@ -395,7 +389,7 @@ workflow vgTrioPipeline {
     }
     
     output {
-        File output_cohort_vcf = output_joint_genotyped_vcf
+        File output_cohort_vcf = bgzipGATKGVCF.output_merged_vcf
         File? output_maternal_bam = maternalMapWorkflow.output_bam
         File? output_maternal_bam_index = maternalMapWorkflow.output_bam_index
         File? output_paternal_bam = paternalMapWorkflow.output_bam
@@ -434,14 +428,8 @@ task runGATKCombineGenotypeGVCFs {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
-        gatk IndexFeatureFile \
-            -F ${in_gvcf_file_maternal} \
-        && gatk IndexFeatureFile \
-            -F ${in_gvcf_file_paternal} \
-        && gatk IndexFeatureFile \
-            -F ${in_gvcf_file_proband} \
-        && gatk CombineGVCFs \
+
+        gatk CombineGVCFs \
           --reference ${in_reference_file} \
           -V ${in_gvcf_file_maternal} -V ${in_gvcf_file_paternal} -V ${in_gvcf_file_proband} \
           --output ${in_sample_name}_cohort.combined.gvcf \
@@ -457,57 +445,6 @@ task runGATKCombineGenotypeGVCFs {
         memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk:4.1.1.0"
-    }
-}
-
-task runDragenJointGenotyper {
-    input {
-        String in_sample_name
-        File in_gvcf_file_maternal
-        File in_gvcf_file_paternal
-        File in_gvcf_file_proband
-        String in_dragen_ref_index_name
-        String in_udp_data_dir
-        String in_helix_username
-    }
-
-    String maternal_gvcf_file_name = basename(in_gvcf_file_maternal)
-    String paternal_gvcf_file_name = basename(in_gvcf_file_paternal)
-    String proband_gvcf_file_name = basename(in_gvcf_file_proband)
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        ## Copy input GVCFs into directory that Dragen can access
-        UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
-        mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ && \
-        cp ~{in_gvcf_file_maternal} ~{in_gvcf_file_paternal} ~{in_gvcf_file_proband} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ && \
-        JOINT_GENOTYPE_DRAGEN_WORK_DIR="/staging/~{in_helix_username}/output_cohort_joint_call_~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{proband_gvcf_file_name}" && \
-        mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper" && \
-        ssh -t ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/" && \
-        mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper ~{in_sample_name}_dragen_joint_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
-    >>>
-    output {
-        File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz"
-        File dragen_joint_genotyped_vcf_index = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz.tbi"
-    }
-    runtime {
-        memory: 50 + " GB"
     }
 }
 
@@ -551,12 +488,12 @@ task runWhatsHapPhasing {
     input {
         String in_cohort_sample_name
         File joint_genotyped_vcf
-        File? in_maternal_bam
-        File? in_maternal_bam_index
-        File? in_paternal_bam
-        File? in_paternal_bam_index
-        File? in_proband_bam
-        File? in_proband_bam_index
+        File in_maternal_bam
+        File in_maternal_bam_index
+        File in_paternal_bam
+        File in_paternal_bam_index
+        File in_proband_bam
+        File in_proband_bam_index
         File in_ped_file
         File in_genetic_map
         String in_contig
