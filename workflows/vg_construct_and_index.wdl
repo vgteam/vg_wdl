@@ -19,7 +19,7 @@ workflow vg_construct_and_index {
              "1",  "2",  "3",  "4",  "5",  "6",
              "7",  "8",  "9", "10", "11", "12",
             "13", "14", "15", "16", "17", "18",
-            "19", "20", "21", "22",  "X",  "Y"
+            "19", "20", "21", "22",  "X",  "Y", "MT"
         ]
 
         # VCF for each contig
@@ -48,7 +48,8 @@ workflow vg_construct_and_index {
             contig = p.left,
             vcf_gz = p.right,
             use_haplotypes = use_haplotypes,
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            construct_cores = 16
         }
     }
     
@@ -64,7 +65,8 @@ workflow vg_construct_and_index {
                 ref_fasta_gz = ref_fasta_gz,
                 contig = contig,
                 use_haplotypes = false,
-                vg_docker = vg_docker
+                vg_docker = vg_docker,
+                construct_cores = 4
             }
         }
         call concat as concat_vg_graph_lists { input:
@@ -181,11 +183,11 @@ task extract_decoys {
         String vg_docker
     }
     
-    command {
+    command <<<
         set -exu -o pipefail
-        
-        zcat ${ref_fasta_gz} | grep "${decoy_regex}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
-    }
+        GREP_REGEX="~{decoy_regex}"
+        zcat ~{ref_fasta_gz} | grep "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
+    >>>
     output {
         Array[String] decoy_contig_ids = read_lines("decoy_contig_ids.txt")
     }
@@ -203,6 +205,7 @@ task construct_graph {
         Boolean use_haplotypes
         String vg_construct_options="--node-max 32 --handle-sv"
         String vg_docker
+        Int construct_cores
     }
     
     Boolean use_vcf = defined(vcf_gz)
@@ -216,7 +219,8 @@ task construct_graph {
             VCF_OPTION_STRING="-v ~{vcf_gz} --region-is-chrom"
         fi
 
-        vg construct --threads 32 -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg"
+        vg construct --threads ~{construct_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg" \
+        && rm -f ref.fa
     >>>
 
     output {
@@ -224,9 +228,9 @@ task construct_graph {
     }
 
     runtime {
-        cpu: 32
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: construct_cores
+        memory: 20 + " GB"
+        disks: "local-disk 50 SSD"
         docker: vg_docker
     }
 }
@@ -406,7 +410,7 @@ task prune_graph {
     command {
         set -exu -o pipefail
         nm=$(basename "${contig_vg}" .vg)
-        vg prune --threads 32 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
+        vg prune --threads 16 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
     }
 
     output {
@@ -414,7 +418,7 @@ task prune_graph {
     }
 
     runtime {
-        cpu: 32
+        cpu: 16
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
         docker: vg_docker
@@ -451,7 +455,7 @@ task prune_graph_with_haplotypes {
     }
 
     runtime {
-        cpu: 32
+        cpu: 16
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
         docker: vg_docker
