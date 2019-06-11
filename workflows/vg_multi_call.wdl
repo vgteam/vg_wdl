@@ -1,55 +1,51 @@
 version 1.0
 
-#version draft-2
-# Apparently cromwell 36.1 doesn't parse the version line in wdl files if the wdl version is a draft version.
-# Cromwell 36.1 wdl parser defaults to draft-2 if a `version` line is not given.
-# https://gatkforums.broadinstitute.org/wdl/discussion/15519/escape-characters-in-draft-2-v-1-0
+### vg_multi_call.wdl ###
+## Author: Charles Markello
+## Description: Core VG variant calling workflow for single sample datasets.
+## Reference: https://github.com/vgteam/vg/wiki
 
 workflow vgMultiMapCall {
     input {
-        Boolean? RUN_LINEAR_CALLER
-        Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
-        Boolean? RUN_DRAGEN_CALLER
-        Boolean DRAGEN_MODE = select_first([RUN_DRAGEN_CALLER, false])
-        Boolean? RUN_GVCF_OUTPUT
-        Boolean GVCF_MODE = select_first([RUN_GVCF_OUTPUT, false])
-        Boolean? RUN_SNPEFF_ANNOTATION
-        Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
-        Boolean? RUN_SV_CALLER
-        Boolean SV_CALLER_MODE = select_first([RUN_SV_CALLER, false])
-        Boolean? GOOGLE_STORE_CLEANUP
-        Boolean GOOGLE_CLEANUP_MODE = select_first([GOOGLE_STORE_CLEANUP, false])
-        File? INPUT_BAM_FILE
-        File? INPUT_BAM_FILE_INDEX
-        File? INPUT_GAM_FILE
-        File? INPUT_GAM_FILE_INDEX
-        String PREVIOUS_WORKFLOW_OUTPUT = "null"
-        String SAMPLE_NAME
-        String VG_CONTAINER
-        Int CHUNK_BASES
-        Int OVERLAP
-        File? PATH_LIST_FILE
-        File XG_FILE
-        File REF_FILE
-        File REF_INDEX_FILE
-        File REF_DICT_FILE
-        File SNPEFF_DATABASE
-        Int CHUNK_GAM_CORES
-        Int CHUNK_GAM_DISK
-        Int CHUNK_GAM_MEM
-        Int VGCALL_CORES
-        Int VGCALL_DISK
-        Int VGCALL_MEM
-        String DRAGEN_REF_INDEX_NAME
-        String UDPBINFO_PATH
-        String HELIX_USERNAME
+        Boolean SURJECT_MODE = true                 # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
+        Boolean DRAGEN_MODE = false                 # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
+        Boolean GVCF_MODE = false                   # Set to 'true' to process and output gVCFs instead of VCFs.
+        Boolean SNPEFF_ANNOTATION = true            # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
+        Boolean SV_CALLER_MODE = false              # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
+        Boolean GOOGLE_CLEANUP_MODE = false         # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        File? INPUT_BAM_FILE                        # Input sample surjected .bam file
+        File? INPUT_BAM_FILE_INDEX                  # Input sample .bai index of surjected .bam file.
+        File? INPUT_GAM_FILE                        # Input sample .gam file
+        File? INPUT_GAM_FILE_INDEX                  # Input sample .gai index of .gam file
+        String PREVIOUS_WORKFLOW_OUTPUT = "null"    # Dummy input for iterative workflow dependency functionality.
+        String SAMPLE_NAME                          # The sample name
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        Int CHUNK_BASES = 50000000                  # Number of bases to chunk .gam alignment files for variant calling
+        Int OVERLAP = 2000                          # Number of overlapping bases between each .gam chunk
+        File? PATH_LIST_FILE                        # (OPTIONAL) Text file where each line is a path name in the XG index
+        File XG_FILE                                # Path to .xg index file
+        File REF_FILE                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
+        File REF_INDEX_FILE                         # Path to .fai index of the REF_FILE fasta reference
+        File REF_DICT_FILE                          # Path to .dict file of the REF_FILE fasta reference
+        File SNPEFF_DATABASE                        # Path to snpeff database .zip file for snpEff annotation functionality.
+        Int CHUNK_GAM_CORES = 32
+        Int CHUNK_GAM_DISK = 400
+        Int CHUNK_GAM_MEM = 100
+        Int VGCALL_CORES = 8
+        Int VGCALL_DISK = 40
+        Int VGCALL_MEM = 64
+        String DRAGEN_REF_INDEX_NAME                # Dragen module based reference index directory (e.g. "hs37d5_v7")
+        String UDPBINFO_PATH                        # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
+        String HELIX_USERNAME                       # The nih helix username which holds a user directory in UDPBINFO_PATH
     }
     
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
-    call extractPathNames {
-        input:
-            in_xg_file=XG_FILE,
-            in_vg_container=VG_CONTAINER
+    if (!defined(PATH_LIST_FILE)) {
+        call extractPathNames {
+            input:
+                in_xg_file=XG_FILE,
+                in_vg_container=VG_CONTAINER
+        }
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
     

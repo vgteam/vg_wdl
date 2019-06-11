@@ -1,92 +1,54 @@
 version 1.0
 
-#version draft-2
-# Apparently cromwell 36.1 doesn't parse the version line in wdl files if the wdl version is a draft version.
-# Cromwell 36.1 wdl parser defaults to draft-2 if a `version` line is not given.
-# https://gatkforums.broadinstitute.org/wdl/discussion/15519/escape-characters-in-draft-2-v-1-0
-
-# Working example pipeline which uses VG to map and HaplotypeCaller to call variants.   
-# Tested on Googles Cloud Platorm "GCP" and works for VG container "quay.io/vgteam/vg:v1.11.0-215-ge5edc43e-t246-run".  
-# WDL pipeline works with JSON input file "vg_pipeline.workingexample.inputs_tiny.json" 
-# Steps in pipeline:    
-# 1) Split reads into chunks.   
-#    500 READS_PER_CHUNK value recommended for HG002 tiny chr 21 dataset    
-#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.tiny.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.tiny.fastq.gz".   
-#    1000000 READS_PER_CHUNK value recommended for HG002 whole chr 21 dataset   
-#      "gs://cmarkell-vg-wdl-dev/HG002_chr21_1.fastq.gz" and "gs://cmarkell-vg-wdl-dev/HG002_chr21_2.fastq.gz". 
-# 2) Align input paired-end reads to a VG graph using either VG MAP or VG MPMAP algorithms.
-#    Set vgPipeline.VGMPMAP_MODE to "true" to run the VG MPMAP algorithm on the read set.
-#    Set vgPipeline.VGMPMAP_MODE to "false" to run the VG MAP algorithm on the read set.
-# Either run GATK's HaplotypeCaller or use the graph-backed caller "VG Call".
-#    Set vgPipeline.SURJECT_MODE to "true" to run HaplotypeCaller or the Dragen modules caller on alignments.
-#       3) Surject VG alignments from GAM format to BAM format.
-#       4) Merge chunked BAM alignments and preprocess them for GATK compatibility.
-#       Either run HaplotypeCaller or use the Dragen module caller on the NIH Biowulf system.
-#           Set vgPipeline.RUN_DRAGEN_CALLER to "false" to run GATKs HaplotypeCaller on alignments.
-#               5) Run GATK HaplotypeCaller on processed BAM data.
-#           Set vgPipeline.RUN_DRAGEN_CALLER to "true" to run the Dragen modules caller on alignments.
-#           (Currently only works on NIH Biowulf system)
-#               5) Run Dragen variant caller on processed BAM data.
-#    Set vgPipeline.SURJECT_MODE to "false" to run VG Call on alignments.   
-#       3) Merge graph alignments into a single GAM file
-#       4) Chunk GAM file by path names as specified by the "vgPipeline.PATH_LIST_FILE"
-#          vgPipeline.PATH_LIST_FILE is a text file that lists path names one per row.
-#       5) Run VG Call on GAM files chunked by path name
-#          Requires vgPipeline.PATH_LENGTH_FILE which is a text file that lists a tab-delimited set of path names and path lengths
-#             one per row.
-#       6) Merge VCFs then compress and index the merged VCF.
+### vg_multi_map_call.wdl ###
+# Author: Charles Markello
+# Description: Core VG mapping and variant calling workflow for single sample datasets.
+# Reference: https://github.com/vgteam/vg/wiki
 
 workflow vgMultiMapCall {
     input {
-        Boolean? RUN_VGMPMAP_ALGORITHM
-        Boolean VGMPMAP_MODE = select_first([RUN_VGMPMAP_ALGORITHM, true])
-        Boolean? RUN_LINEAR_CALLER
-        Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
-        Boolean? RUN_DRAGEN_CALLER
-        Boolean DRAGEN_MODE = select_first([RUN_DRAGEN_CALLER, false])
-        Boolean? RUN_GVCF_OUTPUT
-        Boolean GVCF_MODE = select_first([RUN_GVCF_OUTPUT, false])
-        Boolean? RUN_SNPEFF_ANNOTATION
-        Boolean SNPEFF_ANNOTATION = select_first([RUN_SNPEFF_ANNOTATION, true])
-        Boolean? RUN_SV_CALLER
-        Boolean SV_CALLER_MODE = select_first([RUN_SV_CALLER, false])
-        Boolean? GOOGLE_STORE_CLEANUP
-        Boolean GOOGLE_CLEANUP_MODE = select_first([GOOGLE_STORE_CLEANUP, false])
-        File INPUT_READ_FILE_1
-        File INPUT_READ_FILE_2
-        String SAMPLE_NAME
-        String VG_CONTAINER
-        Int READS_PER_CHUNK
-        Int CHUNK_BASES
-        Int OVERLAP
-        File? PATH_LIST_FILE
-        File XG_FILE
-        File GCSA_FILE
-        File GCSA_LCP_FILE
-        File? GBWT_FILE
-        File? SNARLS_FILE
-        File REF_FILE
-        File REF_INDEX_FILE
-        File REF_DICT_FILE
-        File SNPEFF_DATABASE
-        Int SPLIT_READ_CORES
-        Int SPLIT_READ_DISK
-        Int MAP_CORES
-        Int MAP_DISK
-        Int MAP_MEM
-        Int MERGE_GAM_CORES
-        Int MERGE_GAM_DISK
-        Int MERGE_GAM_MEM
-        Int MERGE_GAM_TIME
-        Int CHUNK_GAM_CORES
-        Int CHUNK_GAM_DISK
-        Int CHUNK_GAM_MEM
-        Int VGCALL_CORES
-        Int VGCALL_DISK
-        Int VGCALL_MEM
-        String DRAGEN_REF_INDEX_NAME
-        String UDPBINFO_PATH
-        String HELIX_USERNAME
+        Boolean VGMPMAP_MODE = true             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
+        Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
+        Boolean DRAGEN_MODE = false             # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
+        Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.
+        Boolean SNPEFF_ANNOTATION = true        # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
+        Boolean SV_CALLER_MODE = false          # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
+        Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
+        File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
+        String SAMPLE_NAME                      # The sample name
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs)
+        Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
+        Int OVERLAP = 2000                      # Number of overlapping bases between each .gam chunk
+        File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
+        File XG_FILE                            # Path to .xg index file
+        File GCSA_FILE                          # Path to .gcsa index file
+        File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
+        File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
+        File? SNARLS_FILE                       # (OPTIONAL) Path to .snarls index file
+        File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
+        File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
+        File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
+        File SNPEFF_DATABASE                    # Path to snpeff database .zip file for snpEff annotation functionality.
+        Int SPLIT_READ_CORES = 32
+        Int SPLIT_READ_DISK = 200
+        Int MAP_CORES = 32
+        Int MAP_DISK = 100
+        Int MAP_MEM = 100
+        Int MERGE_GAM_CORES = 56
+        Int MERGE_GAM_DISK = 400
+        Int MERGE_GAM_MEM = 100
+        Int MERGE_GAM_TIME = 1200
+        Int CHUNK_GAM_CORES = 32
+        Int CHUNK_GAM_DISK = 400
+        Int CHUNK_GAM_MEM = 100
+        Int VGCALL_CORES = 8
+        Int VGCALL_DISK = 40
+        Int VGCALL_MEM = 64
+        String DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
+        String UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
+        String HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
     }
     
     # Split input reads into chunks for parallelized mapping
@@ -110,10 +72,12 @@ workflow vgMultiMapCall {
     }
     
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
-    call extractPathNames {
-        input:
-            in_xg_file=XG_FILE,
-            in_vg_container=VG_CONTAINER
+    if (!defined(PATH_LIST_FILE)) {
+        call extractPathNames {
+            input:
+                in_xg_file=XG_FILE,
+                in_vg_container=VG_CONTAINER
+        }
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
     
@@ -427,7 +391,7 @@ workflow vgMultiMapCall {
             }
         }
         # Set chunk context amount depending on structural variant or default variant calling mode
-        Int default_or_sv_chunk_context = if SV_CALLER_MODE then 200 else 50
+        Int default_or_sv_chunk_context = if SV_CALLER_MODE then 2500 else 50
         # Chunk GAM alignments by contigs list
         call chunkAlignmentsByPathNames {
             input:
@@ -612,7 +576,7 @@ task extractPathNames {
         File output_path_list = "path_list.txt"
     }
     runtime {
-        memory: "50 GB"
+        memory: "20 GB"
         disks: "local-disk 50 SSD"
         docker: in_vg_container
     }

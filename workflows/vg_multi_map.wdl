@@ -1,41 +1,38 @@
 version 1.0
 
-#version draft-2
-# Apparently cromwell 36.1 doesn't parse the version line in wdl files if the wdl version is a draft version.
-# Cromwell 36.1 wdl parser defaults to draft-2 if a `version` line is not given.
-# https://gatkforums.broadinstitute.org/wdl/discussion/15519/escape-characters-in-draft-2-v-1-0
+### vg_multi_map.wdl ###
+## Author: Charles Markello
+## Description: Core VG mapping workflow for single sample datasets.
+## Reference: https://github.com/vgteam/vg/wiki
 
 workflow vgMultiMapCall {
     input {
-        Boolean? RUN_VGMPMAP_ALGORITHM
-        Boolean VGMPMAP_MODE = select_first([RUN_VGMPMAP_ALGORITHM, true])
-        Boolean? RUN_LINEAR_CALLER
-        Boolean SURJECT_MODE = select_first([RUN_LINEAR_CALLER, true])
-        Boolean? GOOGLE_STORE_CLEANUP
-        Boolean GOOGLE_CLEANUP_MODE = select_first([GOOGLE_STORE_CLEANUP, false])
-        File INPUT_READ_FILE_1
-        File INPUT_READ_FILE_2
-        String SAMPLE_NAME
-        String VG_CONTAINER
-        Int READS_PER_CHUNK
-        File? PATH_LIST_FILE
-        File XG_FILE
-        File GCSA_FILE
-        File GCSA_LCP_FILE
-        File? GBWT_FILE
-        File? SNARLS_FILE
-        File REF_FILE
-        File REF_INDEX_FILE
-        File REF_DICT_FILE
-        Int SPLIT_READ_CORES
-        Int SPLIT_READ_DISK
-        Int MAP_CORES
-        Int MAP_DISK
-        Int MAP_MEM
-        Int MERGE_GAM_CORES
-        Int MERGE_GAM_DISK
-        Int MERGE_GAM_MEM
-        Int MERGE_GAM_TIME
+        Boolean VGMPMAP_MODE = true                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
+        Boolean SURJECT_MODE = true                     # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
+        Boolean GOOGLE_CLEANUP_MODE = false             # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
+        File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
+        String SAMPLE_NAME                              # The sample name
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
+        File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index
+        File XG_FILE                                    # Path to .xg index file
+        File GCSA_FILE                                  # Path to .gcsa index file
+        File GCSA_LCP_FILE                              # Path to .gcsa.lcp index file
+        File? GBWT_FILE                                 # (OPTIONAL) Path to .gbwt index file
+        File? SNARLS_FILE                               # (OPTIONAL) Path to .snarls index file
+        File REF_FILE                                   # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
+        File REF_INDEX_FILE                             # Path to .fai index of the REF_FILE fasta reference
+        File REF_DICT_FILE                              # Path to .dict file of the REF_FILE fasta reference
+        Int SPLIT_READ_CORES = 32
+        Int SPLIT_READ_DISK = 200
+        Int MAP_CORES = 32
+        Int MAP_DISK = 100
+        Int MAP_MEM = 100
+        Int MERGE_GAM_CORES = 56
+        Int MERGE_GAM_DISK = 400
+        Int MERGE_GAM_MEM = 100
+        Int MERGE_GAM_TIME = 1200
     }
 
     # Split input reads into chunks for parallelized mapping
@@ -59,10 +56,12 @@ workflow vgMultiMapCall {
     }
 
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
-    call extractPathNames {
-        input:
-            in_xg_file=XG_FILE,
-            in_vg_container=VG_CONTAINER
+    if (!defined(PATH_LIST_FILE)) {
+        call extractPathNames {
+            input:
+                in_xg_file=XG_FILE,
+                in_vg_container=VG_CONTAINER
+        }
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
 
@@ -542,7 +541,7 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        memory: 100 + " GB"
+        memory: 200 + " GB"
         cpu: 32
         disks: "local-disk 100 SSD"
         docker: in_vg_container
