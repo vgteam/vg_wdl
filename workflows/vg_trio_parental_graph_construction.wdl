@@ -146,7 +146,9 @@ task runSplitJointGenotypedVCF {
 
         while read -r contig; do
             if [[ ~{filter_parents} == true && ${contig} == "MT" ]]; then
-                bcftools view -O z -r "${contig}" "-s ~{in_maternal_sample_name}" ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+            elif [[ ~{filter_parents} == true && ${contig} == "Y" ]]; then
+                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
             else
                 bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
             fi

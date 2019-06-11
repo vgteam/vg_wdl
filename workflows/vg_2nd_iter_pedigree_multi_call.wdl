@@ -13,7 +13,9 @@ import "./vg_multi_call.wdl" as vgMultiCallWorkflow
 ###########################
 workflow vgTrioPipeline {
     input {
-        Array[File]+ SIBLING_BAM_FILE_LIST                  # Input list of sibling surjected .bam files.
+        File MATERNAL_GVCF                                  # Input maternal .gvcf.gz file
+        File PATERNAL_GVCF                                  # Input paternal .gvcf.gz file
+        Array[File]+ SIBLING_BAM_FILE_LIST                  # Input list of sibling surjected .bam files. Proband must be first in list.
         Array[File]+ SIBLING_BAM_FILE_INDEX_LIST            # Input list of .bai indices of surjected .bam files. Must follow same sample order as SIBLING_BAM_FILE_LIST.
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Input list of sibling sample names. Must follow same order as SIBLING_BAM_FILE_LIST.
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
@@ -176,9 +178,9 @@ workflow vgTrioPipeline {
     if (!DRAGEN_MODE) {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper2nd {
             input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
+                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
+                in_gvcf_file_maternal=MATERNAL_GVCF,
+                in_gvcf_file_paternal=PATERNAL_GVCF,
                 in_gvcf_files_siblings=gvcf_files_siblings,
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
@@ -186,7 +188,7 @@ workflow vgTrioPipeline {
         }
         call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzip2ndGATKGVCF {
             input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_merged_vcf_file=gatkJointGenotyper2nd.joint_genotyped_vcf,
                 in_vg_container=VG_CONTAINER
         }
@@ -194,9 +196,9 @@ workflow vgTrioPipeline {
     if (DRAGEN_MODE) {
         call runDragenJointGenotyper as dragenJointGenotyper2nd {
             input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
+                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
+                in_gvcf_file_maternal=MATERNAL_GVCF,
+                in_gvcf_file_paternal=PATERNAL_GVCF,
                 in_gvcf_files_siblings=gvcf_files_siblings,
                 in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                 in_udp_data_dir=UDPBINFO_PATH,
@@ -209,12 +211,12 @@ workflow vgTrioPipeline {
     if (SNPEFF_ANNOTATION) {
         call vgMultiMapCallWorkflow.normalizeVCF as normalizeCohortVCF {
             input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_bgzip_vcf_file=output_2nd_joint_genotyped_vcf,
         }
         call vgMultiMapCallWorkflow.snpEffAnnotateVCF as snpEffAnnotateCohortVCF {
             input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_normalized_vcf_file=normalizeCohortVCF.output_normalized_vcf,
                 in_snpeff_database=SNPEFF_DATABASE,
         }
@@ -225,7 +227,7 @@ workflow vgTrioPipeline {
     
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        Array[File] output_gvcf_files_siblings = output_gvcf_files_siblings
+        Array[File] output_gvcf_files_siblings = gvcf_files_siblings
     }
 }
 
@@ -295,7 +297,6 @@ task runDragenJointGenotyper {
 
     String maternal_gvcf_file_name = basename(in_gvcf_file_maternal)
     String paternal_gvcf_file_name = basename(in_gvcf_file_paternal)
-    String proband_gvcf_file_name = basename(in_gvcf_file_proband)
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
