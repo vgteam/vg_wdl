@@ -19,7 +19,7 @@ workflow vg_construct_and_index {
              "1",  "2",  "3",  "4",  "5",  "6",
              "7",  "8",  "9", "10", "11", "12",
             "13", "14", "15", "16", "17", "18",
-            "19", "20", "21", "22",  "X",  "Y"
+            "19", "20", "21", "22",  "X",  "Y", "MT"
         ]
 
         # VCF for each contig
@@ -27,26 +27,61 @@ workflow vg_construct_and_index {
 
         # set true to GBWT index the VCF phased haplotypes
         Boolean use_haplotypes = false
-
+        
+        # set true to generate SNARLS index of VG graph
+        Boolean make_snarls = false
+        
+        # set true to include decoy sequences from reference genome FASTA into VG graph construction
+        Boolean use_decoys = false
+        
+        # regex to use in grep for extracting decoy contig names from reference FASTA
+        String decoy_regex = ">GL"
+        
         # vg docker image tag
         String vg_docker = "quay.io/vgteam/vg:v1.14.0"
     }
 
     # construct graph for each reference contig
     scatter (p in zip(contigs, contigs_vcf_gz)) {
-        call construct_graph { input:
+        call construct_graph as construct_chromosome_graph { input:
             ref_fasta_gz = ref_fasta_gz,
             contig = p.left,
             vcf_gz = p.right,
             use_haplotypes = use_haplotypes,
+            vg_docker = vg_docker,
+            construct_cores = 16
+        }
+    }
+    
+    # extract decoy sequences from fasta and construct graph fro each decoy contig, if so configured
+    if (use_decoys) {
+        call extract_decoys { input:
+            ref_fasta_gz = ref_fasta_gz,
+            decoy_regex = decoy_regex,
+            vg_docker = vg_docker
+        }
+        scatter (contig in extract_decoys.decoy_contig_ids) {
+            call construct_graph as construct_decoy_graph { input:
+                ref_fasta_gz = ref_fasta_gz,
+                contig = contig,
+                use_haplotypes = false,
+                vg_docker = vg_docker,
+                construct_cores = 4
+            }
+        }
+        call concat as concat_vg_graph_lists { input:
+            array_1 = construct_chromosome_graph.contig_vg,
+            array_2 = construct_decoy_graph.contig_vg,
             vg_docker = vg_docker
         }
     }
+    
+    Array[File]? combined_contig_vg_list = if (use_decoys) then concat_vg_graph_lists.out else construct_chromosome_graph.contig_vg
 
     # combine them into a single graph with unique node IDs
     call combine_graphs { input:
         graph_name = graph_name,
-        contigs_vg = construct_graph.contig_vg,
+        contigs_vg = select_first([combined_contig_vg_list]),
         vg_docker = vg_docker
     }
 
@@ -68,7 +103,16 @@ workflow vg_construct_and_index {
         }
         File? final_gbwt = if (defined(gbwt_merge.gbwt)) then gbwt_merge.gbwt else gbwt_index.gbwt[0]
     }
-
+    
+    # make snarls index
+    if (make_snarls) {
+        call snarls_index { input:
+            vg = combine_graphs.vg,
+            graph_name = graph_name,
+            vg_docker = vg_docker
+        }
+    }
+    
     # make xg index
     call xg_index { input:
         graph_name = graph_name,
@@ -82,7 +126,7 @@ workflow vg_construct_and_index {
     # If setting prune_options, make sure to set prune_graph.prune_options or
     # prune_graph_with_haplotypes.prune_options according to the desired path.
     if (!use_haplotypes) {
-        scatter (contig_vg in combine_graphs.contigs_uid_vg) {
+        scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
             call prune_graph { input:
                 contig_vg = contig_vg,
                 vg_docker = vg_docker
@@ -96,12 +140,27 @@ workflow vg_construct_and_index {
             empty_id_map = combine_graphs.empty_id_map,
             vg_docker = vg_docker
         }
+        # If decoys are to be included, prune those graphs and merge
+        #  them with the haplotype pruned graphs
+        if (use_decoys) {
+            scatter (contig_vg in select_first([combine_graphs.decoy_contigs_uid_vg])) {
+                call prune_graph as prune_decoy_graphs { input:
+                    contig_vg = contig_vg,
+                    vg_docker = vg_docker
+                }
+            }
+            call concat as concat_pruned_vg_graph_lists { input:
+                array_1 = prune_graph_with_haplotypes.contigs_pruned_vg,
+                array_2 = prune_decoy_graphs.contig_pruned_vg,
+                vg_docker = vg_docker
+            }
+        }
     }
-
+    
     # make GCSA index
     call gcsa_index { input:
         graph_name = graph_name,
-        contigs_pruned_vg = select_first([prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
+        contigs_pruned_vg = select_first([concat_pruned_vg_graph_lists.out, prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
         id_map = select_first([prune_graph_with_haplotypes.pruned_id_map,combine_graphs.empty_id_map]),
         vg_docker = vg_docker
     }
@@ -112,6 +171,28 @@ workflow vg_construct_and_index {
         File gcsa = gcsa_index.gcsa
         File gcsa_lcp = gcsa_index.lcp
         File? gbwt = final_gbwt
+        File? snarls = snarls_index.snarls
+    }
+}
+
+# extract decoy contigs from reference FASTA file
+task extract_decoys {
+    input {
+        File ref_fasta_gz
+        String decoy_regex
+        String vg_docker
+    }
+    
+    command <<<
+        set -exu -o pipefail
+        GREP_REGEX="~{decoy_regex}"
+        zcat ~{ref_fasta_gz} | grep "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
+    >>>
+    output {
+        Array[String] decoy_contig_ids = read_lines("decoy_contig_ids.txt")
+    }
+    runtime {
+        docker: vg_docker
     }
 }
 
@@ -119,25 +200,56 @@ workflow vg_construct_and_index {
 task construct_graph {
     input {
         File ref_fasta_gz
-        File vcf_gz
+        File? vcf_gz
         String contig
         Boolean use_haplotypes
         String vg_construct_options="--node-max 32 --handle-sv"
         String vg_docker
+        Int construct_cores
     }
-
-    command {
+    
+    Boolean use_vcf = defined(vcf_gz)
+    
+    command <<<
         set -exu -o pipefail
-        pigz -dc ${ref_fasta_gz} > ref.fa
-        tabix "${vcf_gz}"
+        pigz -dc ~{ref_fasta_gz} > ref.fa
+        VCF_OPTION_STRING=""
+        if [ ~{use_vcf} == true ]; then
+            tabix "~{vcf_gz}"
+            VCF_OPTION_STRING="-v ~{vcf_gz} --region-is-chrom"
+        fi
 
-        vg construct -R "${contig}" -C -r ref.fa -v "${vcf_gz}" --region-is-chrom ${vg_construct_options} ${if use_haplotypes then "-a" else ""} > "${contig}.vg"
-    }
+        vg construct --threads ~{construct_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg" \
+        && rm -f ref.fa
+    >>>
 
     output {
         File contig_vg = "${contig}.vg"
     }
 
+    runtime {
+        cpu: construct_cores
+        memory: 20 + " GB"
+        disks: "local-disk 50 SSD"
+        docker: vg_docker
+    }
+}
+
+# helper task concatenates two Array[File] into a single Array[File]
+#   borrowed from https://gatkforums.broadinstitute.org/wdl/discussion/8511/concatenating-arrays
+task concat {
+    input {
+        Array[File]+ array_1
+        Array[File]+ array_2
+        String vg_docker
+    }
+    command {
+        cat "~{write_lines(array_1)}"
+        cat "~{write_lines(array_2)}"
+    }
+    output {
+        Array[File]+ out = read_lines(stdout())
+    }
     runtime {
         docker: vg_docker
     }
@@ -156,20 +268,28 @@ task combine_graphs {
         # we approach this in a particular way to ensure the output array contigs_uid_vg has the
         # same order as the input array contigs_vg (so we can't rely on glob patterns)
         mkdir vg/
+        touch decoy_contigs_uid_vg
         while read -r contig_vg; do
             nm=$(basename "$contig_vg")
             cp "$contig_vg" "vg/$nm"
-            echo "vg/$nm" >> contigs_uid_vg
+            if [[ $nm == *"GL"* ]]; then
+                echo "vg/$nm" >> decoy_contigs_uid_vg
+            else
+                echo "vg/$nm" >> contigs_uid_vg
+            fi
+            echo "vg/$nm" >> all_contigs_uid_vg
         done < "~{write_lines(contigs_vg)}"
-        xargs -n 999999 vg ids -j -m empty.id_map < contigs_uid_vg
+        xargs -n 999999 vg ids -j -m empty.id_map < all_contigs_uid_vg
         mkdir concat
-        xargs -n 999999 cat < contigs_uid_vg > "concat/${graph_name}.vg"
+        xargs -n 999999 cat < all_contigs_uid_vg > "concat/${graph_name}.vg"
     }
 
     output {
         File vg = "concat/${graph_name}.vg"
         File empty_id_map = "empty.id_map"
         Array[File]+ contigs_uid_vg = read_lines("contigs_uid_vg")
+        Array[File]+ all_contigs_uid_vg = read_lines("all_contigs_uid_vg")
+        Array[File]? decoy_contigs_uid_vg = read_lines("decoy_contigs_uid_vg")
     }
 
     runtime {
@@ -190,7 +310,7 @@ task gbwt_index {
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
-        vg index -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
+        vg index --threads 32 -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     }
 
     output {
@@ -198,6 +318,9 @@ task gbwt_index {
     }
 
     runtime {
+        cpu: 32
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: vg_docker
     }
 }
@@ -220,6 +343,32 @@ task gbwt_merge {
     }
 
     runtime {
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
+        docker: vg_docker
+    }
+}
+
+# construct the Snarls index from the VG graph
+task snarls_index {
+    input {
+        File vg
+        String graph_name
+        String vg_docker
+    }
+    
+    command {
+        set -exu -o pipefail
+        vg snarls -t ~{vg} > "~{graph_name}.snarls"
+    }
+    
+    output {
+        File snarls = "~{graph_name}.snarls"
+    }
+     
+    runtime {
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: vg_docker
     }
 }
@@ -235,7 +384,7 @@ task xg_index {
 
     command {
         set -exu -o pipefail
-        vg index -x "${graph_name}.xg" ~{xg_options} "~{vg}"
+        vg index --threads 32 -x "${graph_name}.xg" ~{xg_options} "~{vg}"
     }
 
     output {
@@ -243,6 +392,9 @@ task xg_index {
     }
 
     runtime {
+        cpu: 32
+        memory: 100 + " GB"
+        disks: "local-disk 100 SSD"
         docker: vg_docker
     }
 }
@@ -258,7 +410,7 @@ task prune_graph {
     command {
         set -exu -o pipefail
         nm=$(basename "${contig_vg}" .vg)
-        vg prune -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
+        vg prune --threads 16 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
     }
 
     output {
@@ -266,6 +418,9 @@ task prune_graph {
     }
 
     runtime {
+        cpu: 16
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: vg_docker
     }
 }
@@ -289,7 +444,7 @@ task prune_graph_with_haplotypes {
             contig_gbwt="${p[1]}"
             nm=$(basename "${contig_vg}" .vg)
             contig_pruned_vg="${nm}.pruned.vg"
-            vg prune -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
+            vg prune --threads 16 -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
             echo "$contig_pruned_vg" >> contigs_pruned_vg
         done < "inputs"
     >>>
@@ -300,6 +455,9 @@ task prune_graph_with_haplotypes {
     }
 
     runtime {
+        cpu: 16
+        memory: 50 + " GB"
+        disks: "local-disk 100 SSD"
         docker: vg_docker
     }
 }
@@ -316,7 +474,7 @@ task gcsa_index {
 
     command {
         set -exu -o pipefail
-        vg index -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
+        vg index --threads 32 -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
     }
 
     output {
@@ -325,6 +483,9 @@ task gcsa_index {
     }
 
     runtime {
+        cpu: 32
+        memory: 240 + " GB"
+        disks: "local-disk 800 SSD"
         docker: vg_docker
     }
 }
