@@ -248,7 +248,7 @@ workflow vgTrioPipeline {
     ###############################
     ## Run trio joint genotyping ##
     ###############################
-    if (!RUN_DRAGEN_CALLER) {
+    if (!DRAGEN_MODE) {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper1st {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
@@ -266,7 +266,12 @@ workflow vgTrioPipeline {
                 in_vg_container=VG_CONTAINER
         }
     }
-    if (RUN_DRAGEN_CALLER) {
+    if (
+    
+    
+    
+    
+    ) {
         call runDragenJointGenotyper as dragenJointGenotyper1st {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
