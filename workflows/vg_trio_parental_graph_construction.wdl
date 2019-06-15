@@ -195,13 +195,19 @@ task runWhatsHapPhasing {
         else
             GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chr~{in_contig}_combined_b37.txt --chromosome ~{in_contig}"
         fi
+        ln -s ~{in_maternal_bam} input_maternal.bam
+        ln -s ~{in_maternal_bam_index} input_maternal.bam.bai
+        ln -s ~{in_paternal_bam} input_paternal.bam
+        ln -s ~{in_paternal_bam_index} input_paternal.bam.bai
+        ln -s ~{in_proband_bam} input_proband.bam
+        ln -s ~{in_proband_bam_index} input_proband.bam.bai
         whatshap phase \
             --reference ~{in_reference_file} \
             --indels \
             --ped ~{in_ped_file} \
             ${GENMAP_OPTION_STRING} \
             -o ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf \
-            ~{joint_genotyped_vcf} ~{in_proband_bam} ~{in_maternal_bam} ~{in_paternal_bam} \
+            ~{joint_genotyped_vcf} input_proband.bam input_maternal.bam input_paternal.bam \
         && bgzip ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf
     >>>
 
