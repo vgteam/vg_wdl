@@ -143,14 +143,15 @@ task runSplitJointGenotypedVCF {
         else
           SAMPLE_FILTER_STRING=""
         fi
-
+        ln -s ~{joint_genotyped_vcf} input_vcf_file.vcf.gz
+        ln -s ~{joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
         while read -r contig; do
             if [[ ~{filter_parents} == true && ${contig} == "MT" ]]; then
-                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             elif [[ ~{filter_parents} == true && ${contig} == "Y" ]]; then
-                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             else
-                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             fi
             echo "${contig}.vcf.gz" >> contig_vcf_list.txt
         done < "~{write_lines(contigs)}"
