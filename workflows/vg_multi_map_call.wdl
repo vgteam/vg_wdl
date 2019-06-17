@@ -18,7 +18,7 @@ workflow vgMultiMapCall {
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs)
+        Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                      # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
@@ -506,6 +506,7 @@ task cleanUpUnixFilesystem {
     >>>
     runtime {
         docker: "null"
+        continueOnReturnCode: true
     }
 }
 
@@ -520,6 +521,7 @@ task cleanUpGoogleFilestore {
     }
     runtime {
         docker: "google/cloud-sdk"
+        continueOnReturnCode: true
     }
 }
 
@@ -616,9 +618,11 @@ task runVGMAP {
         if [ ~{gbwt_options} == true ]; then
           GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file}"
         fi
+        ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
+        ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
         vg map \
           -x ~{in_xg_file} \
-          -g ~{in_gcsa_file} \
+          -g input_gcsa_file.gcsa \
           ${GBWT_OPTION_STRING} \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
           -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
@@ -672,11 +676,13 @@ task runVGMPMAP {
         elif [ ~{gbwt_options} == true ] && [ ~{snarl_options} == true ]; then
           GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file}"
         fi
+        ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
+        ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
         vg mpmap \
           -S \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
           -x ~{in_xg_file} \
-          -g ~{in_gcsa_file} \
+          -g input_gcsa_file.gcsa \
           ${GBWT_OPTION_STRING} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
