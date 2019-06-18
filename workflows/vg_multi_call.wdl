@@ -266,6 +266,7 @@ task cleanUpUnixFilesystem {
     >>>
     runtime {
         docker: "null"
+        continueOnReturnCode: true
     }
 }
 
@@ -280,6 +281,7 @@ task cleanUpGoogleFilestore {
     }
     runtime {
         docker: "google/cloud-sdk"
+        continueOnReturnCode: true
     }
 }
 

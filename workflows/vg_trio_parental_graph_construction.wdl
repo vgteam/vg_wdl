@@ -143,14 +143,15 @@ task runSplitJointGenotypedVCF {
         else
           SAMPLE_FILTER_STRING=""
         fi
-
+        ln -s ~{joint_genotyped_vcf} input_vcf_file.vcf.gz
+        ln -s ~{joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
         while read -r contig; do
             if [[ ~{filter_parents} == true && ${contig} == "MT" ]]; then
-                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             elif [[ ~{filter_parents} == true && ${contig} == "Y" ]]; then
-                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             else
-                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             fi
             echo "${contig}.vcf.gz" >> contig_vcf_list.txt
         done < "~{write_lines(contigs)}"
@@ -194,13 +195,19 @@ task runWhatsHapPhasing {
         else
             GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chr~{in_contig}_combined_b37.txt --chromosome ~{in_contig}"
         fi
+        ln -s ~{in_maternal_bam} input_maternal.bam
+        ln -s ~{in_maternal_bam_index} input_maternal.bam.bai
+        ln -s ~{in_paternal_bam} input_paternal.bam
+        ln -s ~{in_paternal_bam_index} input_paternal.bam.bai
+        ln -s ~{in_proband_bam} input_proband.bam
+        ln -s ~{in_proband_bam_index} input_proband.bam.bai
         whatshap phase \
             --reference ~{in_reference_file} \
             --indels \
             --ped ~{in_ped_file} \
             ${GENMAP_OPTION_STRING} \
             -o ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf \
-            ~{joint_genotyped_vcf} ~{in_proband_bam} ~{in_maternal_bam} ~{in_paternal_bam} \
+            ~{joint_genotyped_vcf} input_proband.bam input_maternal.bam input_paternal.bam \
         && bgzip ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf
     >>>
 
