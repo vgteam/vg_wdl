@@ -127,7 +127,10 @@ workflow vgMultiMapCall {
                     in_gam_chunk_file=vg_map_algorithm_chunk_gam_output,
                     in_xg_file=XG_FILE,
                     in_vg_container=VG_CONTAINER,
-                    in_sample_name=SAMPLE_NAME
+                    in_sample_name=SAMPLE_NAME,
+                    in_map_cores=MAP_CORES,
+                    in_map_disk=MAP_DISK,
+                    in_map_mem=MAP_MEM
             }
             call sortMDTagBAMFile {
                 input:
@@ -135,7 +138,10 @@ workflow vgMultiMapCall {
                     in_bam_chunk_file=runSurject.chunk_bam_file,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_reference_dict_file=REF_DICT_FILE,
+                    in_map_cores=MAP_CORES,
+                    in_map_disk=MAP_DISK,
+                    in_map_mem=MAP_MEM
             }
             call runPICARD {
                 input:
@@ -144,7 +150,9 @@ workflow vgMultiMapCall {
                     in_bam_file_index=sortMDTagBAMFile.sorted_bam_file_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_reference_dict_file=REF_DICT_FILE,
+                    in_map_cores=MAP_CORES,
+                    in_map_mem=MAP_MEM
             }
             # Cleanup intermediate surject files after use
             if (GOOGLE_CLEANUP_MODE) {
@@ -522,6 +530,9 @@ task runSurject {
         File in_xg_file
         String in_vg_container
         String in_sample_name
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
     }
 
     command <<<
@@ -547,9 +558,9 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        memory: 200 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -561,6 +572,9 @@ task sortMDTagBAMFile {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
     }
 
     command {
@@ -591,9 +605,9 @@ task sortMDTagBAMFile {
         File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
-        memory: 50 + " GB"
-        cpu: 32
-        disks: "local-disk 50 SSD"
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
@@ -606,6 +620,8 @@ task runPICARD {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_map_cores
+        String in_map_mem
     }
 
     command {
@@ -642,8 +658,8 @@ task runPICARD {
     }
     runtime {
         time: 600
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
         docker: "broadinstitute/picard:latest"
     }
 }
