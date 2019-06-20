@@ -367,7 +367,7 @@ task snarls_index {
     }
      
     runtime {
-        memory: 50 + " GB"
+        memory: 240 + " GB"
         disks: "local-disk 100 SSD"
         docker: vg_docker
     }

@@ -551,7 +551,7 @@ task runSurject {
         vg surject \
           -i \
           -x ~{in_xg_file} \
-          -t 32 \
+          -t ~{in_map_cores} \
           -b ~{in_gam_chunk_file} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
     >>>
     output {
@@ -589,7 +589,7 @@ task sortMDTagBAMFile {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools sort \
-          --threads 32 \
+          --threads ${in_map_cores} \
           ${in_bam_chunk_file} \
           -O BAM \
         | samtools calmd \
@@ -636,17 +636,17 @@ task runPICARD {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar MarkDuplicates \
+        java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
           VALIDATION_STRINGENCY=LENIENT \
           I=${in_bam_file} \
           O=${in_sample_name}.mdtag.dupmarked.bam \
           M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar ReorderSam \
+        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
             VALIDATION_STRINGENCY=LENIENT \
             REFERENCE=${in_reference_file} \
             INPUT=${in_sample_name}.mdtag.dupmarked.bam \
             OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar BuildBamIndex \
+        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar BuildBamIndex \
             VALIDATION_STRINGENCY=LENIENT \
             I=${in_sample_name}.mdtag.dupmarked.reordered.bam \
             O=${in_sample_name}.mdtag.dupmarked.reordered.bam.bai \
