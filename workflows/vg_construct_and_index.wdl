@@ -474,7 +474,7 @@ task gcsa_index {
 
     command {
         set -exu -o pipefail
-        vg index --threads 32 -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
+        vg index --threads 32 -p -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
     }
 
     output {
@@ -483,6 +483,7 @@ task gcsa_index {
     }
 
     runtime {
+        time: 1200
         cpu: 32
         memory: 240 + " GB"
         disks: "local-disk 800 SSD"
