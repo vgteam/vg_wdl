@@ -102,7 +102,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         ${SIB_READ_PAIR_1_LIST} \
         ${SIB_READ_PAIR_2_LIST} \
         ${SIB_ID_LIST} \
-        READS_PER_CHUNK=20000000 \
+        READS_PER_CHUNK=10000000 \
         PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \
         XG_FILE='${XG_FILE_PATH}' \
         GCSA_FILE='${GCSA_FILE_PATH}' \

@@ -16,13 +16,13 @@ workflow vgTrioPipeline {
         File MATERNAL_INPUT_READ_FILE_2                     # Input maternal 2nd read pair fastq.gz
         File PATERNAL_INPUT_READ_FILE_1                     # Input paternal 1st read pair fastq.gz
         File PATERNAL_INPUT_READ_FILE_2                     # Input paternal 2nd read pair fastq.gz
-        File PROBAND_INPUT_READ_FILE_1                      # Input proband 1st read pair fastq.gz
-        File PROBAND_INPUT_READ_FILE_2                      # Input proband 2nd read pair fastq.gz
+        Array[File]+ SIBLING_INPUT_READ_FILE_1_LIST
+        Array[File]+ SIBLING_INPUT_READ_FILE_2_LIST
+        Array[String]+ SAMPLE_NAME_SIBLING_LIST
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
-        String SAMPLE_NAME_PROBAND                          # Sample name for the proband
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        Int READS_PER_CHUNK = 20000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
+        Int READS_PER_CHUNK = 10000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
@@ -67,6 +67,10 @@ workflow vgTrioPipeline {
         String DECOY_REGEX = ">GL"                      # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
+    File PROBAND_INPUT_READ_FILE_1 = SIBLING_INPUT_READ_FILE_1_LIST[0]  # Input proband 1st read pair fastq.gz
+    File PROBAND_INPUT_READ_FILE_2 = SIBLING_INPUT_READ_FILE_2_LIST[0]  # Input proband 2nd read pair fastq.gz
+    String SAMPLE_NAME_PROBAND = SAMPLE_NAME_SIBLING_LIST[0]            # Sample name for the proband
+        
     ###################################
     ## Run mapping workflows on Trio ##
     ###################################
@@ -266,12 +270,7 @@ workflow vgTrioPipeline {
                 in_vg_container=VG_CONTAINER
         }
     }
-    if (
-    
-    
-    
-    
-    ) {
+    if (DRAGEN_MODE) {
         call runDragenJointGenotyper as dragenJointGenotyper1st {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,

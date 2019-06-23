@@ -104,7 +104,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         SAMPLE_NAME_MATERNAL='${MATERNAL_SAMPLE_NAME}' \
         SAMPLE_NAME_PATERNAL='${PATERNAL_SAMPLE_NAME}' \
         SAMPLE_NAME_PROBAND='${PROBAND_SAMPLE_NAME}' \
-        READS_PER_CHUNK=20000000 \
+        READS_PER_CHUNK=10000000 \
         PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \
         XG_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.xg' \
         GCSA_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gcsa' \
