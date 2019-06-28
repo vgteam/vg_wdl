@@ -127,7 +127,10 @@ workflow vgMultiMapCall {
                     in_gam_chunk_file=vg_map_algorithm_chunk_gam_output,
                     in_xg_file=XG_FILE,
                     in_vg_container=VG_CONTAINER,
-                    in_sample_name=SAMPLE_NAME
+                    in_sample_name=SAMPLE_NAME,
+                    in_map_cores=MAP_CORES,
+                    in_map_disk=MAP_DISK,
+                    in_map_mem=MAP_MEM
             }
             call sortMDTagBAMFile {
                 input:
@@ -135,7 +138,10 @@ workflow vgMultiMapCall {
                     in_bam_chunk_file=runSurject.chunk_bam_file,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_reference_dict_file=REF_DICT_FILE,
+                    in_map_cores=MAP_CORES,
+                    in_map_disk=MAP_DISK,
+                    in_map_mem=MAP_MEM
             }
             call runPICARD {
                 input:
@@ -144,7 +150,9 @@ workflow vgMultiMapCall {
                     in_bam_file_index=sortMDTagBAMFile.sorted_bam_file_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_reference_dict_file=REF_DICT_FILE,
+                    in_map_cores=MAP_CORES,
+                    in_map_mem=MAP_MEM
             }
             # Cleanup intermediate surject files after use
             if (GOOGLE_CLEANUP_MODE) {
@@ -489,9 +497,9 @@ task runVGMPMAP {
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
         GBWT_OPTION_STRING=""
         if [ ~{gbwt_options} == true ] && [ ~{snarl_options} == false ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file}"
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} --recombination-penalty 5.0"
         elif [ ~{gbwt_options} == true ] && [ ~{snarl_options} == true ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file}"
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file} --recombination-penalty 5.0"
         fi
         ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
         ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
@@ -503,7 +511,7 @@ task runVGMPMAP {
           ${GBWT_OPTION_STRING} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
-          --recombination-penalty 5.0 -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
     output {
         File chunk_gam_file = glob("*.gam")[0]
@@ -522,6 +530,9 @@ task runSurject {
         File in_xg_file
         String in_vg_container
         String in_sample_name
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
     }
 
     command <<<
@@ -540,16 +551,16 @@ task runSurject {
         vg surject \
           -i \
           -x ~{in_xg_file} \
-          -t 32 \
+          -t ~{in_map_cores} \
           -b ~{in_gam_chunk_file} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
     >>>
     output {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        memory: 200 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -561,6 +572,9 @@ task sortMDTagBAMFile {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
     }
 
     command {
@@ -575,7 +589,7 @@ task sortMDTagBAMFile {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools sort \
-          --threads 32 \
+          --threads ${in_map_cores} \
           ${in_bam_chunk_file} \
           -O BAM \
         | samtools calmd \
@@ -591,9 +605,9 @@ task sortMDTagBAMFile {
         File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
-        memory: 50 + " GB"
-        cpu: 32
-        disks: "local-disk 50 SSD"
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
@@ -606,6 +620,8 @@ task runPICARD {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_map_cores
+        String in_map_mem
     }
 
     command {
@@ -620,17 +636,17 @@ task runPICARD {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar MarkDuplicates \
+        java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
           VALIDATION_STRINGENCY=LENIENT \
           I=${in_bam_file} \
           O=${in_sample_name}.mdtag.dupmarked.bam \
           M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar ReorderSam \
+        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
             VALIDATION_STRINGENCY=LENIENT \
             REFERENCE=${in_reference_file} \
             INPUT=${in_sample_name}.mdtag.dupmarked.bam \
             OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && java -Xmx80g -XX:ParallelGCThreads=32 -jar /usr/picard/picard.jar BuildBamIndex \
+        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar BuildBamIndex \
             VALIDATION_STRINGENCY=LENIENT \
             I=${in_sample_name}.mdtag.dupmarked.reordered.bam \
             O=${in_sample_name}.mdtag.dupmarked.reordered.bam.bai \
@@ -642,8 +658,8 @@ task runPICARD {
     }
     runtime {
         time: 600
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
         docker: "broadinstitute/picard:latest"
     }
 }

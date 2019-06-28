@@ -41,11 +41,11 @@ workflow vgTrioPipeline {
     }
     
     
-    ###########################################
-    ## Run variant calling workflows on Trio ##
-    ###########################################
+    ###########################################################
+    ## Run variant calling workflows on proband and siblings ##
+    ###########################################################
     Int numSilbings = length(SAMPLE_NAME_SIBLING_LIST)
-    call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
+    call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow2 {
         input:
             INPUT_BAM_FILE=SIBLING_BAM_FILE_LIST[0],
             INPUT_BAM_FILE_INDEX=SIBLING_BAM_FILE_INDEX_LIST[0],
@@ -74,7 +74,7 @@ workflow vgTrioPipeline {
             SNPEFF_ANNOTATION=false
     }
     if (numSilbings > 1) {
-        call vgMultiCallWorkflow.vgMultiMapCall as siblingCallWorkflow1 {
+        call vgMultiCallWorkflow.vgMultiMapCall as sibling1CallWorkflow {
             input:
                 INPUT_BAM_FILE=SIBLING_BAM_FILE_LIST[1],
                 INPUT_BAM_FILE_INDEX=SIBLING_BAM_FILE_INDEX_LIST[1],
@@ -101,11 +101,11 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
-                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then probandCallWorkflow.output_vcf else "null"
+                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then probandCallWorkflow2.output_vcf else "null"
         }
     }
     if (numSilbings > 2) {
-        call vgMultiCallWorkflow.vgMultiMapCall as siblingCallWorkflow2 {
+        call vgMultiCallWorkflow.vgMultiMapCall as sibling2CallWorkflow {
             input:
                 INPUT_BAM_FILE=SIBLING_BAM_FILE_LIST[2],
                 INPUT_BAM_FILE_INDEX=SIBLING_BAM_FILE_INDEX_LIST[2],
@@ -132,11 +132,11 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
-                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then siblingCallWorkflow1.output_vcf else "null"
+                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then sibling1CallWorkflow.output_vcf else "null"
         }
     }
     if (numSilbings > 3) {
-        call vgMultiCallWorkflow.vgMultiMapCall as siblingCallWorkflow3 {
+        call vgMultiCallWorkflow.vgMultiMapCall as sibling3CallWorkflow {
             input:
                 INPUT_BAM_FILE=SIBLING_BAM_FILE_LIST[3],
                 INPUT_BAM_FILE_INDEX=SIBLING_BAM_FILE_INDEX_LIST[3],
@@ -163,13 +163,13 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
-                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then siblingCallWorkflow2.output_vcf else "null"
+                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then sibling2CallWorkflow.output_vcf else "null"
         }
     }
-    File proband_gvcf = probandCallWorkflow.output_vcf
-    File? sibling1_gvcf = siblingCallWorkflow1.output_vcf
-    File? sibling2_gvcf = siblingCallWorkflow2.output_vcf
-    File? sibling3_gvcf = siblingCallWorkflow3.output_vcf
+    File proband_gvcf = probandCallWorkflow2.output_vcf
+    File? sibling1_gvcf = sibling1CallWorkflow.output_vcf
+    File? sibling2_gvcf = sibling2CallWorkflow.output_vcf
+    File? sibling3_gvcf = sibling3CallWorkflow.output_vcf
     Array[File] gvcf_files_siblings = select_all([proband_gvcf, sibling1_gvcf, sibling2_gvcf, sibling3_gvcf])
     
     #######################################################
