@@ -497,9 +497,9 @@ task runVGMPMAP {
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
         GBWT_OPTION_STRING=""
         if [ ~{gbwt_options} == true ] && [ ~{snarl_options} == false ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file}"
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} --recombination-penalty 5.0"
         elif [ ~{gbwt_options} == true ] && [ ~{snarl_options} == true ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file}"
+          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file} --recombination-penalty 5.0"
         fi
         ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
         ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
@@ -511,7 +511,7 @@ task runVGMPMAP {
           ${GBWT_OPTION_STRING} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
-          --recombination-penalty 5.0 -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
     output {
         File chunk_gam_file = glob("*.gam")[0]

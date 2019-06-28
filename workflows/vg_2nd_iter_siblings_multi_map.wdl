@@ -35,9 +35,9 @@ workflow vgTrioPipeline {
         Boolean VGMPMAP_MODE = true                         # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
     }
    
-    #######################################
-    ## Run mapping workflows on Siblings ##
-    #######################################
+    ##############################################################################
+    ## Run mapping workflows on proband and siblings against the parental graph ##
+    ##############################################################################
     Array[Pair[File,File]] read_pair_files_list = zip(SIBLING_INPUT_READ_FILE_1_LIST, SIBLING_INPUT_READ_FILE_2_LIST)
     scatter (read_pair_set in zip(read_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] read_pair_files = read_pair_set.left

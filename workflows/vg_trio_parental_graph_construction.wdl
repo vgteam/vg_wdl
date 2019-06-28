@@ -46,53 +46,57 @@ workflow vgTrioPipeline {
     #####################################
     ## Run parental graph construction ##
     #####################################
-    call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
-        input:
-            in_proband_sample_name=SAMPLE_NAME_PROBAND,
-            in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
-            in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
-            joint_genotyped_vcf=COHORT_JOINT_VCF,
-            joint_genotyped_vcf_index=COHORT_JOINT_VCF_INDEX,
-            contigs=CONTIGS,
-            filter_parents=false
-    }
-    scatter (contig_pair in zip(CONTIGS, splitJointGenotypedVCF.contig_vcfs)) {
-        call runWhatsHapPhasing {
+    if (USE_HAPLOTYPES) {
+        call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
             input:
-                in_cohort_sample_name=SAMPLE_NAME_PROBAND,
-                joint_genotyped_vcf=contig_pair.right,
-                in_maternal_bam=MATERNAL_INPUT_BAM_FILE,
-                in_maternal_bam_index=MATERNAL_INPUT_BAM_FILE_INDEX,
-                in_paternal_bam=PATERNAL_INPUT_BAM_FILE,
-                in_paternal_bam_index=PATERNAL_INPUT_BAM_FILE_INDEX,
-                in_proband_bam=PROBAND_INPUT_BAM_FILE,
-                in_proband_bam_index=PROBAND_INPUT_BAM_FILE_INDEX,
-                in_ped_file=PED_FILE,
-                in_genetic_map=GEN_MAP_FILES,
-                in_contig=contig_pair.left,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_reference_dict_file=REF_DICT_FILE
+                in_proband_sample_name=SAMPLE_NAME_PROBAND,
+                in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
+                in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
+                joint_genotyped_vcf=COHORT_JOINT_VCF,
+                joint_genotyped_vcf_index=COHORT_JOINT_VCF_INDEX,
+                contigs=CONTIGS,
+                filter_parents=false
+        }
+        scatter (contig_pair in zip(CONTIGS, splitJointGenotypedVCF.contig_vcfs)) {
+            call runWhatsHapPhasing {
+                input:
+                    in_cohort_sample_name=SAMPLE_NAME_PROBAND,
+                    joint_genotyped_vcf=contig_pair.right,
+                    in_maternal_bam=MATERNAL_INPUT_BAM_FILE,
+                    in_maternal_bam_index=MATERNAL_INPUT_BAM_FILE_INDEX,
+                    in_paternal_bam=PATERNAL_INPUT_BAM_FILE,
+                    in_paternal_bam_index=PATERNAL_INPUT_BAM_FILE_INDEX,
+                    in_proband_bam=PROBAND_INPUT_BAM_FILE,
+                    in_proband_bam_index=PROBAND_INPUT_BAM_FILE_INDEX,
+                    in_ped_file=PED_FILE,
+                    in_genetic_map=GEN_MAP_FILES,
+                    in_contig=contig_pair.left,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+        }
+        call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
+            input:
+                in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
+                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
+        }
+        call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
+            input:
+                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
+                in_vg_container=VG_CONTAINER
         }
     }
-    call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
-        input:
-            in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
-            in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
-    }
-    call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
-        input:
-            in_sample_name=SAMPLE_NAME_PROBAND,
-            in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
-            in_vg_container=VG_CONTAINER
-    }
+    File cohort_vcf_output = select_first([bgzipCohortPhasedVCF.output_merged_vcf, COHORT_JOINT_VCF])
+    File cohort_vcf_index_output = select_first([bgzipCohortPhasedVCF.output_merged_vcf_index, COHORT_JOINT_VCF_INDEX])
     call runSplitJointGenotypedVCF as splitPhasedVCF {
         input:
             in_proband_sample_name=SAMPLE_NAME_PROBAND,
             in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
             in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
-            joint_genotyped_vcf=bgzipCohortPhasedVCF.output_merged_vcf,
-            joint_genotyped_vcf_index=bgzipCohortPhasedVCF.output_merged_vcf_index,
+            joint_genotyped_vcf=cohort_vcf_output,
+            joint_genotyped_vcf_index=cohort_vcf_index_output,
             contigs=CONTIGS,
             filter_parents=true
     }
