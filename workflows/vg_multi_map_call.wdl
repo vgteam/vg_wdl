@@ -1434,6 +1434,57 @@ task runVGCaller {
     }
 }
 
+task runVGPackCaller {
+    input {
+        String in_sample_name
+        File in_vg_file
+        File in_gam_file
+        String in_vg_container
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+        Boolean in_sv_mode
+    }
+
+    ## DRAFT
+    String chunk_tag = basename(in_vg_file, ".vg")
+    command <<<
+        set -eux -o pipefail
+	
+	vg chunk \
+	-x xg_path \
+	-b ~{chunk_tag} \
+	-t cores \
+	-f -R path_id_ranges_path \
+	-a gam_path -g
+
+	vg pack \
+	-x ~{chunk_tag}.xg \
+	-g ~{chunk_tag}.gam  \
+	-q -t 7 \
+	-o ~{chunk_tag}.pack
+	
+	vg call \
+        ~{chunk_tag}.aug.vg \
+	-P ~{chunk_tag}.pack \
+	-x ~{chunk_tag}.xg \
+	-u -n 0 -e 1000 -G 3 \
+        -t ~{in_vgcall_cores} \
+        -S ~{in_sample_name} \
+        -r ${PATH_NAME} > ~{chunk_tag}.vcf
+    >>>
+    output {
+        File output_vcf = "~{chunk_tag}.sorted.vcf.gz"
+        File output_vcf_index = "~{chunk_tag}.sorted.vcf.gz.tbi"
+    }
+    runtime {
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: in_vg_container
+    }
+}
+
 task runVCFClipper {
     input {
         File in_chunk_vcf
