@@ -13,6 +13,7 @@ workflow vgMultiMapCall {
         Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.
         Boolean SNPEFF_ANNOTATION = true        # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean SV_CALLER_MODE = false          # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
+        Boolean PACK_MODE = false               # Set to 'true' to run vg call from packed files and avoids GAM sorting (SURJECT_MODE must be 'false' for this feature to be used)
         Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
@@ -27,6 +28,7 @@ workflow vgMultiMapCall {
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? SNARLS_FILE                       # (OPTIONAL) Path to .snarls index file
+        File? IDRANGES_FILE                     # (OPTIONAL) Path to id ranges file
         File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
@@ -53,7 +55,7 @@ workflow vgMultiMapCall {
     
     # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
-        input:
+	input:
             in_read_file=INPUT_READ_FILE_1,
             in_pair_id="1",
             in_vg_container=VG_CONTAINER,
@@ -102,7 +104,7 @@ workflow vgMultiMapCall {
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM
             }
-        } 
+        }
         if (!VGMPMAP_MODE) {
             call runVGMAP {
                 input:
@@ -381,93 +383,153 @@ workflow vgMultiMapCall {
                 in_merge_gam_cores=MERGE_GAM_CORES,
                 in_merge_gam_disk=MERGE_GAM_DISK,
                 in_merge_gam_mem=MERGE_GAM_MEM,
-                in_merge_gam_time=MERGE_GAM_TIME
+                in_merge_gam_time=MERGE_GAM_TIME,
+	        sort_gam=!PACK_MODE
         }
         # Cleanup gam chunk files after use
         if (GOOGLE_CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
                 input:
                     previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-                    current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+                    current_task_output = mergeAlignmentGAMChunks.merged_gam_file
             }
         }
         if (!GOOGLE_CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
                 input:
-                    previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-                    current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+		    previous_task_outputs = vg_map_algorithm_chunk_gam_output,
+		    current_task_output = mergeAlignmentGAMChunks.merged_gam_file
+	    }
+        }
+	if (PACK_MODE && defined(IDRANGES_FILE)) {
+            # Chunk GAM alignments by contigs list
+            call chunkAlignmentsByPathNamesWithIdRanges {
+		input:
+		    in_sample_name=SAMPLE_NAME,
+		    in_merged_gam=mergeAlignmentGAMChunks.merged_gam_file,
+		    in_xg_file=XG_FILE,
+		    in_path_list_file=pipeline_path_list_file,
+		    in_idranges_file=IDRANGES_FILE,
+		    in_vg_container=VG_CONTAINER,
+		    in_chunk_gam_cores=CHUNK_GAM_CORES,
+		    in_chunk_gam_disk=CHUNK_GAM_DISK,
+		    in_chunk_gam_mem=CHUNK_GAM_MEM
             }
-        }
-        # Set chunk context amount depending on structural variant or default variant calling mode
-        Int default_or_sv_chunk_context = if SV_CALLER_MODE then 2500 else 50
-        # Chunk GAM alignments by contigs list
-        call chunkAlignmentsByPathNames {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
-            in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
-            in_xg_file=XG_FILE,
-            in_path_list_file=pipeline_path_list_file,
-            in_chunk_context=default_or_sv_chunk_context,
-            in_chunk_bases=CHUNK_BASES,
-            in_overlap=OVERLAP,
-            in_vg_container=VG_CONTAINER,
-            in_chunk_gam_cores=CHUNK_GAM_CORES,
-            in_chunk_gam_disk=CHUNK_GAM_DISK,
-            in_chunk_gam_mem=CHUNK_GAM_MEM
-        }
-        Array[Pair[File,File]] vg_caller_input_files_list = zip(chunkAlignmentsByPathNames.output_vg_chunks, chunkAlignmentsByPathNames.output_gam_chunks) 
-        # Run distributed graph-based variant calling
-        scatter (vg_caller_input_files in vg_caller_input_files_list) { 
-            call runVGCaller { 
-                input: 
-                    in_sample_name=SAMPLE_NAME, 
-                    in_chunk_bed_file=chunkAlignmentsByPathNames.output_bed_chunk_file, 
-                    in_vg_file=vg_caller_input_files.left, 
-                    in_gam_file=vg_caller_input_files.right, 
-                    in_chunk_bases=CHUNK_BASES, 
-                    in_overlap=OVERLAP, 
-                    in_vg_container=VG_CONTAINER,
-                    in_vgcall_cores=VGCALL_CORES,
-                    in_vgcall_disk=VGCALL_DISK,
-                    in_vgcall_mem=VGCALL_MEM,
-                    in_sv_mode=SV_CALLER_MODE
+            Array[Pair[File,File]] vg_caller_input_files_list = zip(chunkAlignmentsByPathNames.output_vg_chunks, chunkAlignmentsByPathNames.output_gam_chunks) 
+            # Run distributed graph-based variant calling
+            scatter (vg_caller_input_files in vg_caller_input_files_list) { 
+		call runVGPackCaller {
+		    input: 
+			in_sample_name=SAMPLE_NAME, 
+			in_vg_file=vg_caller_input_files.left, 
+			in_gam_file=vg_caller_input_files.right, 
+			in_vg_container=VG_CONTAINER,
+			in_vgcall_cores=VGCALL_CORES,
+			in_vgcall_disk=VGCALL_DISK,
+			in_vgcall_mem=VGCALL_MEM
+		} 
+		# Cleanup vg call input files after use
+		if (GOOGLE_CLEANUP_MODE) {
+                    call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
+			input:
+			    previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right],
+			    current_task_output = runVGPackCaller.output_vcf
+                    }
+		}
+		if (!GOOGLE_CLEANUP_MODE) {
+                    call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
+			input:
+			    previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right],
+			    current_task_output = runVGPackCaller.output_vcf
+                    }
+		}
+            }
+            # Merge distributed variant called VCFs
+            call concatClippedVCFChunks as concatVCFChunksVGCall { 
+		input: 
+		    in_sample_name=SAMPLE_NAME, 
+		    in_clipped_vcf_chunk_files=runVGPackCaller.output_vcf
             } 
-            call runVCFClipper { 
-                input: 
-                    in_chunk_vcf=runVGCaller.output_vcf, 
-                    in_chunk_vcf_index=runVGCaller.output_vcf_index, 
-                    in_chunk_clip_string=runVGCaller.clip_string 
+            # Extract either the normal or structural variant based VCFs and compress them
+            call bgzipMergedVCF as bgzipVGCalledVCF {
+		input:
+		    in_sample_name=SAMPLE_NAME,
+		    in_merged_vcf_file=concatVCFChunksVGCall.output_merged_vcf,
+		    in_vg_container=VG_CONTAINER
+            }
+	}
+	if (!PACK_MODE || !defined(IDRANGES_FILE)) {
+            # Set chunk context amount depending on structural variant or default variant calling mode
+            Int default_or_sv_chunk_context = if SV_CALLER_MODE then 2500 else 50
+            # Chunk GAM alignments by contigs list
+            call chunkAlignmentsByPathNames {
+		input:
+		    in_sample_name=SAMPLE_NAME,
+		    in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
+		    in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
+		    in_xg_file=XG_FILE,
+		    in_path_list_file=pipeline_path_list_file,
+		    in_chunk_context=default_or_sv_chunk_context,
+		    in_chunk_bases=CHUNK_BASES,
+		    in_overlap=OVERLAP,
+		    in_vg_container=VG_CONTAINER,
+		    in_chunk_gam_cores=CHUNK_GAM_CORES,
+		    in_chunk_gam_disk=CHUNK_GAM_DISK,
+		    in_chunk_gam_mem=CHUNK_GAM_MEM
+            }
+            Array[Pair[File,File]] vg_caller_input_files_list = zip(chunkAlignmentsByPathNames.output_vg_chunks, chunkAlignmentsByPathNames.output_gam_chunks) 
+            # Run distributed graph-based variant calling
+            scatter (vg_caller_input_files in vg_caller_input_files_list) { 
+		call runVGCaller {
+		    input: 
+			in_sample_name=SAMPLE_NAME, 
+			in_chunk_bed_file=chunkAlignmentsByPathNames.output_bed_chunk_file, 
+			in_vg_file=vg_caller_input_files.left, 
+			in_gam_file=vg_caller_input_files.right, 
+			in_chunk_bases=CHUNK_BASES, 
+			in_overlap=OVERLAP, 
+			in_vg_container=VG_CONTAINER,
+			in_vgcall_cores=VGCALL_CORES,
+			in_vgcall_disk=VGCALL_DISK,
+			in_vgcall_mem=VGCALL_MEM,
+			in_sv_mode=SV_CALLER_MODE
+		} 
+		call runVCFClipper { 
+		    input: 
+			in_chunk_vcf=runVGCaller.output_vcf, 
+			in_chunk_vcf_index=runVGCaller.output_vcf_index, 
+			in_chunk_clip_string=runVGCaller.clip_string 
+		} 
+		# Cleanup vg call input files after use
+		if (GOOGLE_CLEANUP_MODE) {
+                    call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
+			input:
+			    previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
+			    current_task_output = runVCFClipper.output_clipped_vcf
+                    }
+		}
+		if (!GOOGLE_CLEANUP_MODE) {
+                    call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
+			input:
+			    previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
+			    current_task_output = runVCFClipper.output_clipped_vcf
+                    }
+		}
+            }
+            # Merge distributed variant called VCFs
+            call concatClippedVCFChunks as concatVCFChunksVGCall { 
+		input: 
+		    in_sample_name=SAMPLE_NAME, 
+		    in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf 
             } 
-            # Cleanup vg call input files after use
-            if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
-                    input:
-                        previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
-                        current_task_output = runVCFClipper.output_clipped_vcf
-                }
+            # Extract either the normal or structural variant based VCFs and compress them
+            call bgzipMergedVCF as bgzipVGCalledVCF {
+		input:
+		    in_sample_name=SAMPLE_NAME,
+		    in_merged_vcf_file=concatVCFChunksVGCall.output_merged_vcf,
+		    in_vg_container=VG_CONTAINER
             }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
-                    input:
-                        previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
-                        current_task_output = runVCFClipper.output_clipped_vcf
-                }
-            }
-        } 
-        # Merge distributed variant called VCFs
-        call concatClippedVCFChunks as concatVCFChunksVGCall { 
-            input: 
-                in_sample_name=SAMPLE_NAME, 
-                in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf 
-        } 
-        # Extract either the normal or structural variant based VCFs and compress them
-        call bgzipMergedVCF as bgzipVGCalledVCF {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_merged_vcf_file=concatVCFChunksVGCall.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
-        }
+	}
     }
     
     # Extract either the linear-based or graph-based VCF
@@ -1235,6 +1297,7 @@ task mergeAlignmentGAMChunks {
         Int in_merge_gam_disk
         Int in_merge_gam_mem
         Int in_merge_gam_time
+	Boolean sort_gam = true
     }
     
     command {
@@ -1249,15 +1312,17 @@ task mergeAlignmentGAMChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        cat ${sep=" " in_alignment_gam_chunk_files} > ${in_sample_name}_merged.gam \
-        && vg gamsort \
-            ${in_sample_name}_merged.gam \
-            -i ${in_sample_name}_merged.sorted.gam.gai \
-            -t ${in_merge_gam_cores} > ${in_sample_name}_merged.sorted.gam
+	if [ ~{sort_gam} == true ]; then
+	    VG_GAMSORT_COMMAND="vg gamsort ${in_sample_name}_merged.gam -i ${in_sample_name}_merged.sorted.gam.gai -t ${in_merge_gam_cores} > ${in_sample_name}_merged.sorted.gam"
+	fi
+
+        cat ${sep=" " in_alignment_gam_chunk_files} > ${in_sample_name}_merged.gam
+	${VG_GAMSORT_COMMAND}
     }
     output {
         File merged_sorted_gam_file = "${in_sample_name}_merged.sorted.gam"
         File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
+        File merged_gam_file = "${in_sample_name}_merged.gam"
     }
     runtime {
         memory: in_merge_gam_mem + " GB"
@@ -1434,6 +1499,53 @@ task runVGCaller {
     }
 }
 
+task chunkAlignmentsByPathNamesWithIdRanges {
+    input {
+        String in_sample_name
+        File in_merged_gam
+        File in_xg_file
+        File in_path_list_file
+        File in_idranges_file
+        String in_vg_container
+        Int in_chunk_gam_cores
+        Int in_chunk_gam_disk
+        Int in_chunk_gam_mem
+    }
+    
+    command { 
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+    
+        vg chunk \
+            -x ${in_xg_file} \
+            -b call_chunk \
+            -t ${in_chunk_gam_cores} \
+            -a ${in_merged_gam} \
+            -P ${in_path_list_file} \
+	    -R ~{in_idranges_file} \
+            -g -f
+    }
+    output {
+        Array[File] output_vg_chunks = glob("call_chunk*.vg")
+        Array[File] output_gam_chunks = glob("call_chunk*.gam")
+    }   
+    runtime {
+        time: 900
+        memory: in_chunk_gam_mem + " GB"
+        cpu: in_chunk_gam_cores
+        disks: "local-disk " + in_chunk_gam_disk + " SSD"
+        docker: in_vg_container
+    }   
+}
+
 task runVGPackCaller {
     input {
         String in_sample_name
@@ -1443,35 +1555,49 @@ task runVGPackCaller {
         Int in_vgcall_cores
         Int in_vgcall_disk
         Int in_vgcall_mem
-        Boolean in_sv_mode
     }
 
-    ## DRAFT
     String chunk_tag = basename(in_vg_file, ".vg")
     command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -eux -o pipefail
-	
-	vg chunk \
-	-x xg_path \
-	-b ~{chunk_tag} \
-	-t cores \
-	-f -R path_id_ranges_path \
-	-a gam_path -g
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+	PATH_NAME="$(echo ~{chunk_tag} | cut -f 4 -d '_')"
+
+	vg index ~{in_vg_file} \
+	   -x ~{chunk_tag}.xg \
+	   -t ~{in_vgcall_cores}
 
 	vg pack \
-	-x ~{chunk_tag}.xg \
-	-g ~{chunk_tag}.gam  \
-	-q -t 7 \
-	-o ~{chunk_tag}.pack
+	   -x ~{chunk_tag}.xg \
+	   -g ~{in_gam_file} \
+	   -q \
+	   -t ~{in_vgcall_cores} \
+	   -o ~{chunk_tag}.pack
 	
 	vg call \
-        ~{chunk_tag}.aug.vg \
-	-P ~{chunk_tag}.pack \
-	-x ~{chunk_tag}.xg \
-	-u -n 0 -e 1000 -G 3 \
-        -t ~{in_vgcall_cores} \
-        -S ~{in_sample_name} \
-        -r ${PATH_NAME} > ~{chunk_tag}.vcf
+           ~{in_vg_file} \
+	   -P ~{chunk_tag}.pack \
+	   -x ~{chunk_tag}.xg \
+	   -u -n 0 -e 1000 -G 3 \
+           -t ~{in_vgcall_cores} \
+           -S ~{in_sample_name} \
+           -r ${PATH_NAME} > ~{chunk_tag}.vcf
+
+	head -10000 ~{chunk_tag}.vcf | grep "^#" >> ~{chunk_tag}.sorted.vcf
+        if [ "$(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
+	    cat ~{chunk_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{chunk_tag}.sorted.vcf
+        fi
+        bgzip ~{chunk_tag}.sorted.vcf && \
+            tabix -f -p vcf ~{chunk_tag}.sorted.vcf.gz
     >>>
     output {
         File output_vcf = "~{chunk_tag}.sorted.vcf.gz"
