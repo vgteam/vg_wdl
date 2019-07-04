@@ -740,9 +740,8 @@ task mergeAlignmentBAMChunksVGMPMAP {
         #to turn off echo do 'set +o xtrace'
         samtools merge \
           -f --threads 32 \
-          - \
+          ${in_sample_name}_merged.positionsorted.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
-          > ${in_sample_name}_merged.positionsorted.bam \
         && samtools index \
           ${in_sample_name}_merged.positionsorted.bam
     }
@@ -816,6 +815,8 @@ task runGATKIndelRealigner {
         ln -s ${in_bam_file.left} input_bam_file.bam
         ln -s ${in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          -drf DuplicateReadFilter \
+          -drf MappingQualityZeroFilter \
           -nt 32 \
           -R ${in_reference_file} \
           -I input_bam_file.bam \

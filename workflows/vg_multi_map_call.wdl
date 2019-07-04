@@ -999,6 +999,8 @@ task runGATKIndelRealigner {
         ln -s ${in_bam_file.left} input_bam_file.bam
         ln -s ${in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          -drf DuplicateReadFilter \
+          -drf MappingQualityZeroFilter \
           -nt 32 \
           -R ${in_reference_file} \
           -I input_bam_file.bam \
