@@ -240,24 +240,30 @@ workflow vgMultiMapCall {
                     in_reference_index_file=REF_INDEX_FILE,
                     in_reference_dict_file=REF_DICT_FILE
             }
+            call extractMapqZeroReads {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_raw_bam_file=gatk_caller_input_files.left,
+                    in_indel_realigned_bam=runGATKIndelRealigner.indel_realigned_bam
+            }
             # Cleanup intermediate variant calling files after use
             if (GOOGLE_CLEANUP_MODE) {
                 call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
                     input:
                         previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
+                        current_task_output = extractMapqZeroReads.indel_realigned_bam
                 }
             }
             if (!GOOGLE_CLEANUP_MODE) {
                 call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
                     input:
                         previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
+                        current_task_output = extractMapqZeroReads.indel_realigned_bam
                 }
             }
         }
         # Merge Indel Realigned BAM
-        Array[File?] indel_realigned_bam_files_maybes = runGATKIndelRealigner.indel_realigned_bam
+        Array[File?] indel_realigned_bam_files_maybes = extractMapqZeroReads.indel_realigned_bam
         Array[File] indel_realigned_bam_files = select_all(indel_realigned_bam_files_maybes)
         call mergeIndelRealignedBAMs {
             input:
@@ -646,15 +652,10 @@ task runPICARD {
             REFERENCE=${in_reference_file} \
             INPUT=${in_sample_name}.mdtag.dupmarked.bam \
             OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar BuildBamIndex \
-            VALIDATION_STRINGENCY=LENIENT \
-            I=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-            O=${in_sample_name}.mdtag.dupmarked.reordered.bam.bai \
         && rm -f ${in_sample_name}.mdtag.dupmarked.bam
     }
     output {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
-        File mark_dupped_reordered_bam_index = "${in_sample_name}.mdtag.dupmarked.reordered.bam.bai"
     }
     runtime {
         time: 600
@@ -816,12 +817,13 @@ task runGATKIndelRealigner {
         ln -s ${in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           -drf DuplicateReadFilter \
-          -drf MappingQualityZeroFilter \
+          --disable_bam_indexing \
           -nt 32 \
           -R ${in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
+          --disable_bam_indexing \
           -R ${in_reference_file} \
           --targetIntervals forIndelRealigner.intervals \
           -I input_bam_file.bam \
@@ -829,7 +831,6 @@ task runGATKIndelRealigner {
     }
     output {
         File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
-        File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
     }
     runtime {
         time: 1200
@@ -838,6 +839,50 @@ task runGATKIndelRealigner {
         docker: "broadinstitute/gatk3:3.8-1"
     }
 }
+
+task extractMapqZeroReads {
+    input {
+        String in_sample_name
+        File in_raw_bam_file
+        File in_indel_realigned_bam
+    }
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        
+        samtools view \
+            -@ 32 \
+            -h \
+            -O BAM \
+            -q 1 \
+            -U zero_mapq.bam \
+            ${in_raw_bam_file} \
+            > non_zero_mapq.bam \
+        && samtools merge \
+            -f --threads 32 \
+            ${in_sample_name}_merged.indel_realigned.mapq_zero.bam \
+            zero_mapq.bam ${in_indel_realigned_bam} \
+        && rm -f zero_mapq.bam non_zero_mapq.bam
+    }
+    output {
+        File indel_realigned_bam = "${in_sample_name}_merged.indel_realigned.mapq_zero.bam"
+    }
+    runtime {
+        memory: 100 + " GB"
+        cpu: 32
+        docker: "biocontainers/samtools:v1.3_cv3"
+    }
+}
+
 
 task mergeIndelRealignedBAMs {
     input {
