@@ -406,23 +406,21 @@ workflow vgMultiMapCall {
             call chunkAlignmentsByPathNamesWithIdRanges {
                 input:
                 in_sample_name=SAMPLE_NAME,
-                in_merged_gam=mergeAlignmentGAMChunks.merged_gam_file,
                 in_xg_file=XG_FILE,
-                in_path_list_file=pipeline_path_list_file,
                 in_idranges_file=IDRANGES_FILE,
                 in_vg_container=VG_CONTAINER,
                 in_chunk_gam_cores=CHUNK_GAM_CORES,
                 in_chunk_gam_disk=CHUNK_GAM_DISK,
                 in_chunk_gam_mem=CHUNK_GAM_MEM
             }
-            Array[Pair[File,File]] vg_packcaller_input_files_list = zip(chunkAlignmentsByPathNamesWithIdRanges.output_vg_chunks, chunkAlignmentsByPathNamesWithIdRanges.output_gam_chunks) 
+            Array[File] vg_packcaller_input_files_list = chunkAlignmentsByPathNamesWithIdRanges.output_vg_chunks
             # Run distributed graph-based variant calling
             scatter (vg_packcaller_input_files in vg_packcaller_input_files_list) {
                 call runVGPackCaller {
                     input: 
                     in_sample_name=SAMPLE_NAME, 
-                    in_vg_file=vg_packcaller_input_files.left, 
-                    in_gam_file=vg_packcaller_input_files.right, 
+                    in_vg_file=vg_packcaller_input_files, 
+                    in_gam_file=mergeAlignmentGAMChunks.merged_gam_file,
                     in_vg_container=VG_CONTAINER,
                     in_vgcall_cores=VGCALL_CORES,
                     in_vgcall_disk=VGCALL_DISK,
@@ -432,14 +430,14 @@ workflow vgMultiMapCall {
                 if (GOOGLE_CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGPackCallInputsGoogle {
                         input:
-                        previous_task_outputs = [vg_packcaller_input_files.left, vg_packcaller_input_files.right],
+                        previous_task_outputs = [vg_packcaller_input_files],
                         current_task_output = runVGPackCaller.output_vcf
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGPackCallInputsUnix {
                         input:
-                        previous_task_outputs = [vg_packcaller_input_files.left, vg_packcaller_input_files.right],
+                        previous_task_outputs = [vg_packcaller_input_files],
                         current_task_output = runVGPackCaller.output_vcf
                     }
                 }
@@ -575,7 +573,7 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
-        docker: "null"
+        docker: "ubuntu"
         continueOnReturnCode: true
     }
 }
@@ -1311,18 +1309,19 @@ task mergeAlignmentGAMChunks {
     # echo each line of the script to stdout so we can see what is happening
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
-    
+
+    VG_GAMSORT_COMMAND="touch ~{in_sample_name}_merged.sorted.gam ~{in_sample_name}_merged.sorted.gam.gai"
     if [ ~{sort_gam} == true ]; then
-        VG_GAMSORT_COMMAND="vg gamsort ${in_sample_name}_merged.gam -i ${in_sample_name}_merged.sorted.gam.gai -t ${in_merge_gam_cores} > ${in_sample_name}_merged.sorted.gam"
+        VG_GAMSORT_COMMAND="vg gamsort ~{in_sample_name}_merged.gam -i ~{in_sample_name}_merged.sorted.gam.gai -t ~{in_merge_gam_cores} > ~{in_sample_name}_merged.sorted.gam"
     fi
     
-    cat ${sep=" " in_alignment_gam_chunk_files} > ${in_sample_name}_merged.gam
+    cat ~{sep=" " in_alignment_gam_chunk_files} > ~{in_sample_name}_merged.gam
     ${VG_GAMSORT_COMMAND}
     >>>
     output {
-        File merged_sorted_gam_file = "${in_sample_name}_merged.sorted.gam"
-        File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
-        File merged_gam_file = "${in_sample_name}_merged.gam"
+        File merged_sorted_gam_file = "~{in_sample_name}_merged.sorted.gam"
+        File merged_sorted_gam_gai_file = "~{in_sample_name}_merged.sorted.gam.gai"
+        File merged_gam_file = "~{in_sample_name}_merged.gam"
     }
     runtime {
         memory: in_merge_gam_mem + " GB"
@@ -1502,9 +1501,7 @@ task runVGCaller {
 task chunkAlignmentsByPathNamesWithIdRanges {
     input {
         String in_sample_name
-        File in_merged_gam
         File in_xg_file
-        File in_path_list_file
         File? in_idranges_file
         String in_vg_container
         Int in_chunk_gam_cores
@@ -1525,17 +1522,13 @@ task chunkAlignmentsByPathNamesWithIdRanges {
     #to turn off echo do 'set +o xtrace'
     
     vg chunk \
-       -x ${in_xg_file} \
+       -x ~{in_xg_file} \
        -b call_chunk \
-       -t ${in_chunk_gam_cores} \
-       -a ${in_merged_gam} \
-       -P ${in_path_list_file} \
-       -R ~{in_idranges_file} \
-       -g -f
+       -t ~{in_chunk_gam_cores} \
+       -R ~{in_idranges_file}
     >>>
     output {
         Array[File] output_vg_chunks = glob("call_chunk*.vg")
-        Array[File] output_gam_chunks = glob("call_chunk*.gam")
     }   
     runtime {
         time: 900
@@ -1570,7 +1563,7 @@ task runVGPackCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PATH_NAME="$(echo ~{chunk_tag} | cut -f 4 -d '_')"
+        PATH_NAME="$(vg paths -L -v ~{in_vg_file} | head -1)"
 
         vg index ~{in_vg_file} \
            -x ~{chunk_tag}.xg \
