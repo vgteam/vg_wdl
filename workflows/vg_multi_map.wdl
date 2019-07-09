@@ -643,11 +643,13 @@ task runPICARD {
         #to turn off echo do 'set +o xtrace'
 
         java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+          PROGRAM_RECORD_ID=null \
           VALIDATION_STRINGENCY=LENIENT \
           I=${in_bam_file} \
           O=${in_sample_name}.mdtag.dupmarked.bam \
           M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
         && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
+            PROGRAM_RECORD_ID=null \
             VALIDATION_STRINGENCY=LENIENT \
             REFERENCE=${in_reference_file} \
             INPUT=${in_sample_name}.mdtag.dupmarked.bam \
@@ -816,6 +818,7 @@ task runGATKIndelRealigner {
         ln -s ${in_bam_file.left} input_bam_file.bam
         ln -s ${in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
           -nt 32 \
@@ -823,6 +826,7 @@ task runGATKIndelRealigner {
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
+          --remove_program_records \
           --disable_bam_indexing \
           -R ${in_reference_file} \
           --targetIntervals forIndelRealigner.intervals \

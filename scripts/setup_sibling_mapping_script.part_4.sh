@@ -89,7 +89,7 @@ done
 XG_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.xg))
 GCSA_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.gcsa))
 GCSA_LCP_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.gcsa.lcp))
-#GBWT_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.gbwt))
+GBWT_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.gbwt))
 #SNARLS_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.snarls))
 
 rm -f ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
@@ -107,6 +107,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         XG_FILE='${XG_FILE_PATH}' \
         GCSA_FILE='${GCSA_FILE_PATH}' \
         GCSA_LCP_FILE='${GCSA_LCP_FILE_PATH}' \
+        GBWT_FILE='${GBWT_FILE_PATH}' \
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
