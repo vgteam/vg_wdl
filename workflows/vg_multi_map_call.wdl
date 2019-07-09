@@ -1520,12 +1520,15 @@ task chunkAlignmentsByPathNamesWithIdRanges {
     # echo each line of the script to stdout so we can see what is happening
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
+
+    ## Reformat id ranges
+    awk '{print $2":"$3}' ~{in_idranges_file} > idranges.txt
     
     vg chunk \
        -x ~{in_xg_file} \
        -b call_chunk \
        -t ~{in_chunk_gam_cores} \
-       -R ~{in_idranges_file}
+       -R idranges.txt
     >>>
     output {
         Array[File] output_vg_chunks = glob("call_chunk*.vg")
