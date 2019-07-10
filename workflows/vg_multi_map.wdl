@@ -685,7 +685,7 @@ task mergeAlignmentBAMChunksVGMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -u --threads 32 \
+          -f -u -p -c --threads 32 \
           - \
           ${sep=" " in_alignment_bam_chunk_files} \
         | samtools fixmate \
@@ -742,7 +742,7 @@ task mergeAlignmentBAMChunksVGMPMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
+          -f -p -c --threads 32 \
           ${in_sample_name}_merged.positionsorted.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
@@ -872,9 +872,13 @@ task extractMapqZeroReads {
             ${in_raw_bam_file} \
             > non_zero_mapq.bam \
         && samtools merge \
-            -f --threads 32 \
-            ${in_sample_name}_merged.indel_realigned.mapq_zero.bam \
+            -f -u -p -c --threads 32 \
+            - \
             zero_mapq.bam ${in_indel_realigned_bam} \
+        | samtools sort \
+          --threads 32 \
+          - \
+          -O BAM > ${in_sample_name}_merged.indel_realigned.mapq_zero.bam \
         && rm -f zero_mapq.bam non_zero_mapq.bam
     }
     output {
@@ -887,7 +891,7 @@ task extractMapqZeroReads {
     }
 }
 
-
+# TODO: Duplicate task of mergeAlignmentBAMChunksVGMPMAP
 task mergeIndelRealignedBAMs {
     input {
         String in_sample_name
@@ -906,7 +910,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
+          -f -p -c --threads 32 \
           ${in_sample_name}_merged.indel_realigned.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
