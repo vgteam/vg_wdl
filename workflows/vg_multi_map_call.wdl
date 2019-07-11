@@ -15,6 +15,7 @@ workflow vgMultiMapCall {
         Boolean SV_CALLER_MODE = false          # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
         Boolean PACK_MODE = false               # Set to 'true' to run vg call from packed files and avoids GAM sorting (SURJECT_MODE must be 'false' for this feature to be used)
         Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        Boolean CLEANUP_MODE = true             # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
@@ -125,14 +126,14 @@ workflow vgMultiMapCall {
         # Surject GAM alignment files to BAM if SURJECT_MODE set to true
         File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file])
         # Cleanup input reads after use
-        if (GOOGLE_CLEANUP_MODE) {
+        if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
                 input:
                 previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
                 current_task_output = vg_map_algorithm_chunk_gam_output
             }
         }
-        if (!GOOGLE_CLEANUP_MODE) {
+        if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
                 input:
                 previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
@@ -173,14 +174,14 @@ workflow vgMultiMapCall {
                 in_map_mem=MAP_MEM
             }
             # Cleanup intermediate surject files after use
-            if (GOOGLE_CLEANUP_MODE) {
+            if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                 call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                     input:
                     previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
                     current_task_output = runPICARD.mark_dupped_reordered_bam
                 }
             }
-            if (!GOOGLE_CLEANUP_MODE) {
+            if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                 call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                     input:
                     previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
@@ -213,14 +214,14 @@ workflow vgMultiMapCall {
         }
         File merged_bam_file_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file])
         File merged_bam_file_index_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file_index, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file_index])
-        if (GOOGLE_CLEANUP_MODE) {
+        if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
                 input:
                 previous_task_outputs = alignment_chunk_bam_files_valid,
                 current_task_output = merged_bam_file_output
             }
         }
-        if (!GOOGLE_CLEANUP_MODE) {
+        if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
                 input:
                 previous_task_outputs = alignment_chunk_bam_files_valid,
@@ -237,14 +238,14 @@ workflow vgMultiMapCall {
             in_path_list_file=pipeline_path_list_file
         }
         # Cleanup merged bam chunk files after use
-        if (GOOGLE_CLEANUP_MODE) {
+        if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpMergeAlignmentBAMChunksGoogle {
                 input:
                 previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
                 current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
             }
         }
-        if (!GOOGLE_CLEANUP_MODE) {
+        if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpMergeAlignmentBAMChunksUnix {
                 input:
                 previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
@@ -274,14 +275,14 @@ workflow vgMultiMapCall {
                 }
             }
             # Cleanup intermediate variant calling files after use
-            if (GOOGLE_CLEANUP_MODE) {
+            if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                 call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
                     input:
                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                     current_task_output = runGATKIndelRealigner.indel_realigned_bam
                 }
             }
-            if (!GOOGLE_CLEANUP_MODE) {
+            if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                 call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
                     input:
                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
@@ -354,14 +355,14 @@ workflow vgMultiMapCall {
             File final_gvcf_output = select_first([runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
         }
         # Cleanup indel realigned bam files after use
-        if (GOOGLE_CLEANUP_MODE) {
+        if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpIndelRealignedBamsGoogle {
                 input:
                 previous_task_outputs = indel_realigned_bam_files,
                 current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
             }
         }
-        if (!GOOGLE_CLEANUP_MODE) {
+        if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpIndelRealignedBamsUnix {
                 input:
                 previous_task_outputs = indel_realigned_bam_files,
@@ -387,14 +388,14 @@ workflow vgMultiMapCall {
             sort_gam=!PACK_MODE
         }
         # Cleanup gam chunk files after use
-        if (GOOGLE_CLEANUP_MODE) {
+        if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
                 input:
                 previous_task_outputs = vg_map_algorithm_chunk_gam_output,
                 current_task_output = mergeAlignmentGAMChunks.merged_gam_file
             }
         }
-        if (!GOOGLE_CLEANUP_MODE) {
+        if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
                 input:
                 previous_task_outputs = vg_map_algorithm_chunk_gam_output,
@@ -427,14 +428,14 @@ workflow vgMultiMapCall {
                     in_vgcall_mem=VGCALL_MEM
                 }
                 # Cleanup vg call input files after use
-                if (GOOGLE_CLEANUP_MODE) {
+                if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGPackCallInputsGoogle {
                         input:
                         previous_task_outputs = [vg_packcaller_input_files],
                         current_task_output = runVGPackCaller.output_vcf
                     }
                 }
-                if (!GOOGLE_CLEANUP_MODE) {
+                if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGPackCallInputsUnix {
                         input:
                         previous_task_outputs = [vg_packcaller_input_files],
@@ -499,14 +500,14 @@ workflow vgMultiMapCall {
                     in_chunk_clip_string=runVGCaller.clip_string 
                 }
                 # Cleanup vg call input files after use
-                if (GOOGLE_CLEANUP_MODE) {
+                if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
                         input:
                         previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
                         current_task_output = runVCFClipper.output_clipped_vcf
                     }
                 }
-                if (!GOOGLE_CLEANUP_MODE) {
+                if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
                         input:
                         previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
@@ -1568,6 +1569,8 @@ task runVGPackCaller {
 
         PATH_NAME="$(vg paths -L -v ~{in_vg_file} | head -1)"
 
+        sleep 2m
+        
         vg index ~{in_vg_file} \
            -x ~{chunk_tag}.xg \
            -t ~{in_vgcall_cores}
