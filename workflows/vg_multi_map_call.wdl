@@ -1605,6 +1605,7 @@ task runVGPackCaller {
     runtime {
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
+        maxRetries: 3
         disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: in_vg_container
     }
