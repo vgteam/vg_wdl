@@ -226,102 +226,74 @@ workflow vgMultiMapCall {
             }
         }
          
-        # Split merged alignment by contigs list
-        call splitBAMbyPath {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_merged_bam_file=merged_bam_file_output,
-                in_merged_bam_file_index=merged_bam_file_index_output,
-                in_path_list_file=pipeline_path_list_file
-        }
-        # Cleanup merged bam chunk files after use
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpMergeAlignmentBAMChunksGoogle {
-                input:
-                    previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
-                    current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
-            }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpMergeAlignmentBAMChunksUnix {
-                input:
-                    previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
-                    current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
-            }
-        }
-        # Run distributed GATK linear variant calling
-        scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
-            call runGATKIndelRealigner {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=gatk_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            # Run regular VCF genotypers
-            if ((!GVCF_MODE) && (!DRAGEN_MODE)) {
-                call runGATKHaplotypeCaller {
+        # Run VCF variant calling procedure
+        if (!GVCF_MODE) {
+            # Run VCF genotypers
+            if (!DRAGEN_MODE) {
+                # Split merged alignment by contigs list
+                call splitBAMbyPath {
                     input:
                         in_sample_name=SAMPLE_NAME,
-                        in_bam_file=runGATKIndelRealigner.indel_realigned_bam,
-                        in_bam_file_index=runGATKIndelRealigner.indel_realigned_bam_index,
-                        in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_merged_bam_file=merged_bam_file_output,
+                        in_merged_bam_file_index=merged_bam_file_index_output,
+                        in_path_list_file=pipeline_path_list_file
                 }
-            }
-            # Cleanup intermediate variant calling files after use
-            if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
+                # Run distributed GATK linear variant calling
+                scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
+                    # Run regular VCF genotypers
+                    call runGATKHaplotypeCaller {
+                        input:
+                            in_sample_name=SAMPLE_NAME,
+                            in_bam_file=gatk_caller_input_files.left,
+                            in_bam_file_index=gatk_caller_input_files.right,
+                            in_reference_file=REF_FILE,
+                            in_reference_index_file=REF_INDEX_FILE,
+                            in_reference_dict_file=REF_DICT_FILE
+                    }
+                    # Cleanup intermediate variant calling files after use
+                    if (GOOGLE_CLEANUP_MODE) {
+                        call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
+                            input:
+                                previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                current_task_output = runGATKHaplotypeCaller.genotyped_vcf
+                        }
+                    }
+                    if (!GOOGLE_CLEANUP_MODE) {
+                        call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
+                            input:
+                                previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                current_task_output = runGATKHaplotypeCaller.genotyped_vcf
+                        }
+                    }
+                }
+                # Merge linear-based called VCFs
+                Array[File?] final_contig_vcf_output = runGATKHaplotypeCaller.genotyped_vcf
+                Array[File] final_contig_vcf_output_list = select_all(final_contig_vcf_output)
+                call concatClippedVCFChunks as concatLinearVCFChunks {
                     input:
-                        previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
+                        in_sample_name=SAMPLE_NAME,
+                        in_clipped_vcf_chunk_files=final_contig_vcf_output_list
+                }
+                call bgzipMergedVCF as bgzipGATKCalledVCF { 
+                    input: 
+                        in_sample_name=SAMPLE_NAME, 
+                        in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
+                        in_vg_container=VG_CONTAINER 
                 }
             }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
+            # Run VCF varaint calling using the Dragen module
+            if (DRAGEN_MODE) {
+                call runDragenCaller {
                     input:
-                        previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
+                        in_sample_name=SAMPLE_NAME,
+                        in_bam_file=merged_bam_file_output,
+                        in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
+                        in_udp_data_dir=UDPBINFO_PATH,
+                        in_helix_username=HELIX_USERNAME
                 }
             }
-        }
-        
-        # Merge linear-based called VCFs
-        if ((!GVCF_MODE) && (!DRAGEN_MODE)) {
-            Array[File?] final_contig_vcf_output = runGATKHaplotypeCaller.genotyped_vcf
-            Array[File] final_contig_vcf_output_list = select_all(final_contig_vcf_output)
-            call concatClippedVCFChunks as concatLinearVCFChunks {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_clipped_vcf_chunk_files=final_contig_vcf_output_list
-            }
-            call bgzipMergedVCF as bgzipGATKCalledVCF { 
-                input: 
-                    in_sample_name=SAMPLE_NAME, 
-                    in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
-                    in_vg_container=VG_CONTAINER 
-            }
-        }
-        # Merge Indel Realigned BAM
-        Array[File?] indel_realigned_bam_files_maybes = runGATKIndelRealigner.indel_realigned_bam
-        Array[File] indel_realigned_bam_files = select_all(indel_realigned_bam_files_maybes)
-        call mergeIndelRealignedBAMs {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=indel_realigned_bam_files
-        }
-        # Run VCF variant calling using the Dragen module
-        if ((!GVCF_MODE) && (DRAGEN_MODE)) {
-            call runDragenCaller {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file,
-                    in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                    in_udp_data_dir=UDPBINFO_PATH,
-                    in_helix_username=HELIX_USERNAME
-            }
+            
+            File final_vcf_output = select_first([bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf])
         }
         # Run GVCF variant calling procedure
         if (GVCF_MODE) {
@@ -330,8 +302,8 @@ workflow vgMultiMapCall {
                 call runGATKHaplotypeCallerGVCF {
                     input:
                         in_sample_name=SAMPLE_NAME,
-                        in_bam_file=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file,
-                        in_bam_file_index=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file_index,
+                        in_bam_file=merged_bam_file_output,
+                        in_bam_file_index=merged_bam_file_index_output,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_reference_dict_file=REF_DICT_FILE
@@ -342,7 +314,7 @@ workflow vgMultiMapCall {
                 call runDragenCallerGVCF {
                     input:
                         in_sample_name=SAMPLE_NAME,
-                        in_bam_file=mergeIndelRealignedBAMs.merged_indel_realigned_bam_file,
+                        in_bam_file=merged_bam_file_output,
                         in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                         in_udp_data_dir=UDPBINFO_PATH,
                         in_helix_username=HELIX_USERNAME
@@ -350,21 +322,6 @@ workflow vgMultiMapCall {
             }
             
             File final_gvcf_output = select_first([runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
-        }
-        # Cleanup indel realigned bam files after use
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpIndelRealignedBamsGoogle {
-                input:
-                    previous_task_outputs = indel_realigned_bam_files,
-                    current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
-            }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpIndelRealignedBamsUnix {
-                input:
-                    previous_task_outputs = indel_realigned_bam_files,
-                    current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
-            }
         }
     }
     
@@ -471,7 +428,7 @@ workflow vgMultiMapCall {
     }
     
     # Extract either the linear-based or graph-based VCF
-    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf, final_gvcf_output])
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, final_vcf_output, final_gvcf_output])
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION) {
         call normalizeVCF {
@@ -486,13 +443,10 @@ workflow vgMultiMapCall {
                 in_snpeff_database=SNPEFF_DATABASE,
         }
     }
-    if (!SNPEFF_ANNOTATION) {
-        File final_vcf_output = variantcaller_vcf_output
-    }
     output {
-        File output_vcf = select_first([snpEffAnnotateVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        File? output_bam = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
-        File? output_bam_index = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file_index
+        File output_vcf = select_first([snpEffAnnotateVCF.output_snpeff_annotated_vcf, variantcaller_vcf_output])
+        File? output_bam = merged_bam_file_output
+        File? output_bam_index = merged_bam_file_index_output
         File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
         File? output_gam_index = mergeAlignmentGAMChunks.merged_sorted_gam_gai_file
     }
@@ -820,24 +774,21 @@ task runPICARD {
         #to turn off echo do 'set +o xtrace'
 
         java -Xmx80g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+          PROGRAM_RECORD_ID=null \
           VALIDATION_STRINGENCY=LENIENT \
           I=${in_bam_file} \
           O=${in_sample_name}.mdtag.dupmarked.bam \
           M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
         && java -Xmx80g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
+            PROGRAM_RECORD_ID=null \
             VALIDATION_STRINGENCY=LENIENT \
             REFERENCE=${in_reference_file} \
             INPUT=${in_sample_name}.mdtag.dupmarked.bam \
             OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && java -Xmx80g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar BuildBamIndex \
-            VALIDATION_STRINGENCY=LENIENT \
-            I=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-            O=${in_sample_name}.mdtag.dupmarked.reordered.bam.bai \
         && rm -f ${in_sample_name}.mdtag.dupmarked.bam
     }
     output {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
-        File mark_dupped_reordered_bam_index = "${in_sample_name}.mdtag.dupmarked.reordered.bam.bai"
     }
     runtime {
         time: 600
@@ -865,7 +816,7 @@ task mergeAlignmentBAMChunksVGMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -u --threads 32 \
+          -f -u -p -c --threads 32 \
           - \
           ${sep=" " in_alignment_bam_chunk_files} \
         | samtools fixmate \
@@ -922,7 +873,7 @@ task mergeAlignmentBAMChunksVGMPMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
+          -f -p -c --threads 32 \
           - \
           ${sep=" " in_alignment_bam_chunk_files} \
           > ${in_sample_name}_merged.positionsorted.bam \
@@ -999,11 +950,16 @@ task runGATKIndelRealigner {
         ln -s ${in_bam_file.left} input_bam_file.bam
         ln -s ${in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          --remove_program_records \
+          -drf DuplicateRead \
+          --disable_bam_indexing \
           -nt 32 \
           -R ${in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
+          --remove_program_records \
+          --disable_bam_indexing \
           -R ${in_reference_file} \
           --targetIntervals forIndelRealigner.intervals \
           -I input_bam_file.bam \
@@ -1011,13 +967,62 @@ task runGATKIndelRealigner {
     }
     output {
         File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
-        File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
     }
     runtime {
         time: 1200
         memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk3:3.8-1"
+    }
+}
+
+task extractMapqZeroReads {
+    input {
+        String in_sample_name
+        File in_raw_bam_file
+        File in_indel_realigned_bam
+    }
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        
+        samtools view \
+            -@ 32 \
+            -h \
+            -O BAM \
+            -q 1 \
+            -U zero_mapq.bam \
+            ${in_raw_bam_file} \
+            > non_zero_mapq.bam \
+        && samtools merge \
+            -f -u -p -c --threads 32 \
+            - \
+            zero_mapq.bam ${in_indel_realigned_bam} \
+        | samtools sort \
+          --threads 32 \
+          - \
+          -O BAM > ${in_sample_name}_merged.indel_realigned.mapq_zero.bam \
+        && samtools index \
+          ${in_sample_name}_merged.indel_realigned.mapq_zero.bam
+        && rm -f zero_mapq.bam non_zero_mapq.bam
+    }
+    output {
+        File indel_realigned_bam = "${in_sample_name}_merged.indel_realigned.mapq_zero.bam"
+        File indel_realigned_bam_index = "${in_sample_name}_merged.indel_realigned.mapq_zero.bam.bai"
+    }
+    runtime {
+        memory: 100 + " GB"
+        cpu: 32
+        docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
 
@@ -1039,7 +1044,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
+          -f -p -c --threads 32 \
           ${in_sample_name}_merged.indel_realigned.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
@@ -1078,11 +1083,14 @@ task runGATKHaplotypeCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+        
+        ln -s ${in_bam_file} input_bam_file.bam
+        ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
           --reference ${in_reference_file} \
-          --input ${in_bam_file} \
+          --input input_bam_file.bam \
           --output ${in_sample_name}.vcf \
         && bgzip ${in_sample_name}.vcf
     }
@@ -1117,12 +1125,15 @@ task runGATKHaplotypeCallerGVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+        
+        ln -s ${in_bam_file} input_bam_file.bam
+        ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
           -ERC GVCF \
           --reference ${in_reference_file} \
-          --input ${in_bam_file} \
+          --input input_bam_file.bam \
           --output ${in_sample_name}.rawLikelihoods.gvcf \
         && bgzip ${in_sample_name}.rawLikelihoods.gvcf
     }

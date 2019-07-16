@@ -206,80 +206,7 @@ workflow vgMultiMapCall {
                     current_task_output = merged_bam_file_output
             }
         }
-
-        # Split merged alignment by contigs list
-        call splitBAMbyPath {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_merged_bam_file=merged_bam_file_output,
-                in_merged_bam_file_index=merged_bam_file_index_output,
-                in_path_list_file=pipeline_path_list_file
-        }
-        # Cleanup merged bam chunk files after use
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpMergeAlignmentBAMChunksGoogle {
-                input:
-                    previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
-                    current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
-            }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpMergeAlignmentBAMChunksUnix {
-                input:
-                    previous_task_outputs = [merged_bam_file_output, merged_bam_file_index_output],
-                    current_task_output = splitBAMbyPath.bams_and_indexes_by_contig[0].left
-            }
-        }
-        # Run distributed Indel Realignment on contig BAMs
-        scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) {
-            call runGATKIndelRealigner {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=gatk_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            # Cleanup intermediate variant calling files after use
-            if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
-                    input:
-                        previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
-                }
-            }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
-                    input:
-                        previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                        current_task_output = runGATKIndelRealigner.indel_realigned_bam
-                }
-            }
-        }
-        # Merge Indel Realigned BAM
-        Array[File?] indel_realigned_bam_files_maybes = runGATKIndelRealigner.indel_realigned_bam
-        Array[File] indel_realigned_bam_files = select_all(indel_realigned_bam_files_maybes)
-        call mergeIndelRealignedBAMs {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=indel_realigned_bam_files
-        }
-        # Cleanup indel realigned bam files after use
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpIndelRealignedBamsGoogle {
-                input:
-                    previous_task_outputs = indel_realigned_bam_files,
-                    current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
-            }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpIndelRealignedBamsUnix {
-                input:
-                    previous_task_outputs = indel_realigned_bam_files,
-                    current_task_output = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
-            }
-        }
-    }
+    } 
     if (!SURJECT_MODE) {
         call mergeAlignmentGAMChunks {
             input:
@@ -308,8 +235,8 @@ workflow vgMultiMapCall {
         }
     }
     output {
-        File? output_bam = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file
-        File? output_bam_index = mergeIndelRealignedBAMs.merged_indel_realigned_bam_file_index
+        File? output_bam = merged_bam_file_output
+        File? output_bam_index = merged_bam_file_index_output
         File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
         File? output_gam_index = mergeAlignmentGAMChunks.merged_sorted_gam_gai_file
     }
@@ -330,6 +257,7 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
+        time: 10
         docker: "null"
         continueOnReturnCode: true
     }
@@ -605,6 +533,7 @@ task sortMDTagBAMFile {
         File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -637,6 +566,7 @@ task runPICARD {
         #to turn off echo do 'set +o xtrace'
 
         java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+          PROGRAM_RECORD_ID=null \
           VALIDATION_STRINGENCY=LENIENT \
           I=${in_bam_file} \
           O=${in_sample_name}.mdtag.dupmarked.bam \
@@ -646,18 +576,13 @@ task runPICARD {
             REFERENCE=${in_reference_file} \
             INPUT=${in_sample_name}.mdtag.dupmarked.bam \
             OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar BuildBamIndex \
-            VALIDATION_STRINGENCY=LENIENT \
-            I=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-            O=${in_sample_name}.mdtag.dupmarked.reordered.bam.bai \
         && rm -f ${in_sample_name}.mdtag.dupmarked.bam
     }
     output {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
-        File mark_dupped_reordered_bam_index = "${in_sample_name}.mdtag.dupmarked.reordered.bam.bai"
     }
     runtime {
-        time: 600
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:latest"
@@ -682,7 +607,7 @@ task mergeAlignmentBAMChunksVGMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -u --threads 32 \
+          -f -u -p -c --threads 32 \
           - \
           ${sep=" " in_alignment_bam_chunk_files} \
         | samtools fixmate \
@@ -739,10 +664,9 @@ task mergeAlignmentBAMChunksVGMPMAP {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
-          - \
+          -f -p -c --threads 32 \
+          ${in_sample_name}_merged.positionsorted.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
-          > ${in_sample_name}_merged.positionsorted.bam \
         && samtools index \
           ${in_sample_name}_merged.positionsorted.bam
     }
@@ -758,86 +682,7 @@ task mergeAlignmentBAMChunksVGMPMAP {
     }
 }
 
-task splitBAMbyPath {
-    input {
-        String in_sample_name
-        File in_merged_bam_file
-        File in_merged_bam_file_index
-        File in_path_list_file
-    }
-
-    command <<<
-        set -eux -o pipefail
-
-        while IFS=$'\t' read -ra path_list_line; do
-            path_name="${path_list_line[0]}"
-            samtools view \
-              -@ 32 \
-              -h -O BAM \
-              ~{in_merged_bam_file} ${path_name} > ~{in_sample_name}.${path_name}.bam \
-            && samtools index \
-              ~{in_sample_name}.${path_name}.bam
-        done < ~{in_path_list_file}
-    >>>
-    output {
-        Array[File] bam_contig_files = glob("~{in_sample_name}.*.bam")
-        Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai")
-        Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-task runGATKIndelRealigner {
-    input {
-        String in_sample_name
-        Pair[File, File] in_bam_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-    }
-
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -s ${in_bam_file.left} input_bam_file.bam
-        ln -s ${in_bam_file.right} input_bam_file.bam.bai
-        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
-          -nt 32 \
-          -R ${in_reference_file} \
-          -I input_bam_file.bam \
-          --out forIndelRealigner.intervals \
-        && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
-          -R ${in_reference_file} \
-          --targetIntervals forIndelRealigner.intervals \
-          -I input_bam_file.bam \
-          --out ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
-    }
-    output {
-        File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
-        File indel_realigned_bam_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bai"
-    }
-    runtime {
-        time: 1200
-        memory: 100 + " GB"
-        cpu: 32
-        docker: "broadinstitute/gatk3:3.8-1"
-    }
-}
-
+# TODO: Duplicate task of mergeAlignmentBAMChunksVGMPMAP
 task mergeIndelRealignedBAMs {
     input {
         String in_sample_name
@@ -856,7 +701,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f --threads 32 \
+          -f -p -c --threads 32 \
           ${in_sample_name}_merged.indel_realigned.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
