@@ -120,8 +120,8 @@ if [ $RUN_SMALL_TEST == false ]; then
         PED_FILE='${TRIO_PEDIGREE_FILE}' \
         GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
         GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
-        USE_HAPLOTYPES='false' \
-        MAKE_SNARLS='false' \
+        USE_HAPLOTYPES='true' \
+        MAKE_SNARLS='true' \
         USE_DECOYS='true' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
