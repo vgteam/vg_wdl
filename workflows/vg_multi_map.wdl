@@ -257,6 +257,7 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
+        time: 10
         docker: "null"
         continueOnReturnCode: true
     }
@@ -532,6 +533,7 @@ task sortMDTagBAMFile {
         File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -580,7 +582,7 @@ task runPICARD {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 600
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:latest"

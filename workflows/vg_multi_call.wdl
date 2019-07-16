@@ -265,6 +265,7 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
+        time: 10
         docker: "null"
         continueOnReturnCode: true
     }
