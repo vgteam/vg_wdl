@@ -8,6 +8,7 @@ version 1.0
 workflow vgMultiMapCall {
     input {
         Boolean VGMPMAP_MODE = true             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
+        Boolean VGGAFFE_MODE = false            # Set to 'true' to use "VG GAFFE" mapper algorithm.
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
         Boolean DRAGEN_MODE = false             # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.
@@ -17,7 +18,7 @@ workflow vgMultiMapCall {
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.17.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.17.0)
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                      # Number of overlapping bases between each .gam chunk
@@ -27,6 +28,8 @@ workflow vgMultiMapCall {
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? SNARLS_FILE                       # (OPTIONAL) Path to .snarls index file
+        File? DIST_FILE                         # (OPTIONAL) Path to .dist snarl-based distance index file
+        File? MINIMIZER_FILE                    # (OPTIONAL) Path to .min minimizer index file
         File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
@@ -86,37 +89,55 @@ workflow vgMultiMapCall {
     ################################################################
     Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-        if (VGMPMAP_MODE) {
-            call runVGMPMAP {
+        if (VGGAFFE_MODE) {
+            call runVGGAFFE {
                 input:
                     in_left_read_pair_chunk_file=read_pair_chunk_files.left,
                     in_right_read_pair_chunk_file=read_pair_chunk_files.right,
                     in_vg_container=VG_CONTAINER,
                     in_xg_file=XG_FILE,
-                    in_gcsa_file=GCSA_FILE,
-                    in_gcsa_lcp_file=GCSA_LCP_FILE,
                     in_gbwt_file=GBWT_FILE,
-                    in_snarls_file=SNARLS_FILE,
+                    in_dist_file=DIST_FILE,
+                    in_min_file=MINIMIZER_FILE,
                     in_sample_name=SAMPLE_NAME,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM
             }
-        } 
-        if (!VGMPMAP_MODE) {
-            call runVGMAP {
-                input:
-                    in_left_read_pair_chunk_file=read_pair_chunk_files.left,
-                    in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-                    in_vg_container=VG_CONTAINER,
-                    in_xg_file=XG_FILE,
-                    in_gcsa_file=GCSA_FILE,
-                    in_gcsa_lcp_file=GCSA_LCP_FILE,
-                    in_gbwt_file=GBWT_FILE,
-                    in_sample_name=SAMPLE_NAME,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
+        }
+        if (!VGGAFFE_MODE) {
+            if (VGMPMAP_MODE) {
+                call runVGMPMAP {
+                    input:
+                        in_left_read_pair_chunk_file=read_pair_chunk_files.left,
+                        in_right_read_pair_chunk_file=read_pair_chunk_files.right,
+                        in_vg_container=VG_CONTAINER,
+                        in_xg_file=XG_FILE,
+                        in_gcsa_file=GCSA_FILE,
+                        in_gcsa_lcp_file=GCSA_LCP_FILE,
+                        in_gbwt_file=GBWT_FILE,
+                        in_snarls_file=SNARLS_FILE,
+                        in_sample_name=SAMPLE_NAME,
+                        in_map_cores=MAP_CORES,
+                        in_map_disk=MAP_DISK,
+                        in_map_mem=MAP_MEM
+                }
+            } 
+            if (!VGMPMAP_MODE) {
+                call runVGMAP {
+                    input:
+                        in_left_read_pair_chunk_file=read_pair_chunk_files.left,
+                        in_right_read_pair_chunk_file=read_pair_chunk_files.right,
+                        in_vg_container=VG_CONTAINER,
+                        in_xg_file=XG_FILE,
+                        in_gcsa_file=GCSA_FILE,
+                        in_gcsa_lcp_file=GCSA_LCP_FILE,
+                        in_gbwt_file=GBWT_FILE,
+                        in_sample_name=SAMPLE_NAME,
+                        in_map_cores=MAP_CORES,
+                        in_map_disk=MAP_DISK,
+                        in_map_mem=MAP_MEM
+                }
             }
         }
         
@@ -648,6 +669,54 @@ task runVGMPMAP {
           ${GBWT_OPTION_STRING} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
+          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+    >>>
+    output {
+        File chunk_gam_file = glob("*.gam")[0]
+    }
+    runtime {
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
+        docker: in_vg_container
+    }
+}
+
+task runVGGAFFE {
+    input {
+        File in_left_read_pair_chunk_file
+        File in_right_read_pair_chunk_file
+        File in_xg_file
+        File in_gbwt_file
+        File in_dist_file
+        File in_min_file
+        String in_vg_container
+        String in_sample_name
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
+    }
+    
+    command <<< 
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        
+        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
+        vg gaffe \
+          -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+          -x ~{in_xg_file} \
+          -H ~{in_gbwt_file} \
+          -m ~{in_min_file} \
+          -d ~{in_dist_file} \
+          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
     output {

@@ -31,6 +31,12 @@ workflow vg_construct_and_index {
         # set true to generate SNARLS index of VG graph
         Boolean make_snarls = false
         
+        # set true to generate snarl-based distance index
+        Boolean make_dist_index = false
+        
+        # set tru to generate the minimizer index from the generated XG index
+        Boolean make_minimizer_index = false
+        
         # set true to include decoy sequences from reference genome FASTA into VG graph construction
         Boolean use_decoys = false
         
@@ -113,11 +119,29 @@ workflow vg_construct_and_index {
         }
     }
     
+    # make snarl-based distance index
+    if (make_dist_index) {
+        call distance_index { input:
+            vg = combine_graphs.vg,
+            graph_name = graph_name,
+            vg_docker = vg_docker
+        }
+    }
+    
     # make xg index
     call xg_index { input:
         graph_name = graph_name,
         vg = combine_graphs.vg,
         vg_docker = vg_docker
+    }
+    
+    # make minimizer index
+    if (make_minimizer_index) {
+        call minimizer_index { input:
+            graph_name = graph_name,
+            xg = xg_index.xg,
+            vg_docker = vg_docker
+        }
     }
 
     # Prune the graph of repetitive sequences in preparation for GCSA indexing.
@@ -172,6 +196,8 @@ workflow vg_construct_and_index {
         File gcsa_lcp = gcsa_index.lcp
         File? gbwt = final_gbwt
         File? snarls = snarls_index.snarls
+        File? dist = distance_index.dist
+        File? mini = minimizer_index.minimizer
     }
 }
 
@@ -373,6 +399,31 @@ task snarls_index {
     }
 }
 
+# make snarl-based distance index
+task distance_index {
+    input {
+        String graph_name
+        File vg
+        String vg_docker
+    }
+
+    command {
+        set -exu -o pipefail
+        vg index --threads 32 -j "${graph_name}.dist" "~{vg}"
+    }
+
+    output {
+        File dist ="${graph_name}.dist"
+    }
+
+    runtime {
+        cpu: 32
+        memory: 100 + " GB"
+        disks: "local-disk 100 SSD"
+        docker: vg_docker
+    }
+}
+
 # make xg index
 task xg_index {
     input {
@@ -389,6 +440,31 @@ task xg_index {
 
     output {
         File xg ="${graph_name}.xg"
+    }
+
+    runtime {
+        cpu: 32
+        memory: 100 + " GB"
+        disks: "local-disk 100 SSD"
+        docker: vg_docker
+    }
+}
+
+# make minimizer index
+task minimizer_index {
+    input {
+        String graph_name
+        File xg
+        String vg_docker
+    }
+
+    command {
+        set -exu -o pipefail
+        vg minimizer --threads 32 "${graph_name}.xg" -i "~{graph_name}.min"
+    }
+
+    output {
+        File minimizer ="${graph_name}.min"
     }
 
     runtime {
