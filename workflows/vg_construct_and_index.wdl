@@ -186,7 +186,7 @@ task extract_decoys {
     command <<<
         set -exu -o pipefail
         GREP_REGEX="~{decoy_regex}"
-        zcat ~{ref_fasta_gz} | grep "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
+        zcat ~{ref_fasta_gz} | grep -E "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
     >>>
     output {
         Array[String] decoy_contig_ids = read_lines("decoy_contig_ids.txt")
