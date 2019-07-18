@@ -272,7 +272,7 @@ task combine_graphs {
         while read -r contig_vg; do
             nm=$(basename "$contig_vg")
             cp "$contig_vg" "vg/$nm"
-            if [[ $nm == *"GL"* ]]; then
+            if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* ]]; then
                 echo "vg/$nm" >> decoy_contigs_uid_vg
             else
                 echo "vg/$nm" >> contigs_uid_vg
