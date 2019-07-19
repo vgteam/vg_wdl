@@ -106,8 +106,15 @@ workflow vg_construct_and_index {
     
     # make snarls index
     if (make_snarls) {
-        call snarls_index { input:
-            vg = combine_graphs.vg,
+        scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
+            call snarls_index { input:
+                vg = contig_vg,
+                graph_name = graph_name,
+                vg_docker = vg_docker
+            }
+        }
+        call snarls_merge { input:
+            snarls = snarls_index.snarls,
             graph_name = graph_name,
             vg_docker = vg_docker
         }
@@ -171,7 +178,7 @@ workflow vg_construct_and_index {
         File gcsa = gcsa_index.gcsa
         File gcsa_lcp = gcsa_index.lcp
         File? gbwt = final_gbwt
-        File? snarls = snarls_index.snarls
+        File? snarls = snarls_merge.snarls
     }
 }
 
@@ -359,7 +366,32 @@ task snarls_index {
     
     command {
         set -exu -o pipefail
-        vg snarls -t ~{vg} > "~{graph_name}.snarls"
+        nm=$(basename "~{vg}" .vg)
+        vg snarls -t ~{vg} > "${nm}.snarls"
+    }
+    
+    output {
+        File snarls = glob("*.snarls")[0]
+    }
+     
+    runtime {
+        memory: 40 + " GB"
+        disks: "local-disk 100 SSD"
+        docker: vg_docker
+    }
+}
+
+# merge multiple SNARL indices (from disjoint contigs)
+task snarls_merge {
+    input {
+        Array[File]+ snarls
+        String graph_name
+        String vg_docker
+    }
+    
+    command {
+        set -exu -o pipefail
+        cat ${sep=" " snarls} > "~{graph_name}.snarls"
     }
     
     output {
@@ -367,8 +399,7 @@ task snarls_index {
     }
      
     runtime {
-        memory: 240 + " GB"
-        disks: "local-disk 100 SSD"
+        disks: "local-disk 20 SSD"
         docker: vg_docker
     }
 }
