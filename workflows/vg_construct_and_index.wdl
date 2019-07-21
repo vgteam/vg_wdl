@@ -178,7 +178,7 @@ workflow vg_construct_and_index {
         File gcsa = gcsa_index.gcsa
         File gcsa_lcp = gcsa_index.lcp
         File? gbwt = final_gbwt
-        File? snarls = snarls_merge.snarls
+        File? snarls = snarls_merge.merged_snarls
     }
 }
 
@@ -367,7 +367,7 @@ task snarls_index {
     command {
         set -exu -o pipefail
         nm=$(basename "~{vg}" .vg)
-        vg snarls -t ~{vg} > "${nm}.snarls"
+        vg snarls -t ~{vg} > "$nm.snarls"
     }
     
     output {
@@ -395,7 +395,7 @@ task snarls_merge {
     }
     
     output {
-        File snarls = "~{graph_name}.snarls"
+        File merged_snarls = "~{graph_name}.snarls"
     }
      
     runtime {
