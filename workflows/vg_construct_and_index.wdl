@@ -106,8 +106,15 @@ workflow vg_construct_and_index {
     
     # make snarls index
     if (make_snarls) {
-        call snarls_index { input:
-            vg = combine_graphs.vg,
+        scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
+            call snarls_index { input:
+                vg = contig_vg,
+                graph_name = graph_name,
+                vg_docker = vg_docker
+            }
+        }
+        call snarls_merge { input:
+            snarls = snarls_index.snarls,
             graph_name = graph_name,
             vg_docker = vg_docker
         }
@@ -171,7 +178,7 @@ workflow vg_construct_and_index {
         File gcsa = gcsa_index.gcsa
         File gcsa_lcp = gcsa_index.lcp
         File? gbwt = final_gbwt
-        File? snarls = snarls_index.snarls
+        File? snarls = snarls_merge.merged_snarls
     }
 }
 
@@ -186,7 +193,7 @@ task extract_decoys {
     command <<<
         set -exu -o pipefail
         GREP_REGEX="~{decoy_regex}"
-        zcat ~{ref_fasta_gz} | grep "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
+        zcat ~{ref_fasta_gz} | grep -E "${GREP_REGEX}" | cut -f 1 -d ' ' | cut -f 2 -d '>' >> decoy_contig_ids.txt
     >>>
     output {
         Array[String] decoy_contig_ids = read_lines("decoy_contig_ids.txt")
@@ -272,7 +279,7 @@ task combine_graphs {
         while read -r contig_vg; do
             nm=$(basename "$contig_vg")
             cp "$contig_vg" "vg/$nm"
-            if [[ $nm == *"GL"* ]]; then
+            if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* ]]; then
                 echo "vg/$nm" >> decoy_contigs_uid_vg
             else
                 echo "vg/$nm" >> contigs_uid_vg
@@ -359,16 +366,40 @@ task snarls_index {
     
     command {
         set -exu -o pipefail
-        vg snarls -t ~{vg} > "~{graph_name}.snarls"
+        nm=$(basename "~{vg}" .vg)
+        vg snarls -t ~{vg} > "$nm.snarls"
     }
     
     output {
-        File snarls = "~{graph_name}.snarls"
+        File snarls = glob("*.snarls")[0]
     }
      
     runtime {
-        memory: 240 + " GB"
+        memory: 40 + " GB"
         disks: "local-disk 100 SSD"
+        docker: vg_docker
+    }
+}
+
+# merge multiple SNARL indices (from disjoint contigs)
+task snarls_merge {
+    input {
+        Array[File]+ snarls
+        String graph_name
+        String vg_docker
+    }
+    
+    command {
+        set -exu -o pipefail
+        cat ${sep=" " snarls} > "~{graph_name}.snarls"
+    }
+    
+    output {
+        File merged_snarls = "~{graph_name}.snarls"
+    }
+     
+    runtime {
+        disks: "local-disk 20 SSD"
         docker: vg_docker
     }
 }
