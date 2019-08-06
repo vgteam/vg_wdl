@@ -368,12 +368,15 @@ task runGATKHaplotypeCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
+        
+        ln -s ${in_bam_file} input_bam_file.bam
+        ln -s ${in_bam_file_index} input_bam_file.bam.bai
+        
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
           --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
-          --input ${in_bam_file} \
+          --input input_bam_file.bam \
           --output ${in_sample_name}.vcf \
         && bgzip ${in_sample_name}.vcf
     }
@@ -409,13 +412,16 @@ task runGATKHaplotypeCallerGVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+        
+        ln -s ${in_bam_file} input_bam_file.bam
+        ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
           -ERC GVCF \
           --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
-          --input ${in_bam_file} \
+          --input input_bam_file.bam \
           --output ${in_sample_name}.rawLikelihoods.gvcf \
         && bgzip ${in_sample_name}.rawLikelihoods.gvcf
     }
