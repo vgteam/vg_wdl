@@ -18,6 +18,7 @@ workflow vgMultiMapCall {
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String PCR_INDEL_MODEL = "CONSERVATIVE"     # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                      # Number of overlapping bases between each .gam chunk
@@ -246,6 +247,7 @@ workflow vgMultiMapCall {
                             in_sample_name=SAMPLE_NAME,
                             in_bam_file=gatk_caller_input_files.left,
                             in_bam_file_index=gatk_caller_input_files.right,
+                            in_pcr_indel_model=PCR_INDEL_MODEL,
                             in_reference_file=REF_FILE,
                             in_reference_index_file=REF_INDEX_FILE,
                             in_reference_dict_file=REF_DICT_FILE
@@ -304,6 +306,7 @@ workflow vgMultiMapCall {
                         in_sample_name=SAMPLE_NAME,
                         in_bam_file=merged_bam_file_output,
                         in_bam_file_index=merged_bam_file_index_output,
+                        in_pcr_indel_model=PCR_INDEL_MODEL,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_reference_dict_file=REF_DICT_FILE
@@ -1067,6 +1070,7 @@ task runGATKHaplotypeCaller {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
+        String in_pcr_indel_model
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
@@ -1089,6 +1093,7 @@ task runGATKHaplotypeCaller {
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
+          --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
           --input input_bam_file.bam \
           --output ${in_sample_name}.vcf \
@@ -1109,6 +1114,7 @@ task runGATKHaplotypeCallerGVCF {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
+        String in_pcr_indel_model
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
@@ -1132,6 +1138,7 @@ task runGATKHaplotypeCallerGVCF {
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
           -ERC GVCF \
+          --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
           --input input_bam_file.bam \
           --output ${in_sample_name}.rawLikelihoods.gvcf \

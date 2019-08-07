@@ -5,7 +5,6 @@ version 1.0
 # Description: Variant calling workflow for entire proband and sibling cohort.
 #              Designed as the 5th step in a pedigree-backed graph alignment pipeline.
 
-import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
 import "./vg_indel_realign.wdl" as vgIndelRealignmentWorkflow
 
 ###########################
@@ -19,6 +18,8 @@ workflow vgTrioPipeline {
         File PATERNAL_INPUT_BAM_FILE_INDEX                  # Input paternal .bai index of surjected .bam file
         Array[File]+ SIBLING_BAM_FILE_LIST                  # Input list of sibling surjected .bam files. Proband must be first in list.
         Array[File]+ SIBLING_BAM_FILE_INDEX_LIST            # Input list of .bai indices of surjected .bam files. Must follow same sample order as SIBLING_BAM_FILE_LIST.
+        String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
+        String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Input list of sibling sample names. Must follow same order as SIBLING_BAM_FILE_LIST.
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
@@ -54,7 +55,7 @@ workflow vgTrioPipeline {
         input:
             INPUT_BAM_FILE=PATERNAL_INPUT_BAM_FILE,
             INPUT_BAM_FILE_INDEX=PATERNAL_INPUT_BAM_FILE_INDEX,
-            SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
+            SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
             VG_CONTAINER=VG_CONTAINER,
             PATH_LIST_FILE=PATH_LIST_FILE,
             XG_FILE=XG_FILE,

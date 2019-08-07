@@ -112,6 +112,8 @@ if [ $RUN_SMALL_TEST == false ]; then
         PATERNAL_INPUT_BAM_FILE_INDEX='${PATERNAL_BAM_BAI_PATH}' \
         ${SIB_BAM_FILE_PARAMS} \
         ${SIB_BAM_FILE_INDEX_PARAMS} \
+        SAMPLE_NAME_MATERNAL='${MATERNAL_SAMPLE_NAME}' \
+        SAMPLE_NAME_PATERNAL='${PATERNAL_SAMPLE_NAME}' \
         ${SIB_ID_LIST} \
         PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \
         XG_FILE='${XG_FILE_PATH}' \

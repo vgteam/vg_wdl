@@ -20,10 +20,11 @@ workflow vgMultiMapCall {
         String PREVIOUS_WORKFLOW_OUTPUT = "null"    # Dummy input for iterative workflow dependency functionality.
         String SAMPLE_NAME                          # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String PCR_INDEL_MODEL = "CONSERVATIVE"     # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
         Int CHUNK_BASES = 50000000                  # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                          # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                        # (OPTIONAL) Text file where each line is a path name in the XG index
-        File XG_FILE                                # Path to .xg index file
+        File? XG_FILE                               # Path to .xg index file
         File REF_FILE                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                         # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                          # Path to .dict file of the REF_FILE fasta reference
@@ -40,7 +41,7 @@ workflow vgMultiMapCall {
     }
     
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
-    if (!defined(PATH_LIST_FILE)) {
+    if (!defined(PATH_LIST_FILE) && defined(XG_FILE)) {
         call extractPathNames {
             input:
                 in_xg_file=XG_FILE,
@@ -72,6 +73,7 @@ workflow vgMultiMapCall {
                         in_sample_name=SAMPLE_NAME,
                         in_bam_file=gatk_caller_input_files.left,
                         in_bam_file_index=gatk_caller_input_files.right,
+                        in_pcr_indel_model=PCR_INDEL_MODEL,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_reference_dict_file=REF_DICT_FILE
@@ -128,6 +130,7 @@ workflow vgMultiMapCall {
                         in_sample_name=SAMPLE_NAME,
                         in_bam_file=input_alignment_file,
                         in_bam_file_index=input_alignment_file_index,
+                        in_pcr_indel_model=PCR_INDEL_MODEL,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_reference_dict_file=REF_DICT_FILE
@@ -152,7 +155,7 @@ workflow vgMultiMapCall {
     ################################
     # Run the VG calling procedure #
     ################################
-    if (!SURJECT_MODE) {
+    if ((!SURJECT_MODE) && defined(XG_FILE)) {
         # Set chunk context amount depending on structural variant or default variant calling mode
         Int default_or_sv_chunk_context = if SV_CALLER_MODE then 200 else 50
         # Chunk GAM alignments by contigs list
@@ -288,7 +291,7 @@ task cleanUpGoogleFilestore {
 
 task extractPathNames {
     input {
-        File in_xg_file
+        File? in_xg_file
         String in_vg_container
     }
 
@@ -348,6 +351,7 @@ task runGATKHaplotypeCaller {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
+        String in_pcr_indel_model
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
@@ -364,11 +368,15 @@ task runGATKHaplotypeCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
+        
+        ln -s ${in_bam_file} input_bam_file.bam
+        ln -s ${in_bam_file_index} input_bam_file.bam.bai
+        
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
+          --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
-          --input ${in_bam_file} \
+          --input input_bam_file.bam \
           --output ${in_sample_name}.vcf \
         && bgzip ${in_sample_name}.vcf
     }
@@ -387,6 +395,7 @@ task runGATKHaplotypeCallerGVCF {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
+        String in_pcr_indel_model
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
@@ -403,12 +412,16 @@ task runGATKHaplotypeCallerGVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+        
+        ln -s ${in_bam_file} input_bam_file.bam
+        ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads 32 \
           -ERC GVCF \
+          --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
-          --input ${in_bam_file} \
+          --input input_bam_file.bam \
           --output ${in_sample_name}.rawLikelihoods.gvcf \
         && bgzip ${in_sample_name}.rawLikelihoods.gvcf
     }
@@ -517,7 +530,7 @@ task chunkAlignmentsByPathNames {
         String in_sample_name
         File in_merged_sorted_gam
         File in_merged_sorted_gam_gai
-        File in_xg_file
+        File? in_xg_file
         Int in_chunk_context
         File in_path_list_file
         Int in_chunk_bases
