@@ -585,7 +585,7 @@ task runPICARD {
         time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
-        docker: "broadinstitute/picard:latest"
+        docker: "broadinstitute/picard:2.20.4"
     }
 }
 
