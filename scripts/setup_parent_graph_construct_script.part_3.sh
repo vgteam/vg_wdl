@@ -115,7 +115,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.16.0' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
         REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \
         PED_FILE='${TRIO_PEDIGREE_FILE}' \
         GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
@@ -141,7 +141,7 @@ else
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.16.0' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
         CONTIGS='21' \
         REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \
         PED_FILE='${TRIO_PEDIGREE_FILE}' \
