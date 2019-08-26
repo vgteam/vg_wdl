@@ -120,7 +120,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.16.0' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.part_6.sh
 else
@@ -137,7 +137,7 @@ else
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.16.0' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.part_6.sh
 fi

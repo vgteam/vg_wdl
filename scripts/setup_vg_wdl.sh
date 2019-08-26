@@ -90,11 +90,13 @@ if [ $RUN_SMALL_TEST == false ]; then
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_decoys_wgs_t289.xg -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.xg
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_decoys_wgs_t289.gcsa -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gcsa
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_decoys_wgs_t289.gcsa.lcp -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gcsa.lcp
+    wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_decoys_wgs_t289.gbwt -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gbwt
 else
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/path_list_21.txt -O ${WORKFLOW_INPUT_DIR}/path_list_21.txt
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_chr21_t289.xg -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.xg
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_chr21_t289.gcsa -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.gcsa
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_chr21_t289.gcsa.lcp -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.gcsa.lcp
+    wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/vg_t289_graph_references/snp1kg_maf0.01_chr21_t289.gbwt -O ${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.gbwt
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/HG002.ped -O ${WORKFLOW_INPUT_DIR}/HG002.ped
 fi
 wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/hs37d5.fa -O ${WORKFLOW_INPUT_DIR}/hs37d5.fa

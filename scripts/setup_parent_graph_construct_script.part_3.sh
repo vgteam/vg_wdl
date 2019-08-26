@@ -115,13 +115,13 @@ if [ $RUN_SMALL_TEST == false ]; then
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.16.0' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
         REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \
         PED_FILE='${TRIO_PEDIGREE_FILE}' \
         GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
         GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
         USE_HAPLOTYPES='true' \
-        MAKE_SNARLS='true' \
+        MAKE_SNARLS='false' \
         USE_DECOYS='true' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
@@ -141,14 +141,14 @@ else
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.16.0' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
         CONTIGS='21' \
         REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \
         PED_FILE='${TRIO_PEDIGREE_FILE}' \
         GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
         GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
         USE_HAPLOTYPES='true' \
-        MAKE_SNARLS='true' \
+        MAKE_SNARLS='false' \
         USE_DECOYS='false' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
