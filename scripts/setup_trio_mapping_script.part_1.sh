@@ -109,6 +109,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         XG_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.xg' \
         GCSA_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gcsa' \
         GCSA_LCP_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gcsa.lcp' \
+        GBWT_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_decoys.gbwt' \
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
@@ -136,6 +137,7 @@ else
         XG_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.xg' \
         GCSA_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.gcsa' \
         GCSA_LCP_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.gcsa.lcp' \
+        GBWT_FILE='${WORKFLOW_INPUT_DIR}/snp1kg_maf0.01_chr21.gbwt' \
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \

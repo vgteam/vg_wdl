@@ -129,6 +129,7 @@ else
         XG_FILE='${XG_FILE_PATH}' \
         GCSA_FILE='${GCSA_FILE_PATH}' \
         GCSA_LCP_FILE='${GCSA_LCP_FILE_PATH}' \
+        GBWT_FILE='${GBWT_FILE_PATH}' \
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \

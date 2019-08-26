@@ -121,7 +121,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
         GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
         USE_HAPLOTYPES='true' \
-        MAKE_SNARLS='true' \
+        MAKE_SNARLS='false' \
         USE_DECOYS='true' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
@@ -148,7 +148,7 @@ else
         GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
         GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
         USE_HAPLOTYPES='true' \
-        MAKE_SNARLS='true' \
+        MAKE_SNARLS='false' \
         USE_DECOYS='false' \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
