@@ -70,7 +70,7 @@ task check_graph {
 
     command <<<
         set -ex -o pipefail
-        apt-get install -y python3
+        apt-get update && apt-get install -y python3
         vg view "~{vg}" > graph.gfa
         python3 - <<EOF
         import sys
@@ -114,7 +114,7 @@ task check_gam {
     }
 
     command <<<
-        apt-get install -y python3
+        apt-get update && apt-get install -y python3
         vg view -a "~{gam}" -j > mappings.json
         python3 - <<EOF
         import json
