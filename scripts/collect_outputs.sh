@@ -74,7 +74,7 @@ if [ ! -d "${OUTPUT_DIR}" ]; then
     mkdir -p ${OUTPUT_DIR}
     chmod 2770 ${OUTPUT_DIR}
 fi
-cd ${OUTPUT_DIR}
+cd ${COHORT_WORKFLOW_DIR}
 
 PROBAND_SAMPLE_NAME="${SIBLING_SAMPLE_NAMES[0]}"
 for SIBLING_ID in ${SIBLING_SAMPLE_NAMES[@]}
@@ -106,6 +106,18 @@ cp ${PATERNAL_GVCF_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.g
 JOINT_GENOTYPED_VCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs/outputs/vgTrioPipeline.output_cohort_vcf -name ${PROBAND_SAMPLE_NAME}.snpeff.unrolled.vcf))
 
 cp ${JOINT_GENOTYPED_VCF_PATH} "${OUTPUT_DIR}/"
+
+tar -cvf ${PROBAND_SAMPLE_NAME}_workflow_outputs.tar ${OUTPUT_DIR}
+
+## Delete intermediate workflow and input directories
+rm -fr ${OUTPUT_DIR}
+rm -fr ${COHORT_WORKFLOW_DIR}/input_reads
+rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs
+rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs
+rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs
+rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs
+rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs
+rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs
 
 exit
 
