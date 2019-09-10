@@ -229,7 +229,7 @@ workflow vgMultiMapCall {
     }
 
     # Extract either the linear-based or graph-based VCF
-    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, final_gvcf_output])
+    File variantcaller_vcf_output = select_first([runDragenCaller.dragen_genotyped_vcf, bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, final_gvcf_output])
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION) {
         call normalizeVCF {
