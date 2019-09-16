@@ -29,7 +29,6 @@ workflow vgMultiMapCall {
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? SNARLS_FILE                       # (OPTIONAL) Path to .snarls index file
-        File? IDRANGES_FILE                     # (OPTIONAL) Path to id ranges file
         File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
@@ -402,62 +401,34 @@ workflow vgMultiMapCall {
                 current_task_output = mergeAlignmentGAMChunks.merged_gam_file
             }
         }
-        if (PACK_MODE && defined(IDRANGES_FILE)) {
-            # Chunk GAM alignments by contigs list
-            call chunkAlignmentsByPathNamesWithIdRanges {
-                input:
-                in_sample_name=SAMPLE_NAME,
-                in_xg_file=XG_FILE,
-                in_idranges_file=IDRANGES_FILE,
-                in_vg_container=VG_CONTAINER,
-                in_chunk_gam_cores=CHUNK_GAM_CORES,
-                in_chunk_gam_disk=CHUNK_GAM_DISK,
-                in_chunk_gam_mem=CHUNK_GAM_MEM
-            }
-            Array[File] vg_packcaller_input_files_list = chunkAlignmentsByPathNamesWithIdRanges.output_vg_chunks
-            # Run distributed graph-based variant calling
-            scatter (vg_packcaller_input_files in vg_packcaller_input_files_list) {
-                call runVGPackCaller {
-                    input: 
-                    in_sample_name=SAMPLE_NAME, 
-                    in_vg_file=vg_packcaller_input_files, 
-                    in_gam_file=mergeAlignmentGAMChunks.merged_gam_file,
-                    in_vg_container=VG_CONTAINER,
-                    in_vgcall_cores=VGCALL_CORES,
-                    in_vgcall_disk=VGCALL_DISK,
-                    in_vgcall_mem=VGCALL_MEM
-                }
-                # Cleanup vg call input files after use
-                if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-                    call cleanUpGoogleFilestore as cleanUpVGPackCallInputsGoogle {
-                        input:
-                        previous_task_outputs = [vg_packcaller_input_files],
-                        current_task_output = runVGPackCaller.output_vcf
-                    }
-                }
-                if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-                    call cleanUpUnixFilesystem as cleanUpVGPackCallInputsUnix {
-                        input:
-                        previous_task_outputs = [vg_packcaller_input_files],
-                        current_task_output = runVGPackCaller.output_vcf
-                    }
-                }
-            }
-            # Merge distributed variant called VCFs
-            call concatClippedVCFChunks as concatVCFChunksVGPackCall {
+        if (PACK_MODE) {
+            call runVGPackCaller {
                 input: 
                 in_sample_name=SAMPLE_NAME, 
-                in_clipped_vcf_chunk_files=runVGPackCaller.output_vcf
+                in_xg_file=XG_FILE, 
+                in_gam_file=mergeAlignmentGAMChunks.merged_gam_file,
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
             }
-            # Extract either the normal or structural variant based VCFs and compress them
-            call bgzipMergedVCF as bgzipVGPackCalledVCF {
-                input:
-                in_sample_name=SAMPLE_NAME,
-                in_merged_vcf_file=concatVCFChunksVGPackCall.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
+            # Cleanup vg call input files after use
+            if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
+                call cleanUpGoogleFilestore as cleanUpVGPackCallInputsGoogle {
+                    input:
+                    previous_task_outputs = [mergeAlignmentGAMChunks.merged_gam_file],
+                    current_task_output = runVGPackCaller.output_vcf
+                }
+            }
+            if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
+                call cleanUpUnixFilesystem as cleanUpVGPackCallInputsUnix {
+                    input:
+                    previous_task_outputs = [mergeAlignmentGAMChunks.merged_gam_file],
+                    current_task_output = runVGPackCaller.output_vcf
+                }
             }
         }
-        if (!PACK_MODE || !defined(IDRANGES_FILE)) {
+        if (!PACK_MODE) {
             # Set chunk context amount depending on structural variant or default variant calling mode
             Int default_or_sv_chunk_context = if SV_CALLER_MODE then 2500 else 50
             # Chunk GAM alignments by contigs list
@@ -532,7 +503,7 @@ workflow vgMultiMapCall {
     }
     
     # Extract either the linear-based or graph-based VCF
-    File variantcaller_vcf_output = select_first([bgzipVGPackCalledVCF.output_merged_vcf, bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf, final_gvcf_output])
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf, final_gvcf_output, runVGPackCaller.output_vcf])
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION) {
         call normalizeVCF {
@@ -1499,54 +1470,10 @@ task runVGCaller {
     }
 }
 
-task chunkAlignmentsByPathNamesWithIdRanges {
-    input {
-        String in_sample_name
-        File in_xg_file
-        File? in_idranges_file
-        String in_vg_container
-        Int in_chunk_gam_cores
-        Int in_chunk_gam_disk
-        Int in_chunk_gam_mem
-    }
-    
-    command <<< 
-    # Set the exit code of a pipeline to that of the rightmost command
-    # to exit with a non-zero status, or zero if all commands of the pipeline exit
-    set -o pipefail
-    # cause a bash script to exit immediately when a command fails
-    set -e
-    # cause the bash shell to treat unset variables as an error and exit immediately
-    set -u
-    # echo each line of the script to stdout so we can see what is happening
-    set -o xtrace
-    #to turn off echo do 'set +o xtrace'
-
-    ## Reformat id ranges
-    awk '{print $2":"$3}' ~{in_idranges_file} > idranges.txt
-    
-    vg chunk \
-       -x ~{in_xg_file} \
-       -b call_chunk \
-       -t ~{in_chunk_gam_cores} \
-       -R idranges.txt
-    >>>
-    output {
-        Array[File] output_vg_chunks = glob("call_chunk*.vg")
-    }   
-    runtime {
-        time: 900
-        memory: in_chunk_gam_mem + " GB"
-        cpu: in_chunk_gam_cores
-        disks: "local-disk " + in_chunk_gam_disk + " SSD"
-        docker: in_vg_container
-    }   
-}
-
 task runVGPackCaller {
     input {
         String in_sample_name
-        File in_vg_file
+        File in_xg_file
         File in_gam_file
         String in_vg_container
         Int in_vgcall_cores
@@ -1554,7 +1481,7 @@ task runVGPackCaller {
         Int in_vgcall_mem
     }
 
-    String chunk_tag = basename(in_vg_file, ".vg")
+    String graph_tag = basename(in_xg_file, ".xg")
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1567,40 +1494,29 @@ task runVGPackCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PATH_NAME="$(vg paths -L -v ~{in_vg_file} | head -1)"
-
-        sleep 2m
-        
-        vg index ~{in_vg_file} \
-           -x ~{chunk_tag}.xg \
-           -t ~{in_vgcall_cores}
-
         vg pack \
-           -x ~{chunk_tag}.xg \
+           -x ~{in_xg_file} \
            -g ~{in_gam_file} \
            -q \
            -t ~{in_vgcall_cores} \
-           -o ~{chunk_tag}.pack
-
+           -o ~{graph_tag}.pack
+        
         vg call \
-           ~{in_vg_file} \
-           -P ~{chunk_tag}.pack \
-           -x ~{chunk_tag}.xg \
-           -u -n 0 -e 1000 -G 3 \
+           -k ~{graph_tag}.pack \
            -t ~{in_vgcall_cores} \
-           -S ~{in_sample_name} \
-           -r ${PATH_NAME} > ~{chunk_tag}.vcf
+           -s ~{in_sample_name} \
+           ~{in_xg_file} > ~{graph_tag}.vcf
 
-        head -10000 ~{chunk_tag}.vcf | grep "^#" >> ~{chunk_tag}.sorted.vcf
-        if [ "$(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
-            cat ~{chunk_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{chunk_tag}.sorted.vcf
+        head -10000 ~{graph_tag}.vcf | grep "^#" >> ~{graph_tag}.sorted.vcf
+        if [ "$(cat ~{graph_tag}.vcf | grep -v '^#')" ]; then
+            cat ~{graph_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{graph_tag}.sorted.vcf
         fi
-        bgzip ~{chunk_tag}.sorted.vcf && \
-            tabix -f -p vcf ~{chunk_tag}.sorted.vcf.gz
+        bgzip ~{graph_tag}.sorted.vcf && \
+            tabix -f -p vcf ~{graph_tag}.sorted.vcf.gz
     >>>
     output {
-        File output_vcf = "~{chunk_tag}.sorted.vcf.gz"
-        File output_vcf_index = "~{chunk_tag}.sorted.vcf.gz.tbi"
+        File output_vcf = "~{graph_tag}.sorted.vcf.gz"
+        File output_vcf_index = "~{graph_tag}.sorted.vcf.gz.tbi"
     }
     runtime {
         memory: in_vgcall_mem + " GB"
