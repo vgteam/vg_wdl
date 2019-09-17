@@ -323,12 +323,15 @@ task splitBAMbyPath {
     command <<<
         set -eux -o pipefail
 
+        ln -s ~{in_merged_bam_file} input_bam_file.bam
+        ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
+        
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
               -@ 32 \
               -h -O BAM \
-              ~{in_merged_bam_file} ${path_name} > ~{in_sample_name}.${path_name}.bam \
+              input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
               ~{in_sample_name}.${path_name}.bam
         done < ~{in_path_list_file}
