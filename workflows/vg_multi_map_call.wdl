@@ -1,7 +1,7 @@
 version 1.0
 
 ### vg_multi_map_call.wdl ###
-# Author: Charles Markello
+# Authors: Charles Markello, Jean Monlong
 # Description: Core VG mapping and variant calling workflow for single sample datasets.
 # Reference: https://github.com/vgteam/vg/wiki
 
@@ -29,10 +29,10 @@ workflow vgMultiMapCall {
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? SNARLS_FILE                       # (OPTIONAL) Path to .snarls index file
-        File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
-        File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
-        File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
-        File SNPEFF_DATABASE                    # Path to snpeff database .zip file for snpEff annotation functionality.
+        File? REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
+        File? REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
+        File? REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
+        File? SNPEFF_DATABASE                    # Path to snpeff database .zip file for snpEff annotation functionality.
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 200
         Int MAP_CORES = 32
@@ -48,9 +48,9 @@ workflow vgMultiMapCall {
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
-        String DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
-        String UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
-        String HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
+        String? DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
+        String? UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
+        String? HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
     }
     
     # Split input reads into chunks for parallelized mapping
@@ -139,7 +139,7 @@ workflow vgMultiMapCall {
                 current_task_output = vg_map_algorithm_chunk_gam_output
             }
         }
-        if (SURJECT_MODE) {
+        if (SURJECT_MODE && defined(REF_FILE) && defined(REF_DICT_FILE) && defined(REF_INDEX_FILE)) {
             call runSurject {
                 input:
                 in_gam_chunk_file=vg_map_algorithm_chunk_gam_output,
@@ -193,7 +193,7 @@ workflow vgMultiMapCall {
     ##############################################
     # Run the linear alignment calling procedure #
     ##############################################
-    if (SURJECT_MODE) {
+    if (SURJECT_MODE && defined(REF_FILE) && defined(REF_DICT_FILE) && defined(REF_INDEX_FILE)) {
         # Merge chunked alignments from surjected GAM files
         Array[File?] alignment_chunk_bam_files_maybes = runPICARD.mark_dupped_reordered_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
@@ -315,7 +315,7 @@ workflow vgMultiMapCall {
             in_alignment_bam_chunk_files=indel_realigned_bam_files
         }
         # Run VCF variant calling using the Dragen module
-        if ((!GVCF_MODE) && (DRAGEN_MODE)) {
+        if ((!GVCF_MODE) && (DRAGEN_MODE) && defined(DRAGEN_REF_INDEX_NAME) && defined(UDPBINFO_PATH) && defined(HELIX_USERNAME)) {
             call runDragenCaller {
                 input:
                 in_sample_name=SAMPLE_NAME,
@@ -340,7 +340,7 @@ workflow vgMultiMapCall {
                 }
             }
             # Run GVCF varaint calling using the Dragen module
-            if (DRAGEN_MODE) {
+            if (DRAGEN_MODE && defined(DRAGEN_REF_INDEX_NAME) && defined(UDPBINFO_PATH) && defined(HELIX_USERNAME)) {
                 call runDragenCallerGVCF {
                     input:
                     in_sample_name=SAMPLE_NAME,
@@ -505,7 +505,7 @@ workflow vgMultiMapCall {
     # Extract either the linear-based or graph-based VCF
     File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf, final_gvcf_output, runVGPackCaller.output_vcf])
     # Run snpEff annotation on final VCF as desired
-    if (SNPEFF_ANNOTATION) {
+    if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
         call normalizeVCF {
             input:
             in_sample_name=SAMPLE_NAME,
@@ -784,9 +784,9 @@ task sortMDTagBAMFile {
     input {
         String in_sample_name
         File in_bam_chunk_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
+        File? in_reference_file
+        File? in_reference_index_file
+        File? in_reference_dict_file
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
@@ -832,9 +832,9 @@ task runPICARD {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
+        File? in_reference_file
+        File? in_reference_index_file
+        File? in_reference_dict_file
         Int in_map_cores
         String in_map_mem
     }
@@ -1011,9 +1011,9 @@ task runGATKIndelRealigner {
     input {
         String in_sample_name
         Pair[File, File] in_bam_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
+        File? in_reference_file
+        File? in_reference_index_file
+        File? in_reference_dict_file
     }
     
     command {
@@ -1094,9 +1094,9 @@ task runGATKHaplotypeCaller {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
+        File? in_reference_file
+        File? in_reference_index_file
+        File? in_reference_dict_file
     }
     
     command {
@@ -1133,9 +1133,9 @@ task runGATKHaplotypeCallerGVCF {
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
+        File? in_reference_file
+        File? in_reference_index_file
+        File? in_reference_dict_file
     }
     
     command {
@@ -1172,9 +1172,9 @@ task runDragenCaller {
     input {
         String in_sample_name
         File in_bam_file
-        String in_dragen_ref_index_name
-        String in_udp_data_dir
-        String in_helix_username
+        String? in_dragen_ref_index_name
+        String? in_udp_data_dir
+        String? in_helix_username
     }
      
     String bam_file_name = basename(in_bam_file)
@@ -1217,9 +1217,9 @@ task runDragenCallerGVCF {
     input {
         String in_sample_name
         File in_bam_file
-        String in_dragen_ref_index_name
-        String in_udp_data_dir
-        String in_helix_username
+        String? in_dragen_ref_index_name
+        String? in_udp_data_dir
+        String? in_helix_username
     }
     
     String bam_file_name = basename(in_bam_file)
@@ -1662,7 +1662,7 @@ task snpEffAnnotateVCF {
     input {
         String in_sample_name
         File in_normalized_vcf_file
-        File in_snpeff_database
+        File? in_snpeff_database
     }
     
     command <<<
