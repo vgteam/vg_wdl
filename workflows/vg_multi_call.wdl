@@ -435,6 +435,7 @@ task runGATKHaplotypeCallerGVCF {
         memory: 100 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk:4.1.1.0"
+        time: 1800
     }
 }
 
