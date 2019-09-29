@@ -111,7 +111,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
         SPLIT_READ_CORES=16 \
         SPLIT_READ_DISK=50 \
         MAP_CORES=32 \
@@ -133,7 +133,7 @@ else
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
         SPLIT_READ_CORES=2 \
         SPLIT_READ_DISK=10 \
         MAP_CORES=4 \

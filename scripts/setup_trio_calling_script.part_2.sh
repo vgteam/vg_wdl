@@ -109,7 +109,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
         SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \
         DRAGEN_REF_INDEX_NAME='hs37d5_v7' \
         UDPBINFO_PATH='Udpbinfo' \
@@ -133,7 +133,7 @@ else
         REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
         REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
         REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.18.0-101-gea138e861-t327-run' \
+        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
         SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \
         DRAGEN_REF_INDEX_NAME='hs37d5_v7' \
         UDPBINFO_PATH='Udpbinfo' \
