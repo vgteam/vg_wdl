@@ -77,7 +77,7 @@ workflow vgTrioPipeline {
     call vgMultiCallWorkflow.vgMultiMapCall as paternalCallWorkflow {
         input:
             INPUT_BAM_FILE=PATERNAL_INPUT_BAM_FILE,
-            INPUT_BAM_FILE_INDEX=PATERNAL_INPUT_BAM_FILE,
+            INPUT_BAM_FILE_INDEX=PATERNAL_INPUT_BAM_FILE_INDEX,
             SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
             VG_CONTAINER=VG_CONTAINER,
             CHUNK_BASES=CHUNK_BASES,
@@ -106,7 +106,7 @@ workflow vgTrioPipeline {
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
         input:
             INPUT_BAM_FILE=PROBAND_INPUT_BAM_FILE,
-            INPUT_BAM_FILE_INDEX=PROBAND_INPUT_BAM_FILE,
+            INPUT_BAM_FILE_INDEX=PROBAND_INPUT_BAM_FILE_INDEX,
             SAMPLE_NAME=SAMPLE_NAME_PROBAND,
             VG_CONTAINER=VG_CONTAINER,
             CHUNK_BASES=CHUNK_BASES,
