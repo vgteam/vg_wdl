@@ -158,7 +158,8 @@ workflow vgMultiMapCall {
                     in_reference_dict_file=REF_DICT_FILE,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
+                    in_map_mem=MAP_MEM,
+                    in_vgmpmap_mode=VGMPMAP_MODE
             }
             call runPICARD {
                 input:
@@ -196,22 +197,13 @@ workflow vgMultiMapCall {
         # Merge chunked alignments from surjected GAM files
         Array[File?] alignment_chunk_bam_files_maybes = runPICARD.mark_dupped_reordered_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
-        if (!VGMPMAP_MODE) {
-            call mergeAlignmentBAMChunksVGMAP {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
-            }
+        call mergeAlignmentBAMChunks {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
         }
-        if (VGMPMAP_MODE) {
-            call mergeAlignmentBAMChunksVGMPMAP {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
-            }
-        }
-        File merged_bam_file_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file])
-        File merged_bam_file_index_output = select_first([mergeAlignmentBAMChunksVGMAP.merged_bam_file_index, mergeAlignmentBAMChunksVGMPMAP.merged_bam_file_index])
+        File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
+        File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
         if (GOOGLE_CLEANUP_MODE) {
             call cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
                 input:
@@ -715,9 +707,10 @@ task sortMDTagBAMFile {
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
+        Boolean in_vgmpmap_mode
     }
-    
-    command {
+
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -728,23 +721,59 @@ task sortMDTagBAMFile {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        samtools sort \
-          --threads ${in_map_cores} \
-          ${in_bam_chunk_file} \
-          -O BAM \
-        | samtools calmd \
-          -b \
-          - \
-          ${in_reference_file} \
-          > ${in_sample_name}_positionsorted.mdtag.bam \
-        && samtools index \
-          ${in_sample_name}_positionsorted.mdtag.bam
-    }
+        if [ ~{in_vgmpmap_mode} == false ]; then
+            samtools sort \
+              --threads ~{in_map_cores} \
+              -n \
+              ~{in_bam_chunk_file} \
+              -O BAM \
+            | samtools fixmate \
+              -O BAM \
+              - \
+              - \
+            | samtools sort \
+              --threads ~{in_map_cores} \
+              - \
+              -O BAM \
+            | samtools addreplacerg \
+              -O BAM \
+              -r ID:1 -r LB:lib1 -r SM:UDP10864 -r PL:illumina -r PU:unit1 \
+              - \
+            | samtools view \
+              -@ 32 \
+              -h -O SAM \
+              - \
+            | samtools view \
+              -@ 32 \
+              -h -O BAM \
+              - \
+            | samtools calmd \
+              -b \
+              - \
+              ~{in_reference_file} \
+              > ~{in_sample_name}_positionsorted.mdtag.bam \
+            && samtools index \
+              ~{in_sample_name}_positionsorted.mdtag.bam
+        else
+            samtools sort \
+              --threads ~{in_map_cores} \
+              ~{in_bam_chunk_file} \
+              -O BAM \
+            | samtools calmd \
+              -b \
+              - \
+              ~{in_reference_file} \
+              > ~{in_sample_name}_positionsorted.mdtag.bam \
+            && samtools index \
+              ~{in_sample_name}_positionsorted.mdtag.bam
+        fi
+    >>>
     output {
         File sorted_bam_file = "${in_sample_name}_positionsorted.mdtag.bam"
         File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
+        time: 200
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -801,64 +830,7 @@ task runPICARD {
     }
 }
 
-task mergeAlignmentBAMChunksVGMAP {
-    input {
-        String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
-    }
-    
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools merge \
-          -f -u -p -c --threads 32 \
-          - \
-          ${sep=" " in_alignment_bam_chunk_files} \
-        | samtools fixmate \
-          -O BAM \
-          - \
-          ${in_sample_name}_merged.namesorted.fixmate.bam \
-        | samtools sort \
-          --threads 32 \
-          - \
-          -O BAM \
-        | samtools addreplacerg \
-          -O BAM \
-          -r ID:1 -r LB:lib1 -r SM:${in_sample_name} -r PL:illumina -r PU:unit1 \
-          - \
-        | samtools view \
-          -@ 32 \
-          -h -O SAM \
-          - \
-        | samtools view \
-          -@ 32 \
-          -h -O BAM \
-          - \
-          > ${in_sample_name}_merged.fixmate.positionsorted.rg.bam \
-        && samtools index \
-          ${in_sample_name}_merged.fixmate.positionsorted.rg.bam
-    }
-    output {
-        File merged_bam_file = "${in_sample_name}_merged.fixmate.positionsorted.rg.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.fixmate.positionsorted.rg.bam.bai"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-task mergeAlignmentBAMChunksVGMPMAP {
+task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
