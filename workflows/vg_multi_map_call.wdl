@@ -3,10 +3,11 @@ version 1.0
 ### vg_multi_map_call.wdl ###
 workflow vgMultiMapCall {
     meta {
-    author: "Charles Markello"
+        author: "Charles Markello"
         email: "cmarkell@ucsc.edu"
         description: "Core VG mapping and variant calling workflow for single sample datasets."
     }
+    
     input {
         Boolean VGMPMAP_MODE = true             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
@@ -18,7 +19,7 @@ workflow vgMultiMapCall {
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         String PCR_INDEL_MODEL = "CONSERVATIVE"     # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling

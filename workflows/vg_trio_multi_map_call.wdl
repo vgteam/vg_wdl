@@ -5,10 +5,10 @@ version 1.0
 ## Description: Trio-backed VG mapping and variant calling workflow for mother-father-child trio datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "./vg_multi_map.wdl" as vgMultiMapWorkflow
-import "./vg_multi_call.wdl" as vgMultiCallWorkflow
-import "./vg_construct_and_index.wdl" as vgConstructWorkflow
+import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
+import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_call.wdl" as vgMultiCallWorkflow
+import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
     input {
@@ -16,12 +16,12 @@ workflow vgTrioPipeline {
         File MATERNAL_INPUT_READ_FILE_2                     # Input maternal 2nd read pair fastq.gz
         File PATERNAL_INPUT_READ_FILE_1                     # Input paternal 1st read pair fastq.gz
         File PATERNAL_INPUT_READ_FILE_2                     # Input paternal 2nd read pair fastq.gz
-        Array[File]+ SIBLING_INPUT_READ_FILE_1_LIST
-        Array[File]+ SIBLING_INPUT_READ_FILE_2_LIST
-        Array[String]+ SAMPLE_NAME_SIBLING_LIST
+        Array[File]+ SIBLING_INPUT_READ_FILE_1_LIST         # Input 1st read pair list where the proband file is listed first followed by sibling fastq.gz
+        Array[File]+ SIBLING_INPUT_READ_FILE_2_LIST         # Input 2nd read pair list where the proband file is listed first followed by sibling fastq.gz
+        Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Sample name for siblings where the proband file is listed first followed by the siblings
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int READS_PER_CHUNK = 10000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
@@ -58,13 +58,13 @@ workflow vgTrioPipeline {
         File PED_FILE
         File GEN_MAP_FILES
         String GRAPH_NAME
-        Boolean VGMPMAP_MODE                            # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
-        Boolean DRAGEN_MODE                             # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
+        Boolean VGMPMAP_MODE = true                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
+        Boolean DRAGEN_MODE = false                     # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean USE_HAPLOTYPES = true                   # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
-        Boolean MAKE_SNARLS = true                      # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
+        Boolean MAKE_SNARLS = false                     # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
-        String DECOY_REGEX = ">GL"                      # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
+        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
     File PROBAND_INPUT_READ_FILE_1 = SIBLING_INPUT_READ_FILE_1_LIST[0]  # Input proband 1st read pair fastq.gz
@@ -217,7 +217,7 @@ workflow vgTrioPipeline {
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
-            PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then maternalCallWorkflow.output_vcf else "null"
+            PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
         input:
@@ -246,7 +246,7 @@ workflow vgTrioPipeline {
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
-            PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then paternalCallWorkflow.output_vcf else "null"
+            PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     
     ###############################
@@ -386,7 +386,7 @@ workflow vgTrioPipeline {
                 MERGE_GAM_DISK=MERGE_GAM_DISK,
                 MERGE_GAM_MEM=MERGE_GAM_MEM,
                 MERGE_GAM_TIME=MERGE_GAM_TIME,
-                VGMPMAP_MODE=VGMPMAP_MODE,
+                VGMPMAP_MODE=false,
                 SURJECT_MODE=true
         }
     }
@@ -455,7 +455,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
-                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then probandCallWorkflow2.output_vcf else "null"
+                PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
     if (numSilbings > 2) {
@@ -486,7 +486,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
-                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then sibling1CallWorkflow.output_vcf else "null"
+                PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
     if (numSilbings > 3) {
@@ -517,7 +517,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
-                PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then sibling2CallWorkflow.output_vcf else "null"
+                PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
     File proband_gvcf = probandCallWorkflow2.output_vcf

@@ -38,7 +38,7 @@ workflow vg_construct_and_index {
         String decoy_regex = ">GL\|>NC_007605\|>hs37d5"
         
         # vg docker image tag
-        String vg_docker = "quay.io/vgteam/vg:v1.16.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.19.0"
     }
 
     # construct graph for each reference contig

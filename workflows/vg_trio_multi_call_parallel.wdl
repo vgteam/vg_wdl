@@ -1,12 +1,12 @@
 version 1.0
 
-### vg_trio_multi_call.wdl ###
+### vg_trio_multi_call_parallel.wdl ###
 # Author: Charles Markello
 # Description: Variant calling workflow for mother-father-proband trios.
 #              Designed as the 2nd step in a pedigree-backed graph alignment pipeline.
 
-import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "./vg_multi_call.wdl" as vgMultiCallWorkflow
+import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_call.wdl" as vgMultiCallWorkflow
 
 ###########################
 ### WORKFLOW DEFINITION ###
@@ -22,7 +22,7 @@ workflow vgTrioPipeline {
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         String SAMPLE_NAME_PROBAND                          # Sample name for the proband
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index

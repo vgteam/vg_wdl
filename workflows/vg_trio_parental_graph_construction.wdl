@@ -5,8 +5,8 @@ version 1.0
 # Description: Workflow for constructing  mother-father graph references.
 #              Designed as the 3rd step in a pedigree-backed graph alignment pipeline.
 
-import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "./vg_construct_and_index.wdl" as vgConstructWorkflow
+import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
 
 ###########################
 ### WORKFLOW DEFINITION ###
@@ -24,7 +24,7 @@ workflow vgTrioPipeline {
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         String SAMPLE_NAME_PROBAND                          # Sample name for the proband
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
@@ -37,7 +37,7 @@ workflow vgTrioPipeline {
                                                             #   (ftp://ftp.ncbi.nlm.nih.gov/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz)
         String GRAPH_NAME                                   # Name of the parental graph reference
         Boolean USE_HAPLOTYPES = true                       # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
-        Boolean MAKE_SNARLS = true                          # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
+        Boolean MAKE_SNARLS = false                         # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                           # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5"     # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true' to use this option.
     }

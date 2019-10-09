@@ -18,7 +18,7 @@ workflow vgTrioPipeline {
         Array[File]+ SIBLING_BAM_FILE_LIST                  # Input list of sibling surjected .bam files. Proband must be first in list.
         Array[File]+ SIBLING_BAM_FILE_INDEX_LIST            # Input list of .bai indices of surjected .bam files. Must follow same sample order as SIBLING_BAM_FILE_LIST.
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Input list of sibling sample names. Must follow same order as SIBLING_BAM_FILE_LIST.
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
