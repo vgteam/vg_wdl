@@ -1,11 +1,12 @@
 version 1.0
 
 ### vg_multi_map_call.wdl ###
-# Author: Charles Markello
-# Description: Core VG mapping and variant calling workflow for single sample datasets.
-# Reference: https://github.com/vgteam/vg/wiki
-
 workflow vgMultiMapCall {
+    meta {
+    author: "Charles Markello"
+        email: "cmarkell@ucsc.edu"
+        description: "Core VG mapping and variant calling workflow for single sample datasets."
+    }
     input {
         Boolean VGMPMAP_MODE = true             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
