@@ -525,7 +525,7 @@ task sortMDTagBAMFile {
               -O BAM \
             | samtools addreplacerg \
               -O BAM \
-              -r ID:1 -r LB:lib1 -r SM:UDP10864 -r PL:illumina -r PU:unit1 \
+              -r ID:1 -r LB:lib1 -r SM:~{in_sample_name} -r PL:illumina -r PU:unit1 \
               - \
             | samtools view \
               -@ 32 \
