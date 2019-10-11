@@ -5,12 +5,17 @@ version 1.0
 ## Description: Trio-backed VG mapping and variant calling workflow for mother-father-child trio datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
-import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_call.wdl" as vgMultiCallWorkflow
-import "https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
+import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+import "./vg_multi_call.wdl" as vgMultiCallWorkflow
+import "./vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
+    meta {
+        author: "Charles Markello"
+        email: "cmarkell@ucsc.edu"
+        description: "Core VG mapping and variant calling workflow for pedigree datasets."
+    }
     input {
         File MATERNAL_INPUT_READ_FILE_1                     # Input maternal 1st read pair fastq.gz
         File MATERNAL_INPUT_READ_FILE_2                     # Input maternal 2nd read pair fastq.gz
@@ -258,7 +263,7 @@ workflow vgTrioPipeline {
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
-                in_gvcf_file_proband=probandCallWorkflow.output_vcf,
+                in_gvcf_files_siblings=[probandCallWorkflow.output_vcf],
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
@@ -276,7 +281,7 @@ workflow vgTrioPipeline {
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
-                in_gvcf_file_proband=probandCallWorkflow.output_vcf,
+                in_gvcf_files_siblings=[probandCallWorkflow.output_vcf],
                 in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                 in_udp_data_dir=UDPBINFO_PATH,
                 in_helix_username=HELIX_USERNAME
@@ -337,8 +342,8 @@ workflow vgTrioPipeline {
             in_proband_sample_name=SAMPLE_NAME_PROBAND,
             in_maternal_sample_name=SAMPLE_NAME_MATERNAL,
             in_paternal_sample_name=SAMPLE_NAME_PATERNAL,
-            joint_genotyped_vcf=bgzipCohortPhasedVCF.output_merged_vcf,
-            joint_genotyped_vcf_index=bgzipCohortPhasedVCF.output_merged_vcf_index,
+            joint_genotyped_vcf=cohort_vcf_output,
+            joint_genotyped_vcf_index=cohort_vcf_index_output,
             contigs=CONTIGS,
             filter_parents=true
     }
@@ -533,8 +538,8 @@ workflow vgTrioPipeline {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper2nd {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
-                in_gvcf_file_maternal=MATERNAL_GVCF,
-                in_gvcf_file_paternal=PATERNAL_GVCF,
+                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
+                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=gvcf_files_siblings,
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
@@ -551,8 +556,8 @@ workflow vgTrioPipeline {
         call runDragenJointGenotyper as dragenJointGenotyper2nd {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
-                in_gvcf_file_maternal=MATERNAL_GVCF,
-                in_gvcf_file_paternal=PATERNAL_GVCF,
+                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
+                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=gvcf_files_siblings,
                 in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                 in_udp_data_dir=UDPBINFO_PATH,
@@ -581,10 +586,10 @@ workflow vgTrioPipeline {
     
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        File output_maternal_bam = maternalMapWorkflow.output_bam
-        File output_maternal_bam_index = maternalMapWorkflow.output_bam_index
-        File output_paternal_bam = paternalMapWorkflow.output_bam
-        File output_paternal_bam_index = paternalMapWorkflow.output_bam_index
+        File? output_maternal_bam = maternalMapWorkflow.output_bam
+        File? output_maternal_bam_index = maternalMapWorkflow.output_bam_index
+        File? output_paternal_bam = paternalMapWorkflow.output_bam
+        File? output_paternal_bam_index = paternalMapWorkflow.output_bam_index
         Array[File] output_gvcf_files_siblings = gvcf_files_siblings
         Array[File] final_output_sibling_bam_list = output_sibling_bam_list
         Array[File] final_output_sibling_bam_index_list = output_sibling_bam_index_list
@@ -714,18 +719,21 @@ task runSplitJointGenotypedVCF {
 
     command <<<
         set -exu -o pipefail
-        
+
         if [ ~{filter_parents} == true ]; then
           SAMPLE_FILTER_STRING="-s ~{in_maternal_sample_name},~{in_paternal_sample_name}"
         else
           SAMPLE_FILTER_STRING=""
         fi
-
+        ln -s ~{joint_genotyped_vcf} input_vcf_file.vcf.gz
+        ln -s ~{joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
         while read -r contig; do
             if [[ ~{filter_parents} == true && ${contig} == "MT" ]]; then
-                bcftools view -O z -r "${contig}" "-s ~{in_maternal_sample_name}" ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
+            elif [[ ~{filter_parents} == true && ${contig} == "Y" ]]; then
+                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             else
-                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} ~{joint_genotyped_vcf} > "${contig}.vcf.gz"
+                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             fi
             echo "${contig}.vcf.gz" >> contig_vcf_list.txt
         done < "~{write_lines(contigs)}"
