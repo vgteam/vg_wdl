@@ -73,7 +73,7 @@ if [ ! -d "${VG_WDL_DIR}" ]; then
 fi
 
 cd ${VG_WDL_DIR}
-git clone https://github.com/cmarkello/miniwdl.git
+git clone https://github.com/chanzuckerberg/miniwdl.git
 virtualenv miniwdl_venv
 source miniwdl_venv/bin/activate
 pip3 install ./miniwdl
