@@ -1,6 +1,6 @@
 {
-  "vgPipeline.INPUT_READ_FILE_1": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/HG002_chr21_1.tiny.fastq.gz", 
-  "vgPipeline.INPUT_READ_FILE_2": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/HG002_chr21_2.tiny.fastq.gz",
+  "vgPipeline.INPUT_READ_FILE_1": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/test_input_reads/HG002_chr21_1.tiny.2x250.fastq.gz", 
+  "vgPipeline.INPUT_READ_FILE_2": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/test_input_reads/HG002_chr21_2.tiny.2x250.fastq.gz",
   "vgPipeline.SAMPLE_NAME": "HG002",
   "vgPipeline.READS_PER_CHUNK": 500,
   "vgPipeline.CHUNK_BASES": 25000000,
