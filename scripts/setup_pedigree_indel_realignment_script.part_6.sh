@@ -87,17 +87,17 @@ SIB_BAM_FILE_INDEX_PARAMS=""
 SIB_ID_LIST=""
 for SIBLING_ID in ${SIBLING_SAMPLE_NAMES[@]}
 do
-  SIB_BAM_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs/outputs -name ${SIBLING_ID}_merged.positionsorted.bam))
-  SIB_BAM_FILE_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs/outputs -name ${SIBLING_ID}_merged.positionsorted.bam.bai))
+  SIB_BAM_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs/output_links -name ${SIBLING_ID}_merged.positionsorted.bam))
+  SIB_BAM_FILE_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs/output_links -name ${SIBLING_ID}_merged.positionsorted.bam.bai))
   SIB_BAM_FILE_PARAMS+="SIBLING_BAM_FILE_LIST='${SIB_BAM_FILE_PATH}' "
   SIB_BAM_FILE_INDEX_PARAMS+="SIBLING_BAM_FILE_INDEX_LIST='${SIB_BAM_FILE_INDEX_PATH}' "
   SIB_ID_LIST+="SAMPLE_NAME_SIBLING_LIST='${SIBLING_ID}' "
 done
-MATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/outputs -name ${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
-MATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/outputs -name ${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
-PATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/outputs -name ${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
-PATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/outputs -name ${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
-XG_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/outputs -regex .*.xg))
+MATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
+MATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
+PATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
+PATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
+XG_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/output_links -regex .*.xg))
 
 rm -f ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.part_6.sh
 echo '#!/bin/bash' >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.part_6.sh
