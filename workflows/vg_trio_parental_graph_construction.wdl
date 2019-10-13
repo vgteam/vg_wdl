@@ -5,8 +5,8 @@ version 1.0
 # Description: Workflow for constructing  mother-father graph references.
 #              Designed as the 3rd step in a pedigree-backed graph alignment pipeline.
 
-import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
+import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "./vg_construct_and_index.wdl" as vgConstructWorkflow
 
 ###########################
 ### WORKFLOW DEFINITION ###
