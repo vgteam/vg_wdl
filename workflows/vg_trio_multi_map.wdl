@@ -5,7 +5,7 @@ version 1.0
 # Description: Mapping workflow for mother-father-proband trios.
 #              Designed as the 1st step in a pedigree-backed graph alignment pipeline.
 
-import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
+import "./vg_multi_map.wdl" as vgMultiMapWorkflow
 
 ###########################
 ### WORKFLOW DEFINITION ###
