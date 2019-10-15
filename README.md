@@ -23,6 +23,25 @@ docker pull variantgraphs/vg:1.3.1
 ```
 
 ## Usage
+Install miniwdl in a python 3 virtual environment
+```
+git clone https://github.com/chanzuckerberg/miniwdl.git
+virtualenv miniwdl_venv
+source miniwdl_venv/bin/activate
+pip3 install ./miniwdl
+deactivate
+```
+Download `.wdl` workflow file and `.json` input file
+```
+wget https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map_call.wdl
+wget https://github.com/vgteam/vg_wdl/raw/master/params/vg_multi_map_call.inputs_tiny.http_url.json
+```
+Activate the miniwdl virtual environment and run the example workflow
+```
+source miniwdl_venv/bin/activate
+miniwdl cromwell vg_multi_map_call.wdl -i vg_multi_map_call.inputs_tiny.http_url.json
+```
+To modify the input parameters, edit the input `.json` with the necessary changes.
 
 ## Examples
 
