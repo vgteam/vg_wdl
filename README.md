@@ -27,6 +27,19 @@ docker pull variantgraphs/vg:1.3.1
 ## Examples
 
 ## Availability
+Workflow for processing single sample datasets:
+- [workflow file](https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map_call.wdl)
+- [parameter file](https://github.com/vgteam/vg_wdl/raw/master/params/vg_multi_map_call.inputs_tiny.http_url.json)
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/vg-pipeline-workingexample:master?tab=info)
+
+Workflow for processing pedigree datasets:
+- [workflow file](https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_trio_multi_map_call.wdl)
+- [parameter file](https://github.com/vgteam/vg_wdl/raw/master/params/vg_trio_multi_map_call.inputs_tiny.http_url.json)
+
+Workflow for mapping and calling structural variants in a single sample:
+- [workflow file](https://github.com/vgteam/vg_wdl/raw/svpack/workflows/vg_map_call_sv.wdl)
+- [parameter file](https://github.com/vgteam/vg_wdl/raw/svpack/params/vg_map_call_sv_test.inputs.json)
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/vg_map_call_sv:svpack?tab=info)
 
 ## Contributing, Help, Bugs and Requests
 Please open an Issue on [github](https://github.com/vgteam/vg_wdl) for help, bug reports, or feature requests.
