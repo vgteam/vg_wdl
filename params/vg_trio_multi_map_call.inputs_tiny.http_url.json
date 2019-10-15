@@ -32,9 +32,9 @@
   "vgTrioPipeline.GEN_MAP_FILES": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/genetic_map_GRCh37.tar",
   "vgTrioPipeline.GRAPH_NAME": "HG002_parental_graph_chr21",
   "vgTrioPipeline.CONTIGS": ["21"],
-  "vgTrioPipeline.VGMPMAP_MODE": "true",
-  "vgTrioPipeline.DRAGEN_MODE": "false",
-  "vgTrioPipeline.USE_HAPLOTYPES": "true",
-  "vgTrioPipeline.USE_DECOYS": "false",
-  "vgTrioPipeline.SNPEFF_ANNOTATION": "false"
+  "vgTrioPipeline.VGMPMAP_MODE": true,
+  "vgTrioPipeline.DRAGEN_MODE": false,
+  "vgTrioPipeline.USE_HAPLOTYPES": true,
+  "vgTrioPipeline.USE_DECOYS": false,
+  "vgTrioPipeline.SNPEFF_ANNOTATION": false
 }
