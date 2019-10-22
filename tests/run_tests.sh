@@ -14,7 +14,7 @@ miniwdl cromwell --no-quant-check -d "$ORIG_CWD/vg_wdl_tests_ABOlocus_SV" \
 miniwdl check --no-quant-check vg_ABOlocus_test_pedigree.wdl
 miniwdl cromwell --no-quant-check -d "$ORIG_CWD/vg_wdl_tests_ABOlocus_pedigree" \
     vg_ABOlocus_test_pedigree.wdl \
-    ABOlocus_fa_gz=ABOlocus.fa.gz ABOlocus_SV_vcf_gz=ABOlocus_SV.vcf.gz \
+    ABOlocus_fa_gz=ABOlocus.fa.gz ABOlocus_small_vcf_gz=ABOlocus_small.vcf.gz \
     maternal_reads_bam=HG004.hs37d5.2x250.abo.bam \
     paternal_reads_bam=HG003.hs37d5.2x250.abo.bam \
     child_reads_bam=HG002.hs37d5.2x250.abo.bam \
