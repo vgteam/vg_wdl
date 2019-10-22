@@ -1,0 +1,4 @@
+#Family	ID	Father	Mother	Sex[1=M]	Affected[2=A]
+HG002	HG002	HG003	HG004	1	2
+HG002	HG003	0	0	1	1
+HG002	HG004	0	0	2	1

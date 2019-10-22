@@ -30,7 +30,7 @@ workflow vgTrioPipeline {
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
-        File SNPEFF_DATABASE                                # Path to snpeff database .zip file
+        File? SNPEFF_DATABASE                                # Path to snpeff database .zip file
         Int CHUNK_GAM_CORES = 32
         Int CHUNK_GAM_DISK = 400
         Int CHUNK_GAM_MEM = 100
