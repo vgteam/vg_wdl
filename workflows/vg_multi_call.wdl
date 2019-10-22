@@ -28,7 +28,7 @@ workflow vgMultiMapCall {
         File REF_FILE                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                         # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                          # Path to .dict file of the REF_FILE fasta reference
-        File SNPEFF_DATABASE                        # Path to snpeff database .zip file for snpEff annotation functionality.
+        File? SNPEFF_DATABASE                        # Path to snpeff database .zip file for snpEff annotation functionality.
         Int CHUNK_GAM_CORES = 32
         Int CHUNK_GAM_DISK = 400
         Int CHUNK_GAM_MEM = 100
@@ -231,7 +231,7 @@ workflow vgMultiMapCall {
     # Extract either the linear-based or graph-based VCF
     File variantcaller_vcf_output = select_first([runDragenCaller.dragen_genotyped_vcf, bgzipVGCalledVCF.output_merged_vcf, bgzipGATKCalledVCF.output_merged_vcf, final_gvcf_output])
     # Run snpEff annotation on final VCF as desired
-    if (SNPEFF_ANNOTATION) {
+    if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
         call normalizeVCF {
             input:
                 in_sample_name=SAMPLE_NAME,
