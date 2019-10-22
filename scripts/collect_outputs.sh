@@ -26,7 +26,8 @@ Inputs:
     -f Father UDP ID (in format UDP####)
     -w PATH to where the UDP cohort will be processed and where the input reads will be stored
     -o PATH to the output directory
-
+    -d (OPTIONAL, default=false) Set to 'true' if deleting leftover workflow raw output
+    
 Outputs:
 
 Assumptions:
@@ -41,8 +42,11 @@ if [ $# -lt 5 ] || [[ $@ != -* ]]; then
     exit 1
 fi
 
+## DEFAULT PARAMETERS
+DEL_RAW_OUTPUT=false
+
 ## Parse through arguments
-while getopts "s:m:f:w:o:h" OPTION; do
+while getopts "s:m:f:w:o:d:h" OPTION; do
     case $OPTION in
         s)
             SIBLING_SAMPLE_NAMES+=($OPTARG)
@@ -58,6 +62,9 @@ while getopts "s:m:f:w:o:h" OPTION; do
         ;;
         o)
             OUTPUT_DIR=$OPTARG
+        ;;
+        d)
+            DEL_RAW_OUTPUT=$OPTARG
         ;;
         h)
             usage
@@ -110,14 +117,16 @@ cp ${JOINT_GENOTYPED_VCF_PATH} "${OUTPUT_DIR}/"
 tar -cvf ${PROBAND_SAMPLE_NAME}_workflow_outputs.tar ${OUTPUT_DIR}
 
 ## Delete intermediate workflow and input directories
-rm -fr ${OUTPUT_DIR}
-rm -fr ${COHORT_WORKFLOW_DIR}/input_reads
-rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs
-rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs
-rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs
-rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs
-rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs
-rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs
+if [ $DEL_RAW_OUTPUT == true ]; then
+    rm -fr ${OUTPUT_DIR}
+    rm -fr ${COHORT_WORKFLOW_DIR}/input_reads
+    rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs
+    rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs
+    rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs
+    rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs
+    rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs
+    rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs
+fi
 
 exit
 
