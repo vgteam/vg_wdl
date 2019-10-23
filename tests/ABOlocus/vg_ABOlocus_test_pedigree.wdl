@@ -58,6 +58,7 @@ workflow vg_ABOlocus_test {
         GCSA_FILE = cons.gcsa,
         GCSA_LCP_FILE = cons.gcsa_lcp,
         GBWT_FILE = cons.gbwt,
+        GRAPH_NAME = "ABOlocus_parental",
         CONTIGS = ["ABOlocus"],
         REF_FILE = ref_file,
         REF_INDEX_FILE = ref_index_file,
