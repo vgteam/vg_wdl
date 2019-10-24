@@ -830,7 +830,7 @@ task snpEffAnnotateVCF {
     input {
         String in_sample_name
         File in_normalized_vcf_file
-        File in_snpeff_database
+        File? in_snpeff_database
     }
 
     command <<<

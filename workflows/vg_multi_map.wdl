@@ -610,7 +610,7 @@ task runPICARD {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 60
+        time: 180
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:2.20.4"

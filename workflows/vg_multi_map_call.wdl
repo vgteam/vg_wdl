@@ -825,7 +825,7 @@ task runPICARD {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 600
+        time: 180
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:2.20.4"
@@ -1564,7 +1564,7 @@ task snpEffAnnotateVCF {
     input {
         String in_sample_name
         File in_normalized_vcf_file
-        File in_snpeff_database
+        File? in_snpeff_database
     }
     
     command <<<

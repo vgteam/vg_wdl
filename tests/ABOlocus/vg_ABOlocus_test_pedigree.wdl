@@ -19,6 +19,7 @@ workflow vg_ABOlocus_test {
         File ref_file
         File ref_index_file
         File ref_dict_file
+        File ref_file_gz
         File ped_file
         String vg_docker = "quay.io/vgteam/vg:v1.19.0"
     }
@@ -71,16 +72,28 @@ workflow vg_ABOlocus_test {
         VGCALL_CORES = 2,
         VGCALL_DISK = 5,
         VGCALL_MEM = 10,
-        REF_FASTA_GZ = ref_file,
+        REF_FASTA_GZ = ref_file_gz,
         PED_FILE = ped_file,
         SNPEFF_ANNOTATION = false,
         USE_DECOYS = false
     }
     
+    call check_trio_bams { input:
+        mom_fastq_1_gz = mom_reads.fastq_1_gz,
+        dad_fastq_1_gz = dad_reads.fastq_1_gz,
+        child_fastq_1_gz = child_reads.fastq_1_gz,
+        mom_bam = vgtrio.output_maternal_bam,
+        dad_bam = vgtrio.output_paternal_bam,
+        child_bam = vgtrio.final_output_sibling_bam_list[0]
+    }
+    
     output {
-        File cohort_vcf = vgtrio.output_cohort_vcf
-        File output_maternal_bam = vgtrio.output_maternal_bam
-        File output_paternal_bam = vgtrio.output_paternal_bam
+        Int mom_reads = check_trio_bams.mom_reads
+        Int dad_reads = check_trio_bams.dad_reads
+        Int child_reads = check_trio_bams.child_reads
+        Int mom_reads_aligned_identically = check_trio_bams.mom_reads_aligned_identically
+        Int dad_reads_aligned_identically = check_trio_bams.dad_reads_aligned_identically
+        Int child_reads_aligned_identically = check_trio_bams.child_reads_aligned_identically
     }
 }
 
@@ -91,24 +104,74 @@ task bam_to_paired_fastq {
 
     command <<<
         set -eux -o pipefail
-        apt-get update
-        apt-get install -y openjdk-11-jre-headless wget samtools pigz
-        wget https://github.com/broadinstitute/picard/releases/download/2.19.0/picard.jar
-
+        
         samtools sort -n -@ $(nproc) -O BAM -o namesorted.bam "~{bam}"
         nm=$(basename "~{bam}" .bam)
-        java -jar picard.jar SamToFastq I=namesorted.bam RE_REVERSE=true INCLUDE_NON_PF_READS=true "FASTQ=${nm}_1.fastq" "SECOND_END_FASTQ=${nm}_2.fastq" "UNPAIRED_FASTQ=${nm}_unpaired.fastq" VALIDATION_STRINGENCY=LENIENT
+        java -jar /picard.jar SamToFastq I=namesorted.bam RE_REVERSE=true INCLUDE_NON_PF_READS=true "FASTQ=${nm}_1.fastq" "SECOND_END_FASTQ=${nm}_2.fastq" "UNPAIRED_FASTQ=${nm}_unpaired.fastq" VALIDATION_STRINGENCY=LENIENT
         pigz *.fastq
     >>>
 
     runtime {
-        docker: "ubuntu:18.04"
+        docker: "quay.io/cmarkello/bamsplit:latest"
     }
 
     output {
         File fastq_1_gz = glob("*_1.fastq.gz")[0]
         File fastq_2_gz = glob("*_2.fastq.gz")[0]
         File fastq_unpaired_gz = glob("*_unpaired.fastq.gz")[0]
+    }
+}
+
+task check_trio_bams {
+    # checks if the trio bams have the expected # of mappings, and finds the proportion aligned at 100% identity
+    input {
+        File mom_fastq_1_gz
+        File dad_fastq_1_gz
+        File child_fastq_1_gz
+        File mom_bam
+        File dad_bam
+        File child_bam
+    }
+
+    command <<<
+        set -eux -o pipefail
+        
+        n_mom_reads=$(expr $(zcat ~{mom_fastq_1_gz} | wc -l) / 2)
+        if [ "$n_mom_reads" -ne "$(samtools view ~{mom_bam} | wc -l)" ]; then
+            echo "wrong read count for maternal alignments" >&2
+            exit 1
+        fi
+        echo "$n_mom_reads" > n_mom_reads
+        samtools view "~{mom_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' > n_mom_identical
+        
+        n_dad_reads=$(expr $(zcat ~{dad_fastq_1_gz} | wc -l) / 2)
+        if [ "$n_dad_reads" -ne "$(samtools view ~{dad_bam} | wc -l)" ]; then
+            echo "wrong read count for paternal alignments" >&2
+            exit 1
+        fi
+        echo "$n_dad_reads" > n_dad_reads
+        samtools view "~{dad_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' > n_dad_identical
+        
+        n_child_reads=$(expr $(zcat ~{child_fastq_1_gz} | wc -l) / 2)
+        if [ "$n_child_reads" -ne "$(samtools view ~{child_bam} | wc -l)" ]; then
+            echo "wrong read count for child alignments" >&2
+            exit 1
+        fi
+        echo "$n_child_reads" > n_child_reads
+        samtools view "~{child_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' > n_child_identical
+    >>>
+
+    runtime {
+        docker: "quay.io/cmarkello/bamsplit:latest"
+    }
+
+    output {
+        Int mom_reads = read_int("n_mom_reads")
+        Int dad_reads = read_int("n_dad_reads")
+        Int child_reads = read_int("n_child_reads")
+        Int mom_reads_aligned_identically = read_int("n_mom_identical")
+        Int dad_reads_aligned_identically = read_int("n_dad_identical")
+        Int child_reads_aligned_identically = read_int("n_child_identical")
     }
 }
 

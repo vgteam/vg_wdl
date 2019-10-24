@@ -18,7 +18,8 @@ miniwdl cromwell --no-quant-check -d "$ORIG_CWD/vg_wdl_tests_ABOlocus_pedigree" 
     maternal_reads_bam=HG004.hs37d5.2x250.abo.bam \
     paternal_reads_bam=HG003.hs37d5.2x250.abo.bam \
     child_reads_bam=HG002.hs37d5.2x250.abo.bam \
-    ref_file=ABOlocus.fa.gz \
-    ref_index_file=ABOlocus.fa.gz.fai \
+    ref_file=ABOlocus.fa \
+    ref_index_file=ABOlocus.fa.fai \
     ref_dict_file=ABOlocus.dict \
+    ref_file_gz=ABOlocus.fa.gz \
     ped_file=HG002.ped
