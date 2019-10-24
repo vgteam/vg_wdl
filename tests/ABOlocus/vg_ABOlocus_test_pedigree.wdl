@@ -88,9 +88,9 @@ workflow vg_ABOlocus_test {
     }
     
     output {
-        Int mom_reads = check_trio_bams.mom_reads
-        Int dad_reads = check_trio_bams.dad_reads
-        Int child_reads = check_trio_bams.child_reads
+        Int n_mom_reads = check_trio_bams.n_mom_reads
+        Int n_dad_reads = check_trio_bams.n_dad_reads
+        Int n_child_reads = check_trio_bams.n_child_reads
         Int mom_reads_aligned_identically = check_trio_bams.mom_reads_aligned_identically
         Int dad_reads_aligned_identically = check_trio_bams.dad_reads_aligned_identically
         Int child_reads_aligned_identically = check_trio_bams.child_reads_aligned_identically
@@ -166,9 +166,9 @@ task check_trio_bams {
     }
 
     output {
-        Int mom_reads = read_int("n_mom_reads")
-        Int dad_reads = read_int("n_dad_reads")
-        Int child_reads = read_int("n_child_reads")
+        Int n_mom_reads = read_int("n_mom_reads")
+        Int n_dad_reads = read_int("n_dad_reads")
+        Int n_child_reads = read_int("n_child_reads")
         Int mom_reads_aligned_identically = read_int("n_mom_identical")
         Int dad_reads_aligned_identically = read_int("n_dad_identical")
         Int child_reads_aligned_identically = read_int("n_child_identical")
