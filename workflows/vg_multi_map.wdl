@@ -250,7 +250,7 @@ task cleanUpUnixFilesystem {
     >>>
     runtime {
         time: 10
-        docker: "null"
+        docker: "ubuntu:latest"
         continueOnReturnCode: true
     }
 }
