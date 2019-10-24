@@ -128,9 +128,9 @@ task check_trio_bams {
         File mom_fastq_1_gz
         File dad_fastq_1_gz
         File child_fastq_1_gz
-        File mom_bam
-        File dad_bam
-        File child_bam
+        File? mom_bam
+        File? dad_bam
+        File? child_bam
     }
 
     command <<<
