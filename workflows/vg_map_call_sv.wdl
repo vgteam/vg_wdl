@@ -14,6 +14,7 @@ workflow vgMapCallSV {
         File XG_FILE                            # Path to .xg index file
         File GCSA_FILE                          # Path to .gcsa index file
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
+        File? SNARL_FILE                         # Path to snarl index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
@@ -135,6 +136,7 @@ workflow vgMapCallSV {
         in_sample_name=SAMPLE_NAME, 
         in_xg_file=XG_FILE, 
         in_gam_file=mergeAlignmentGAMChunks.merged_gam_file,
+        in_snarl_file=SNARL_FILE,
         in_vg_container=VG_CONTAINER,
         in_vgcall_cores=VGCALL_CORES,
         in_vgcall_disk=VGCALL_DISK,
@@ -364,12 +366,14 @@ task runVGPackCaller {
         String in_sample_name
         File in_xg_file
         File in_gam_file
+        File? in_snarl_file
         String in_vg_container
         Int in_vgcall_cores
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
 
+    Boolean snarl_options = defined(in_snarl_file)
     String graph_tag = basename(in_xg_file, ".xg")
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -389,11 +393,16 @@ task runVGPackCaller {
            -q \
            -t ~{in_vgcall_cores} \
            -o ~{graph_tag}.pack
+
+        SNARL_OPTION_STRING=""
+        if [ ~{snarl_options} == true ]; then
+          SNARL_OPTION_STRING="--snarls ~{in_snarl_file}"
+        fi
         
         vg call \
            -k ~{graph_tag}.pack \
            -t ~{in_vgcall_cores} \
-           -s ~{in_sample_name} \
+           -s ~{in_sample_name} ${SNARL_OPTION_STRING} \
            ~{in_xg_file} > ~{graph_tag}.vcf
 
         head -10000 ~{graph_tag}.vcf | grep "^#" >> ~{graph_tag}.sorted.vcf

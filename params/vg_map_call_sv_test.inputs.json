@@ -5,8 +5,9 @@
     "vgMapCallSV.XG_FILE": "graph.xg",
     "vgMapCallSV.GCSA_FILE": "graph.gcsa",
     "vgMapCallSV.GCSA_LCP_FILE": "graph.gcsa.lcp",
+    "vgMapCallSV.SNARL_FILE": "graph.snarls",
     "vgMapCallSV.GBWT_FILE": "graph.gbwt",
-    "vgMapCallSV.VG_CONTAINER": "quay.io/vgteam/vg:v1.18.0-326-gad0b34ba3-t342-run",
+    "vgMapCallSV.VG_CONTAINER": "quay.io/vgteam/vg:v1.19.0",
     "vgMapCallSV.READS_PER_CHUNK": 10000000,
     "vgMapCallSV.SPLIT_READ_CORES": 32,
     "vgMapCallSV.SPLIT_READ_DISK": 200,
@@ -17,9 +18,9 @@
     "vgMapCallSV.MERGE_GAM_DISK": 400,
     "vgMapCallSV.MERGE_GAM_MEM": 100,
     "vgMapCallSV.MERGE_GAM_TIME": 2400,
-    "vgMapCallSV.VGCALL_CORES": 16,
+    "vgMapCallSV.VGCALL_CORES": 10,
     "vgMapCallSV.VGCALL_DISK": 200,
-    "vgMapCallSV.VGCALL_MEM": 64,
+    "vgMapCallSV.VGCALL_MEM": 100,
     "vgMapCallSV.GOOGLE_CLEANUP_MODE": "true",
     "vgMapCallSV.CLEANUP_MODE": "false"
 }
