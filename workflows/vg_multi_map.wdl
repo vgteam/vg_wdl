@@ -632,7 +632,7 @@ task mergeAlignmentBAMChunks {
         Array[File] in_alignment_bam_chunk_files
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -645,14 +645,14 @@ task mergeAlignmentBAMChunks {
         #to turn off echo do 'set +o xtrace'
         samtools merge \
           -f -p -c --threads "$(nproc)" \
-          ${in_sample_name}_merged.positionsorted.bam \
-          ${sep=" " in_alignment_bam_chunk_files} \
+          ~{in_sample_name}_merged.positionsorted.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
-          ${in_sample_name}_merged.positionsorted.bam
-    }
+          ~{in_sample_name}_merged.positionsorted.bam
+    >>>
     output {
-        File merged_bam_file = "${in_sample_name}_merged.positionsorted.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.bam.bai"
+        File merged_bam_file = "~{in_sample_name}_merged.positionsorted.bam"
+        File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
         memory: 100 + " GB"
@@ -669,7 +669,7 @@ task mergeIndelRealignedBAMs {
         Array[File] in_alignment_bam_chunk_files
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -682,14 +682,14 @@ task mergeIndelRealignedBAMs {
         #to turn off echo do 'set +o xtrace'
         samtools merge \
           -f -p -c --threads "$(nproc)" \
-          ${in_sample_name}_merged.indel_realigned.bam \
-          ${sep=" " in_alignment_bam_chunk_files} \
+          ~{in_sample_name}_merged.indel_realigned.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
-          ${in_sample_name}_merged.indel_realigned.bam
-    }
+          ~{in_sample_name}_merged.indel_realigned.bam
+    >>>
     output {
-        File merged_indel_realigned_bam_file = "${in_sample_name}_merged.indel_realigned.bam"
-        File merged_indel_realigned_bam_file_index = "${in_sample_name}_merged.indel_realigned.bam.bai"
+        File merged_indel_realigned_bam_file = "~{in_sample_name}_merged.indel_realigned.bam"
+        File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
         memory: 100 + " GB"

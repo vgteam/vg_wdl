@@ -312,13 +312,13 @@ task gbwt_index {
         String vg_docker
     }
 
-    command {
+    command <<<
         set -exu -o pipefail
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
         vg index --threads "$(nproc)" -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
-    }
+    >>>
 
     output {
         File gbwt = glob("*.gbwt")[0]
@@ -413,13 +413,13 @@ task xg_index {
         String vg_docker
     }
 
-    command {
+    command <<<
         set -exu -o pipefail
-        vg index --threads "$(nproc)" -x "${graph_name}.xg" ~{xg_options} "~{vg}"
-    }
+        vg index --threads "$(nproc)" -x "~{graph_name}.xg" ~{xg_options} "~{vg}"
+    >>>
 
     output {
-        File xg ="${graph_name}.xg"
+        File xg ="~{graph_name}.xg"
     }
 
     runtime {
@@ -503,14 +503,14 @@ task gcsa_index {
         String vg_docker
     }
 
-    command {
+    command <<<
         set -exu -o pipefail
-        vg index --threads "$(nproc)" -p -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
-    }
+        vg index --threads "$(nproc)" -p -g "~{graph_name}.gcsa" -f "~{id_map}" ~{gcsa_options} ~{sep=" " contigs_pruned_vg}
+    >>>
 
     output {
-        File gcsa = "${graph_name}.gcsa"
-        File lcp = "${graph_name}.gcsa.lcp"
+        File gcsa = "~{graph_name}.gcsa"
+        File lcp = "~{graph_name}.gcsa.lcp"
     }
 
     runtime {

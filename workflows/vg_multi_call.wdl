@@ -365,7 +365,7 @@ task runGATKHaplotypeCaller {
         File in_reference_dict_file
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -377,19 +377,19 @@ task runGATKHaplotypeCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        ln -s ${in_bam_file} input_bam_file.bam
-        ln -s ${in_bam_file_index} input_bam_file.bam.bai
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
         
         gatk HaplotypeCaller \
           --native-pair-hmm-threads "$(nproc)" \
-          --pcr-indel-model ${in_pcr_indel_model} \
-          --reference ${in_reference_file} \
+          --pcr-indel-model ~{in_pcr_indel_model} \
+          --reference ~{in_reference_file} \
           --input input_bam_file.bam \
-          --output ${in_sample_name}.vcf \
-        && bgzip ${in_sample_name}.vcf
-    }
+          --output ~{in_sample_name}.vcf \
+        && bgzip ~{in_sample_name}.vcf
+    >>>
     output {
-        File genotyped_vcf = "${in_sample_name}.vcf.gz"
+        File genotyped_vcf = "~{in_sample_name}.vcf.gz"
     }
     runtime {
         memory: 100 + " GB"
@@ -409,7 +409,7 @@ task runGATKHaplotypeCallerGVCF {
         File in_reference_dict_file
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -421,20 +421,20 @@ task runGATKHaplotypeCallerGVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        ln -s ${in_bam_file} input_bam_file.bam
-        ln -s ${in_bam_file_index} input_bam_file.bam.bai
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads "$(nproc)" \
           -ERC GVCF \
-          --pcr-indel-model ${in_pcr_indel_model} \
-          --reference ${in_reference_file} \
+          --pcr-indel-model ~{in_pcr_indel_model} \
+          --reference ~{in_reference_file} \
           --input input_bam_file.bam \
-          --output ${in_sample_name}.rawLikelihoods.gvcf \
-        && bgzip ${in_sample_name}.rawLikelihoods.gvcf
-    }
+          --output ~{in_sample_name}.rawLikelihoods.gvcf \
+        && bgzip ~{in_sample_name}.rawLikelihoods.gvcf
+    >>>
     output {
-        File rawLikelihoods_gvcf = "${in_sample_name}.rawLikelihoods.gvcf.gz"
+        File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
         memory: 100 + " GB"

@@ -784,8 +784,8 @@ task sortMDTagBAMFile {
         fi
     >>>
     output {
-        File sorted_bam_file = "${in_sample_name}_positionsorted.mdtag.bam"
-        File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
+        File sorted_bam_file = "~{in_sample_name}_positionsorted.mdtag.bam"
+        File sorted_bam_file_index = "~{in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
         time: 200
@@ -851,7 +851,7 @@ task mergeAlignmentBAMChunks {
         Array[File] in_alignment_bam_chunk_files
     }
     
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -865,14 +865,14 @@ task mergeAlignmentBAMChunks {
         samtools merge \
           -f -p -c --threads "$(nproc)" \
           - \
-          ${sep=" " in_alignment_bam_chunk_files} \
-          > ${in_sample_name}_merged.positionsorted.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
+          > ~{in_sample_name}_merged.positionsorted.bam \
         && samtools index \
-          ${in_sample_name}_merged.positionsorted.bam
-    }
+          ~{in_sample_name}_merged.positionsorted.bam
+    >>>
     output {
-        File merged_bam_file = "${in_sample_name}_merged.positionsorted.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.bam.bai"
+        File merged_bam_file = "~{in_sample_name}_merged.positionsorted.bam"
+        File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
         memory: 100 + " GB"
@@ -928,7 +928,7 @@ task runGATKIndelRealigner {
         File in_reference_dict_file
     }
     
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -940,26 +940,26 @@ task runGATKIndelRealigner {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        ln -s ${in_bam_file.left} input_bam_file.bam
-        ln -s ${in_bam_file.right} input_bam_file.bam.bai
+        ln -s ~{in_bam_file.left} input_bam_file.bam
+        ln -s ~{in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
           -nt "$(nproc)" \
-          -R ${in_reference_file} \
+          -R ~{in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
           --remove_program_records \
           --disable_bam_indexing \
-          -R ${in_reference_file} \
+          -R ~{in_reference_file} \
           --targetIntervals forIndelRealigner.intervals \
           -I input_bam_file.bam \
-          --out ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
-    }
+          --out ~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
+    >>>
     output {
-        File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
+        File indel_realigned_bam = "~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
     }
     runtime {
         time: 1200
@@ -976,7 +976,7 @@ task extractMapqZeroReads {
         File in_indel_realigned_bam
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -994,23 +994,23 @@ task extractMapqZeroReads {
             -O BAM \
             -q 1 \
             -U zero_mapq.bam \
-            ${in_raw_bam_file} \
+            ~{in_raw_bam_file} \
             > non_zero_mapq.bam \
         && samtools merge \
             -f -u -p -c --threads "$(nproc)" \
             - \
-            zero_mapq.bam ${in_indel_realigned_bam} \
+            zero_mapq.bam ~{in_indel_realigned_bam} \
         | samtools sort \
           --threads "$(nproc)" \
           - \
-          -O BAM > ${in_sample_name}_merged.indel_realigned.mapq_zero.bam \
+          -O BAM > ~{in_sample_name}_merged.indel_realigned.mapq_zero.bam \
         && samtools index \
-          ${in_sample_name}_merged.indel_realigned.mapq_zero.bam
+          ~{in_sample_name}_merged.indel_realigned.mapq_zero.bam
         && rm -f zero_mapq.bam non_zero_mapq.bam
-    }
+    >>>
     output {
-        File indel_realigned_bam = "${in_sample_name}_merged.indel_realigned.mapq_zero.bam"
-        File indel_realigned_bam_index = "${in_sample_name}_merged.indel_realigned.mapq_zero.bam.bai"
+        File indel_realigned_bam = "~{in_sample_name}_merged.indel_realigned.mapq_zero.bam"
+        File indel_realigned_bam_index = "~{in_sample_name}_merged.indel_realigned.mapq_zero.bam.bai"
     }
     runtime {
         memory: 100 + " GB"
@@ -1025,7 +1025,7 @@ task mergeIndelRealignedBAMs {
         Array[File] in_alignment_bam_chunk_files
     }
     
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -1038,14 +1038,14 @@ task mergeIndelRealignedBAMs {
         #to turn off echo do 'set +o xtrace'
         samtools merge \
           -f -p -c --threads "$(nproc)" \
-          ${in_sample_name}_merged.indel_realigned.bam \
-          ${sep=" " in_alignment_bam_chunk_files} \
+          ~{in_sample_name}_merged.indel_realigned.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
-          ${in_sample_name}_merged.indel_realigned.bam
-    }
+          ~{in_sample_name}_merged.indel_realigned.bam
+    >>>
     output {
-        File merged_indel_realigned_bam_file = "${in_sample_name}_merged.indel_realigned.bam"
-        File merged_indel_realigned_bam_file_index = "${in_sample_name}_merged.indel_realigned.bam.bai"
+        File merged_indel_realigned_bam_file = "~{in_sample_name}_merged.indel_realigned.bam"
+        File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
         memory: 100 + " GB"
@@ -1066,7 +1066,7 @@ task runGATKHaplotypeCaller {
         File in_reference_dict_file
     }
     
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -1078,19 +1078,19 @@ task runGATKHaplotypeCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        ln -s ${in_bam_file} input_bam_file.bam
-        ln -s ${in_bam_file_index} input_bam_file.bam.bai
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads "$(nproc)" \
-          --pcr-indel-model ${in_pcr_indel_model} \
-          --reference ${in_reference_file} \
+          --pcr-indel-model ~{in_pcr_indel_model} \
+          --reference ~{in_reference_file} \
           --input input_bam_file.bam \
-          --output ${in_sample_name}.vcf \
-        && bgzip ${in_sample_name}.vcf
-    }
+          --output ~{in_sample_name}.vcf \
+        && bgzip ~{in_sample_name}.vcf
+    >>>
     output {
-        File genotyped_vcf = "${in_sample_name}.vcf.gz"
+        File genotyped_vcf = "~{in_sample_name}.vcf.gz"
     }
     runtime {
         memory: 100 + " GB"
@@ -1110,7 +1110,7 @@ task runGATKHaplotypeCallerGVCF {
         File in_reference_dict_file
     }
     
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -1122,20 +1122,20 @@ task runGATKHaplotypeCallerGVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         
-        ln -s ${in_bam_file} input_bam_file.bam
-        ln -s ${in_bam_file_index} input_bam_file.bam.bai
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
           --native-pair-hmm-threads "$(nproc)" \
           -ERC GVCF \
-          --pcr-indel-model ${in_pcr_indel_model} \
-          --reference ${in_reference_file} \
+          --pcr-indel-model ~{in_pcr_indel_model} \
+          --reference ~{in_reference_file} \
           --input input_bam_file.bam \
-          --output ${in_sample_name}.rawLikelihoods.gvcf \
-        && bgzip ${in_sample_name}.rawLikelihoods.gvcf
-    }
+          --output ~{in_sample_name}.rawLikelihoods.gvcf \
+        && bgzip ~{in_sample_name}.rawLikelihoods.gvcf
+    >>>
     output {
-        File rawLikelihoods_gvcf = "${in_sample_name}.rawLikelihoods.gvcf.gz"
+        File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
         memory: 100 + " GB"
