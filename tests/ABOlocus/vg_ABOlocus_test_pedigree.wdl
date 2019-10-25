@@ -75,6 +75,7 @@ workflow vg_ABOlocus_test {
         REF_FASTA_GZ = ref_file_gz,
         PED_FILE = ped_file,
         SNPEFF_ANNOTATION = false,
+        CLEANUP_FILES = false,
         USE_DECOYS = false
     }
     

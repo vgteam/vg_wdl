@@ -12,6 +12,7 @@ workflow vgMultiMapCall {
         Boolean GVCF_MODE = false                   # Set to 'true' to process and output gVCFs instead of VCFs.
         Boolean SNPEFF_ANNOTATION = true            # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean SV_CALLER_MODE = false              # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
+        Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
         Boolean GOOGLE_CLEANUP_MODE = false         # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File? INPUT_BAM_FILE                        # Input sample surjected .bam file
         File? INPUT_BAM_FILE_INDEX                  # Input sample .bai index of surjected .bam file.
@@ -79,18 +80,20 @@ workflow vgMultiMapCall {
                         in_reference_dict_file=REF_DICT_FILE
                 }
                 # Cleanup intermediate variant calling files after use
-                if (GOOGLE_CLEANUP_MODE) {
-                    call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
-                        input:
-                            previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                            current_task_output = runGATKHaplotypeCaller.genotyped_vcf
+                if (CLEANUP_FILES) {
+                    if (GOOGLE_CLEANUP_MODE) {
+                        call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
+                            input:
+                                previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                current_task_output = runGATKHaplotypeCaller.genotyped_vcf
+                        }
                     }
-                }
-                if (!GOOGLE_CLEANUP_MODE) {
-                    call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
-                        input:
-                            previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                            current_task_output = runGATKHaplotypeCaller.genotyped_vcf
+                    if (!GOOGLE_CLEANUP_MODE) {
+                        call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
+                            input:
+                                previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                current_task_output = runGATKHaplotypeCaller.genotyped_vcf
+                        }
                     }
                 }
             }
@@ -198,18 +201,20 @@ workflow vgMultiMapCall {
                     in_chunk_clip_string=runVGCaller.clip_string
             }
             # Cleanup vg call input files after use
-            if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
-                    input:
-                        previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
-                        current_task_output = runVCFClipper.output_clipped_vcf
+            if (CLEANUP_FILES) {
+                if (GOOGLE_CLEANUP_MODE) {
+                    call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
+                        input:
+                            previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
+                            current_task_output = runVCFClipper.output_clipped_vcf
+                    }
                 }
-            }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
-                    input:
-                        previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
-                        current_task_output = runVCFClipper.output_clipped_vcf
+                if (!GOOGLE_CLEANUP_MODE) {
+                    call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
+                        input:
+                            previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
+                            current_task_output = runVCFClipper.output_clipped_vcf
+                    }
                 }
             }
         }

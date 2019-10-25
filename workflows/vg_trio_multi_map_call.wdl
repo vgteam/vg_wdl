@@ -69,6 +69,7 @@ workflow vgTrioPipeline {
         Boolean MAKE_SNARLS = false                     # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
+        Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
         String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
@@ -105,6 +106,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
             VGMPMAP_MODE=VGMPMAP_MODE,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true
     }
     call vgMultiMapWorkflow.vgMultiMapCall as paternalMapWorkflow {
@@ -133,6 +135,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
             VGMPMAP_MODE=VGMPMAP_MODE,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true
     }
     call vgMultiMapWorkflow.vgMultiMapCall as probandMapWorkflow {
@@ -161,6 +164,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
             VGMPMAP_MODE=VGMPMAP_MODE,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true
     }
     
@@ -192,6 +196,7 @@ workflow vgTrioPipeline {
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
+            CLEANUP_FILES=CLEANUP_FILES,
             SNPEFF_ANNOTATION=false
     }
     call vgMultiCallWorkflow.vgMultiMapCall as paternalCallWorkflow {
@@ -220,6 +225,7 @@ workflow vgTrioPipeline {
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
+            CLEANUP_FILES=CLEANUP_FILES,
             PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
@@ -248,6 +254,7 @@ workflow vgTrioPipeline {
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
+            CLEANUP_FILES=CLEANUP_FILES,
             PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     
@@ -389,6 +396,7 @@ workflow vgTrioPipeline {
                 MERGE_GAM_MEM=MERGE_GAM_MEM,
                 MERGE_GAM_TIME=MERGE_GAM_TIME,
                 VGMPMAP_MODE=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 SURJECT_MODE=true
         }
     }
@@ -426,6 +434,7 @@ workflow vgTrioPipeline {
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
+            CLEANUP_FILES=CLEANUP_FILES,
             SNPEFF_ANNOTATION=false
     }
     if (numSilbings > 1) {
@@ -455,6 +464,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
@@ -485,6 +495,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
@@ -515,6 +526,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
