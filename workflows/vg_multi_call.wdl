@@ -334,7 +334,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ 32 \
+              -@ "$(nproc)" \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -381,7 +381,7 @@ task runGATKHaplotypeCaller {
         ln -s ${in_bam_file_index} input_bam_file.bam.bai
         
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads 32 \
+          --native-pair-hmm-threads "$(nproc)" \
           --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
           --input input_bam_file.bam \
@@ -425,7 +425,7 @@ task runGATKHaplotypeCallerGVCF {
         ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads 32 \
+          --native-pair-hmm-threads "$(nproc)" \
           -ERC GVCF \
           --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \

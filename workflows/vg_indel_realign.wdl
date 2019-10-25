@@ -184,7 +184,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ 32 \
+              -@ "$(nproc)" \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -231,7 +231,7 @@ task runGATKIndelRealigner {
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
-          -nt 32 \
+          -nt "$(nproc)" \
           -R ${in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
@@ -272,7 +272,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
+          -f -p -c --threads "$(nproc)" \
           ${in_sample_name}_merged.indel_realigned.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \

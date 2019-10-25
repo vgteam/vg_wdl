@@ -317,7 +317,7 @@ task gbwt_index {
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
-        vg index --threads 32 -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
+        vg index --threads "$(nproc)" -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     }
 
     output {
@@ -415,7 +415,7 @@ task xg_index {
 
     command {
         set -exu -o pipefail
-        vg index --threads 32 -x "${graph_name}.xg" ~{xg_options} "~{vg}"
+        vg index --threads "$(nproc)" -x "${graph_name}.xg" ~{xg_options} "~{vg}"
     }
 
     output {
@@ -505,7 +505,7 @@ task gcsa_index {
 
     command {
         set -exu -o pipefail
-        vg index --threads 32 -p -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
+        vg index --threads "$(nproc)" -p -g "${graph_name}.gcsa" -f "${id_map}" ${gcsa_options} ${sep=" " contigs_pruned_vg}
     }
 
     output {

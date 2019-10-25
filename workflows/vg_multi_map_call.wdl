@@ -755,11 +755,11 @@ task sortMDTagBAMFile {
               -r ID:1 -r LB:lib1 -r SM:~{in_sample_name} -r PL:illumina -r PU:unit1 \
               - \
             | samtools view \
-              -@ 32 \
+              -@ ~{in_map_cores} \
               -h -O SAM \
               - \
             | samtools view \
-              -@ 32 \
+              -@ ~{in_map_cores} \
               -h -O BAM \
               - \
             | samtools calmd \
@@ -863,7 +863,7 @@ task mergeAlignmentBAMChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
+          -f -p -c --threads "$(nproc)" \
           - \
           ${sep=" " in_alignment_bam_chunk_files} \
           > ${in_sample_name}_merged.positionsorted.bam \
@@ -899,7 +899,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ 32 \
+              -@ "$(nproc)" \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -946,7 +946,7 @@ task runGATKIndelRealigner {
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
-          -nt 32 \
+          -nt "$(nproc)" \
           -R ${in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
@@ -989,7 +989,7 @@ task extractMapqZeroReads {
         #to turn off echo do 'set +o xtrace'
         
         samtools view \
-            -@ 32 \
+            -@ "$(nproc)" \
             -h \
             -O BAM \
             -q 1 \
@@ -997,11 +997,11 @@ task extractMapqZeroReads {
             ${in_raw_bam_file} \
             > non_zero_mapq.bam \
         && samtools merge \
-            -f -u -p -c --threads 32 \
+            -f -u -p -c --threads "$(nproc)" \
             - \
             zero_mapq.bam ${in_indel_realigned_bam} \
         | samtools sort \
-          --threads 32 \
+          --threads "$(nproc)" \
           - \
           -O BAM > ${in_sample_name}_merged.indel_realigned.mapq_zero.bam \
         && samtools index \
@@ -1037,7 +1037,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
+          -f -p -c --threads "$(nproc)" \
           ${in_sample_name}_merged.indel_realigned.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
@@ -1082,7 +1082,7 @@ task runGATKHaplotypeCaller {
         ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads 32 \
+          --native-pair-hmm-threads "$(nproc)" \
           --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \
           --input input_bam_file.bam \
@@ -1126,7 +1126,7 @@ task runGATKHaplotypeCallerGVCF {
         ln -s ${in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads 32 \
+          --native-pair-hmm-threads "$(nproc)" \
           -ERC GVCF \
           --pcr-indel-model ${in_pcr_indel_model} \
           --reference ${in_reference_file} \

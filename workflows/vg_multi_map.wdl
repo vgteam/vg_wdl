@@ -537,11 +537,11 @@ task sortMDTagBAMFile {
               -r ID:1 -r LB:lib1 -r SM:~{in_sample_name} -r PL:illumina -r PU:unit1 \
               - \
             | samtools view \
-              -@ 32 \
+              -@ ~{in_map_cores} \
               -h -O SAM \
               - \
             | samtools view \
-              -@ 32 \
+              -@ ~{in_map_cores} \
               -h -O BAM \
               - \
             | samtools calmd \
@@ -644,7 +644,7 @@ task mergeAlignmentBAMChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
+          -f -p -c --threads "$(nproc)" \
           ${in_sample_name}_merged.positionsorted.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
@@ -681,7 +681,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
+          -f -p -c --threads "$(nproc)" \
           ${in_sample_name}_merged.indel_realigned.bam \
           ${sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
