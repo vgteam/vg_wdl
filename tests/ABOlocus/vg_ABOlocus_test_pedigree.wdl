@@ -143,7 +143,7 @@ task check_trio_bams {
             exit 1
         fi
         echo "$n_mom_reads" > n_mom_reads
-        samtools view "~{mom_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' > n_mom_identical
+        samtools view "~{mom_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_mom_identical
         
         n_dad_reads=$(expr $(zcat ~{dad_fastq_1_gz} | wc -l) / 2)
         if [ "$n_dad_reads" -ne "$(samtools view ~{dad_bam} | wc -l)" ]; then
@@ -151,7 +151,7 @@ task check_trio_bams {
             exit 1
         fi
         echo "$n_dad_reads" > n_dad_reads
-        samtools view "~{dad_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' > n_dad_identical
+        samtools view "~{dad_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_dad_identical
         
         n_child_reads=$(expr $(zcat ~{child_fastq_1_gz} | wc -l) / 2)
         if [ "$n_child_reads" -ne "$(samtools view ~{child_bam} | wc -l)" ]; then
@@ -159,7 +159,7 @@ task check_trio_bams {
             exit 1
         fi
         echo "$n_child_reads" > n_child_reads
-        samtools view "~{child_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' > n_child_identical
+        samtools view "~{child_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_child_identical
     >>>
 
     runtime {

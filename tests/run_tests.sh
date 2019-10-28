@@ -1,6 +1,7 @@
 #!/bin/bash
 set -ex -o pipefail
 
+TRAVIS_DEBUG_MODE=true
 ORIG_CWD="$(pwd)"
 cd "$(dirname $0)/ABOlocus"
 #miniwdl check --no-quant-check vg_ABOlocus_test_small.wdl
