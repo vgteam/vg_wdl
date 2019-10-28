@@ -217,9 +217,7 @@ workflow vgMultiMapCall {
                 in_merge_gam_cores=MERGE_GAM_CORES,
                 in_merge_gam_disk=MERGE_GAM_DISK,
                 in_merge_gam_mem=MERGE_GAM_MEM,
-                in_merge_gam_time=MERGE_GAM_TIME,
-                in_map_cores=MAP_CORES,
-                in_map_mem=MAP_MEM
+                in_merge_gam_time=MERGE_GAM_TIME
         }
         # Cleanup gam chunk files after use
         if (CLEANUP_FILES) {
