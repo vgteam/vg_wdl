@@ -49,7 +49,7 @@ workflow vgMultiMapCall {
         Int CHUNK_GAM_MEM = 100
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
-        Int VGCALL_MEM = 64
+        Int VGCALL_MEM = 80
         String DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
         String UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
         String HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
@@ -207,7 +207,9 @@ workflow vgMultiMapCall {
         call mergeAlignmentBAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
+                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                in_map_cores=MAP_CORES,
+                in_map_mem=MAP_MEM
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
         File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
@@ -238,7 +240,9 @@ workflow vgMultiMapCall {
                         in_sample_name=SAMPLE_NAME,
                         in_merged_bam_file=merged_bam_file_output,
                         in_merged_bam_file_index=merged_bam_file_index_output,
-                        in_path_list_file=pipeline_path_list_file
+                        in_path_list_file=pipeline_path_list_file,
+                        in_map_cores=MAP_CORES,
+                        in_map_mem=MAP_MEM
                 }
                 # Run distributed GATK linear variant calling
                 scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
@@ -251,7 +255,10 @@ workflow vgMultiMapCall {
                             in_pcr_indel_model=PCR_INDEL_MODEL,
                             in_reference_file=REF_FILE,
                             in_reference_index_file=REF_INDEX_FILE,
-                            in_reference_dict_file=REF_DICT_FILE
+                            in_reference_dict_file=REF_DICT_FILE,
+                            in_vgcall_cores=VGCALL_CORES,
+                            in_vgcall_disk=VGCALL_DISK,
+                            in_vgcall_mem=VGCALL_MEM
                     }
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
@@ -277,13 +284,17 @@ workflow vgMultiMapCall {
                 call concatClippedVCFChunks as concatLinearVCFChunks {
                     input:
                         in_sample_name=SAMPLE_NAME,
-                        in_clipped_vcf_chunk_files=final_contig_vcf_output_list
+                        in_clipped_vcf_chunk_files=final_contig_vcf_output_list,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
                 }
                 call bgzipMergedVCF as bgzipGATKCalledVCF { 
                     input: 
                         in_sample_name=SAMPLE_NAME, 
                         in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
-                        in_vg_container=VG_CONTAINER 
+                        in_vg_container=VG_CONTAINER, 
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
                 }
             }
             # Run VCF varaint calling using the Dragen module
@@ -312,7 +323,10 @@ workflow vgMultiMapCall {
                         in_pcr_indel_model=PCR_INDEL_MODEL,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
                 }
             }
             # Run GVCF varaint calling using the Dragen module
@@ -402,7 +416,9 @@ workflow vgMultiMapCall {
                 input: 
                     in_chunk_vcf=runVGCaller.output_vcf, 
                     in_chunk_vcf_index=runVGCaller.output_vcf_index, 
-                    in_chunk_clip_string=runVGCaller.clip_string 
+                    in_chunk_clip_string=runVGCaller.clip_string,
+                    in_vgcall_disk=VGCALL_DISK,
+                    in_vgcall_mem=VGCALL_MEM
             } 
             # Cleanup vg call input files after use
             if (CLEANUP_FILES) {
@@ -426,14 +442,18 @@ workflow vgMultiMapCall {
         call concatClippedVCFChunks as concatVCFChunksVGCall { 
             input: 
                 in_sample_name=SAMPLE_NAME, 
-                in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf 
+                in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         } 
         # Extract either the normal or structural variant based VCFs and compress them
         call bgzipMergedVCF as bgzipVGCalledVCF {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_merged_vcf_file=concatVCFChunksVGCall.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     
@@ -445,12 +465,18 @@ workflow vgMultiMapCall {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_bgzip_vcf_file=variantcaller_vcf_output,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call snpEffAnnotateVCF {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_normalized_vcf_file=normalizeVCF.output_normalized_vcf,
                 in_snpeff_database=SNPEFF_DATABASE,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     output {
@@ -849,8 +875,10 @@ task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
+        Int in_map_cores
+        String in_map_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -864,9 +892,8 @@ task mergeAlignmentBAMChunks {
         #to turn off echo do 'set +o xtrace'
         samtools merge \
           -f -p -c --threads "$(nproc)" \
-          - \
+          ~{in_sample_name}_merged.positionsorted.bam \
           ~{sep=" " in_alignment_bam_chunk_files} \
-          > ~{in_sample_name}_merged.positionsorted.bam \
         && samtools index \
           ~{in_sample_name}_merged.positionsorted.bam
     >>>
@@ -875,8 +902,8 @@ task mergeAlignmentBAMChunks {
         File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
@@ -888,6 +915,8 @@ task splitBAMbyPath {
         File in_merged_bam_file
         File in_merged_bam_file_index
         File in_path_list_file
+        Int in_map_cores
+        String in_map_mem
     }
     
     command <<<
@@ -912,144 +941,8 @@ task splitBAMbyPath {
         Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-task runGATKIndelRealigner {
-    input {
-        String in_sample_name
-        Pair[File, File] in_bam_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-    }
-    
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        ln -s ~{in_bam_file.left} input_bam_file.bam
-        ln -s ~{in_bam_file.right} input_bam_file.bam.bai
-        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
-          --remove_program_records \
-          -drf DuplicateRead \
-          --disable_bam_indexing \
-          -nt "$(nproc)" \
-          -R ~{in_reference_file} \
-          -I input_bam_file.bam \
-          --out forIndelRealigner.intervals \
-        && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
-          --remove_program_records \
-          --disable_bam_indexing \
-          -R ~{in_reference_file} \
-          --targetIntervals forIndelRealigner.intervals \
-          -I input_bam_file.bam \
-          --out ~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
-    >>>
-    output {
-        File indel_realigned_bam = "~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
-    }
-    runtime {
-        time: 1200
-        memory: 100 + " GB"
-        cpu: 32
-        docker: "broadinstitute/gatk3:3.8-1"
-    }
-}
-
-task extractMapqZeroReads {
-    input {
-        String in_sample_name
-        File in_raw_bam_file
-        File in_indel_realigned_bam
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        samtools view \
-            -@ "$(nproc)" \
-            -h \
-            -O BAM \
-            -q 1 \
-            -U zero_mapq.bam \
-            ~{in_raw_bam_file} \
-            > non_zero_mapq.bam \
-        && samtools merge \
-            -f -u -p -c --threads "$(nproc)" \
-            - \
-            zero_mapq.bam ~{in_indel_realigned_bam} \
-        | samtools sort \
-          --threads "$(nproc)" \
-          - \
-          -O BAM > ~{in_sample_name}_merged.indel_realigned.mapq_zero.bam \
-        && samtools index \
-          ~{in_sample_name}_merged.indel_realigned.mapq_zero.bam
-        && rm -f zero_mapq.bam non_zero_mapq.bam
-    >>>
-    output {
-        File indel_realigned_bam = "~{in_sample_name}_merged.indel_realigned.mapq_zero.bam"
-        File indel_realigned_bam_index = "~{in_sample_name}_merged.indel_realigned.mapq_zero.bam.bai"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-task mergeIndelRealignedBAMs {
-    input {
-        String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
-    }
-    
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools merge \
-          -f -p -c --threads "$(nproc)" \
-          ~{in_sample_name}_merged.indel_realigned.bam \
-          ~{sep=" " in_alignment_bam_chunk_files} \
-        && samtools index \
-          ~{in_sample_name}_merged.indel_realigned.bam
-    >>>
-    output {
-        File merged_indel_realigned_bam_file = "~{in_sample_name}_merged.indel_realigned.bam"
-        File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
@@ -1064,6 +957,9 @@ task runGATKHaplotypeCaller {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
     
     command <<<
@@ -1093,8 +989,9 @@ task runGATKHaplotypeCaller {
         File genotyped_vcf = "~{in_sample_name}.vcf.gz"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "broadinstitute/gatk:4.1.1.0"
     }
 }
@@ -1108,6 +1005,9 @@ task runGATKHaplotypeCallerGVCF {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
     
     command <<<
@@ -1138,8 +1038,9 @@ task runGATKHaplotypeCallerGVCF {
         File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "broadinstitute/gatk:4.1.1.0"
     }
 }
@@ -1447,6 +1348,8 @@ task runVCFClipper {
         File in_chunk_vcf
         File in_chunk_vcf_index
         String in_chunk_clip_string
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     String chunk_tag = basename(in_chunk_vcf, ".sorted.vcf.gz")
@@ -1468,8 +1371,8 @@ task runVCFClipper {
         File output_clipped_vcf = "${chunk_tag}.clipped.vcf.gz"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -1478,6 +1381,8 @@ task concatClippedVCFChunks {
     input {
         String in_sample_name
         Array[File] in_clipped_vcf_chunk_files
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command {
@@ -1501,8 +1406,8 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -1512,6 +1417,8 @@ task bgzipMergedVCF {
         String in_sample_name
         File in_merged_vcf_file
         String in_vg_container
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     # TODO:
@@ -1536,8 +1443,8 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -1546,9 +1453,12 @@ task normalizeVCF {
     input {
         String in_sample_name
         File in_bgzip_vcf_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
     
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -1560,15 +1470,15 @@ task normalizeVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bcftools norm -m-both --threads 16 -o ${in_sample_name}.unrolled.vcf ${in_bgzip_vcf_file}
-    }
+        bcftools norm -m-both --threads "$(nproc)" -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
+    >>>
     output {
-        File output_normalized_vcf = "${in_sample_name}.unrolled.vcf"
+        File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"
     }
     runtime {
-        cpu: 16
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -1578,6 +1488,9 @@ task snpEffAnnotateVCF {
         String in_sample_name
         File in_normalized_vcf_file
         File? in_snpeff_database
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
     
     command <<<
@@ -1599,9 +1512,9 @@ task snpEffAnnotateVCF {
         File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
     }
     runtime {
-        cpu: 16
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
     }
 }

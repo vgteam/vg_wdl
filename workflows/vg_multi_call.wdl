@@ -77,7 +77,10 @@ workflow vgMultiMapCall {
                         in_pcr_indel_model=PCR_INDEL_MODEL,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
                 }
                 # Cleanup intermediate variant calling files after use
                 if (CLEANUP_FILES) {
@@ -104,13 +107,17 @@ workflow vgMultiMapCall {
             call concatClippedVCFChunks as concatLinearVCFChunks {
                 input:
                     in_sample_name=SAMPLE_NAME,
-                    in_clipped_vcf_chunk_files=final_contig_vcf_output_list
+                    in_clipped_vcf_chunk_files=final_contig_vcf_output_list,
+                    in_vgcall_disk=VGCALL_DISK,
+                    in_vgcall_mem=VGCALL_MEM
             }
             call bgzipMergedVCF as bgzipGATKCalledVCF {
                 input:
                     in_sample_name=SAMPLE_NAME,
                     in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
-                    in_vg_container=VG_CONTAINER
+                    in_vg_container=VG_CONTAINER,
+                    in_vgcall_disk=VGCALL_DISK,
+                    in_vgcall_mem=VGCALL_MEM
             }
         }
         # Run VCF variant calling using the Dragen module
@@ -136,7 +143,10 @@ workflow vgMultiMapCall {
                         in_pcr_indel_model=PCR_INDEL_MODEL,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
                 }
             }
             # Run GVCF varaint calling using the Dragen module
@@ -198,7 +208,9 @@ workflow vgMultiMapCall {
                 input:
                     in_chunk_vcf=runVGCaller.output_vcf,
                     in_chunk_vcf_index=runVGCaller.output_vcf_index,
-                    in_chunk_clip_string=runVGCaller.clip_string
+                    in_chunk_clip_string=runVGCaller.clip_string,
+                    in_vgcall_disk=VGCALL_DISK,
+                    in_vgcall_mem=VGCALL_MEM
             }
             # Cleanup vg call input files after use
             if (CLEANUP_FILES) {
@@ -222,14 +234,18 @@ workflow vgMultiMapCall {
         call concatClippedVCFChunks as concatVCFChunksVGCall {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf
+                in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         # Extract either the normal or structural variant based VCFs and compress them
         call bgzipMergedVCF as bgzipVGCalledVCF {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_merged_vcf_file=concatVCFChunksVGCall.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
 
@@ -241,12 +257,18 @@ workflow vgMultiMapCall {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_bgzip_vcf_file=variantcaller_vcf_output,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call snpEffAnnotateVCF {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_normalized_vcf_file=normalizeVCF.output_normalized_vcf,
                 in_snpeff_database=SNPEFF_DATABASE,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (!SNPEFF_ANNOTATION) {
@@ -363,6 +385,9 @@ task runGATKHaplotypeCaller {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command <<<
@@ -376,10 +401,10 @@ task runGATKHaplotypeCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        
+
         gatk HaplotypeCaller \
           --native-pair-hmm-threads "$(nproc)" \
           --pcr-indel-model ~{in_pcr_indel_model} \
@@ -392,8 +417,9 @@ task runGATKHaplotypeCaller {
         File genotyped_vcf = "~{in_sample_name}.vcf.gz"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "broadinstitute/gatk:4.1.1.0"
     }
 }
@@ -407,6 +433,9 @@ task runGATKHaplotypeCallerGVCF {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command <<<
@@ -420,7 +449,7 @@ task runGATKHaplotypeCallerGVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
@@ -437,10 +466,10 @@ task runGATKHaplotypeCallerGVCF {
         File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "broadinstitute/gatk:4.1.1.0"
-        time: 1800
     }
 }
 
@@ -705,6 +734,8 @@ task runVCFClipper {
         File in_chunk_vcf
         File in_chunk_vcf_index
         String in_chunk_clip_string
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     String chunk_tag = basename(in_chunk_vcf, ".sorted.vcf.gz")
@@ -726,8 +757,8 @@ task runVCFClipper {
         File output_clipped_vcf = "${chunk_tag}.clipped.vcf.gz"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -736,6 +767,8 @@ task concatClippedVCFChunks {
     input {
         String in_sample_name
         Array[File] in_clipped_vcf_chunk_files
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command {
@@ -759,8 +792,8 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -770,6 +803,8 @@ task bgzipMergedVCF {
         String in_sample_name
         File in_merged_vcf_file
         String in_vg_container
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     # TODO:
@@ -794,8 +829,8 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: in_vg_container
     }
 }
@@ -804,9 +839,12 @@ task normalizeVCF {
     input {
         String in_sample_name
         File in_bgzip_vcf_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -818,15 +856,15 @@ task normalizeVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bcftools norm -m-both --threads 16 -o ${in_sample_name}.unrolled.vcf ${in_bgzip_vcf_file}
-    }
+        bcftools norm -m-both --threads "$(nproc)" -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
+    >>>
     output {
-        File output_normalized_vcf = "${in_sample_name}.unrolled.vcf"
+        File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"
     }
     runtime {
-        cpu: 16
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -836,6 +874,9 @@ task snpEffAnnotateVCF {
         String in_sample_name
         File in_normalized_vcf_file
         File? in_snpeff_database
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command <<<
@@ -857,11 +898,10 @@ task snpEffAnnotateVCF {
         File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
     }
     runtime {
-        cpu: 16
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
     }
 }
-
 

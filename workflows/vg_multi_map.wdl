@@ -185,7 +185,9 @@ workflow vgMultiMapCall {
         call mergeAlignmentBAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
+                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                in_map_cores=MAP_CORES,
+                in_map_mem=MAP_MEM
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
         File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
@@ -215,7 +217,9 @@ workflow vgMultiMapCall {
                 in_merge_gam_cores=MERGE_GAM_CORES,
                 in_merge_gam_disk=MERGE_GAM_DISK,
                 in_merge_gam_mem=MERGE_GAM_MEM,
-                in_merge_gam_time=MERGE_GAM_TIME
+                in_merge_gam_time=MERGE_GAM_TIME,
+                in_map_cores=MAP_CORES,
+                in_map_mem=MAP_MEM
         }
         # Cleanup gam chunk files after use
         if (CLEANUP_FILES) {
@@ -630,6 +634,8 @@ task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
+        Int in_map_cores
+        String in_map_mem
     }
 
     command <<<
@@ -655,45 +661,8 @@ task mergeAlignmentBAMChunks {
         File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-# TODO: Duplicate task of mergeAlignmentBAMChunksVGMPMAP
-task mergeIndelRealignedBAMs {
-    input {
-        String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools merge \
-          -f -p -c --threads "$(nproc)" \
-          ~{in_sample_name}_merged.indel_realigned.bam \
-          ~{sep=" " in_alignment_bam_chunk_files} \
-        && samtools index \
-          ~{in_sample_name}_merged.indel_realigned.bam
-    >>>
-    output {
-        File merged_indel_realigned_bam_file = "~{in_sample_name}_merged.indel_realigned.bam"
-        File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
