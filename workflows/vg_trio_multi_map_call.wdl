@@ -276,7 +276,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=gatkJointGenotyper1st.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {
@@ -330,13 +332,17 @@ workflow vgTrioPipeline {
         call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
             input:
                 in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
-                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
+                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     File cohort_vcf_output = select_first([bgzipCohortPhasedVCF.output_merged_vcf, output_joint_genotyped_vcf])
@@ -554,7 +560,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_merged_vcf_file=gatkJointGenotyper2nd.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {
@@ -577,12 +585,18 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_bgzip_vcf_file=output_2nd_joint_genotyped_vcf,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call vgMultiMapCallWorkflow.snpEffAnnotateVCF as snpEffAnnotateCohortVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_normalized_vcf_file=normalizeCohortVCF.output_normalized_vcf,
                 in_snpeff_database=SNPEFF_DATABASE,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (!SNPEFF_ANNOTATION) {
