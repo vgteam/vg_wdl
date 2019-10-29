@@ -64,7 +64,10 @@ workflow vgMultiMapCall {
                     in_sample_name=SAMPLE_NAME,
                     in_merged_bam_file=input_alignment_file,
                     in_merged_bam_file_index=input_alignment_file_index,
-                    in_path_list_file=pipeline_path_list_file
+                    in_path_list_file=pipeline_path_list_file,
+                    in_vgcall_cores=VGCALL_CORES,
+                    in_vgcall_disk=VGCALL_DISK,
+                    in_vgcall_mem=VGCALL_MEM
             }
             # Run distributed GATK linear variant calling
             scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) {
@@ -333,8 +336,8 @@ task extractPathNames {
         File output_path_list = "path_list.txt"
     }
     runtime {
-        memory: "50 GB"
-        disks: "local-disk 50 SSD"
+        memory: "10 GB"
+        disks: "local-disk 10 SSD"
         docker: in_vg_container
     }
 }
@@ -345,6 +348,9 @@ task splitBAMbyPath {
         File in_merged_bam_file
         File in_merged_bam_file_index
         File in_path_list_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command <<<
@@ -356,7 +362,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ "$(nproc)" \
+              -@ ~{in_vgcall_cores} \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -369,9 +375,9 @@ task splitBAMbyPath {
         Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }

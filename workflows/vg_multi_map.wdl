@@ -187,6 +187,7 @@ workflow vgMultiMapCall {
                 in_sample_name=SAMPLE_NAME,
                 in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
                 in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
@@ -633,6 +634,7 @@ task mergeAlignmentBAMChunks {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
         Int in_map_cores
+        Int in_map_disk
         String in_map_mem
     }
 
@@ -661,7 +663,7 @@ task mergeAlignmentBAMChunks {
     runtime {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
-        disks: "local-disk 100 SSD"
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
