@@ -151,7 +151,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=gatkJointGenotyper1st.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {

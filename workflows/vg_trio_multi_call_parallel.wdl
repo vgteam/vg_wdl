@@ -1,12 +1,12 @@
 version 1.0
 
-### vg_trio_multi_call_parallel.wdl ###
+### vg_trio_multi_call.wdl ###
 # Author: Charles Markello
 # Description: Variant calling workflow for mother-father-proband trios.
 #              Designed as the 2nd step in a pedigree-backed graph alignment pipeline.
 
-import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "https://github.com/vgteam/vg_wdl/blob/master/workflows/vg_multi_call.wdl" as vgMultiCallWorkflow
+import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "./vg_multi_call.wdl" as vgMultiCallWorkflow
 
 ###########################
 ### WORKFLOW DEFINITION ###
@@ -22,7 +22,7 @@ workflow vgTrioPipeline {
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         String SAMPLE_NAME_PROBAND                          # Sample name for the proband
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
@@ -70,7 +70,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
+            DRAGEN_MODE=false,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false
     }
@@ -98,7 +98,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
+            DRAGEN_MODE=false,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
             PREVIOUS_WORKFLOW_OUTPUT="null"
@@ -127,7 +127,7 @@ workflow vgTrioPipeline {
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
             SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
+            DRAGEN_MODE=false,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
             PREVIOUS_WORKFLOW_OUTPUT="null"
@@ -151,7 +151,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=gatkJointGenotyper1st.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {

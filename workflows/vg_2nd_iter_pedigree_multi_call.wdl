@@ -190,7 +190,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_merged_vcf_file=gatkJointGenotyper2nd.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {
@@ -213,12 +215,18 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_bgzip_vcf_file=output_2nd_joint_genotyped_vcf,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call vgMultiMapCallWorkflow.snpEffAnnotateVCF as snpEffAnnotateCohortVCF {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_normalized_vcf_file=normalizeCohortVCF.output_normalized_vcf,
                 in_snpeff_database=SNPEFF_DATABASE,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (!SNPEFF_ANNOTATION) {
