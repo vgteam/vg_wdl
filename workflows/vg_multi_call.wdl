@@ -412,7 +412,7 @@ task runGATKHaplotypeCaller {
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads "$(nproc)" \
+          --native-pair-hmm-threads ~{in_vgcall_cores} \
           --pcr-indel-model ~{in_pcr_indel_model} \
           --reference ~{in_reference_file} \
           --input input_bam_file.bam \
@@ -460,7 +460,7 @@ task runGATKHaplotypeCallerGVCF {
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads "$(nproc)" \
+          --native-pair-hmm-threads ~{in_vgcall_cores} \
           -ERC GVCF \
           --pcr-indel-model ~{in_pcr_indel_model} \
           --reference ~{in_reference_file} \
@@ -862,7 +862,7 @@ task normalizeVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bcftools norm -m-both --threads "$(nproc)" -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
+        bcftools norm -m-both --threads ~{in_vgcall_cores} -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
     >>>
     output {
         File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"
