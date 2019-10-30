@@ -36,10 +36,10 @@ workflow vgMultiMapCall {
         File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
         File? SNPEFF_DATABASE                    # Path to snpeff database .zip file for snpEff annotation functionality.
         Int SPLIT_READ_CORES = 32
-        Int SPLIT_READ_DISK = 200
+        Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 32
-        Int MAP_DISK = 100
-        Int MAP_MEM = 100
+        Int MAP_DISK = 10
+        Int MAP_MEM = 60
         Int MERGE_GAM_CORES = 56
         Int MERGE_GAM_DISK = 400
         Int MERGE_GAM_MEM = 100
@@ -554,8 +554,9 @@ task splitReads {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
+        time: 60
         cpu: in_split_read_cores
-        memory: "40 GB"
+        memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
         docker: in_vg_container
     }
@@ -733,6 +734,7 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -816,7 +818,7 @@ task sortMDTagBAMFile {
         File sorted_bam_file_index = "~{in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
-        time: 200
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -866,7 +868,7 @@ task runPICARD {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 180
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:2.20.4"
@@ -905,6 +907,7 @@ task mergeAlignmentBAMChunks {
         File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
+        time: 240
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -932,7 +935,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ "$(nproc)" \
+              -@ ~{in_map_cores} \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -982,7 +985,7 @@ task runGATKHaplotypeCaller {
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads "$(nproc)" \
+          --native-pair-hmm-threads ~{in_vgcall_cores} \
           --pcr-indel-model ~{in_pcr_indel_model} \
           --reference ~{in_reference_file} \
           --input input_bam_file.bam \
@@ -1030,7 +1033,7 @@ task runGATKHaplotypeCallerGVCF {
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
 
         gatk HaplotypeCaller \
-          --native-pair-hmm-threads "$(nproc)" \
+          --native-pair-hmm-threads ~{in_vgcall_cores} \
           -ERC GVCF \
           --pcr-indel-model ~{in_pcr_indel_model} \
           --reference ~{in_reference_file} \
@@ -1410,6 +1413,7 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
+        time: 60
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
@@ -1447,6 +1451,7 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
+        time: 30
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: in_vg_container
@@ -1474,7 +1479,7 @@ task normalizeVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bcftools norm -m-both --threads "$(nproc)" -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
+        bcftools norm -m-both --threads ~{in_vgcall_cores} -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
     >>>
     output {
         File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"

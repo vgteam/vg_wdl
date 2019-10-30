@@ -126,6 +126,10 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
+        time: 20
+        memory: 2 + " GB"
+        cpu: 2
+        disks: "local-disk 10 SSD"
         docker: "ubuntu:latest"
         continueOnReturnCode: true
     }
@@ -197,9 +201,10 @@ task splitBAMbyPath {
         Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
+        time: 400
+        memory: 10 + " GB"
+        cpu: 2
+        disks: "local-disk 10 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }
@@ -247,8 +252,8 @@ task runGATKIndelRealigner {
         File indel_realigned_bam = "~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
     }
     runtime {
-        time: 1200
-        memory: 100 + " GB"
+        time: 180
+        memory: 20 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk3:3.8-1"
     }

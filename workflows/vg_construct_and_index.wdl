@@ -49,7 +49,7 @@ workflow vg_construct_and_index {
             vcf_gz = p.right,
             use_haplotypes = use_haplotypes,
             vg_docker = vg_docker,
-            construct_cores = 16
+            construct_cores = 2
         }
     }
     
@@ -66,7 +66,7 @@ workflow vg_construct_and_index {
                 contig = contig,
                 use_haplotypes = false,
                 vg_docker = vg_docker,
-                construct_cores = 4
+                construct_cores = 2
             }
         }
         call concat as concat_vg_graph_lists { input:
@@ -199,6 +199,8 @@ task extract_decoys {
         Array[String] decoy_contig_ids = read_lines("decoy_contig_ids.txt")
     }
     runtime {
+        time: 10
+        memory: 5
         docker: vg_docker
     }
 }
@@ -235,9 +237,10 @@ task construct_graph {
     }
 
     runtime {
+        time: 20
         cpu: construct_cores
-        memory: 20 + " GB"
-        disks: "local-disk 50 SSD"
+        memory: 5 + " GB"
+        disks: "local-disk 10 SSD"
         docker: vg_docker
     }
 }
@@ -258,6 +261,8 @@ task concat {
         Array[File]+ out = read_lines(stdout())
     }
     runtime {
+        time: 5
+        memory: 2 + " GB"
         docker: vg_docker
     }
 }
@@ -300,6 +305,8 @@ task combine_graphs {
     }
 
     runtime {
+        time: 180
+        memory: 20 + " GB"
         docker: vg_docker
     }
 }
@@ -317,7 +324,7 @@ task gbwt_index {
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
-        vg index --threads "$(nproc)" -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
+        vg index --threads "$(nproc --all)" -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     >>>
 
     output {
@@ -325,9 +332,10 @@ task gbwt_index {
     }
 
     runtime {
-        cpu: 32
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        time: 30
+        cpu: 30
+        memory: 15 + " GB"
+        disks: "local-disk 10 SSD"
         docker: vg_docker
     }
 }
@@ -350,8 +358,9 @@ task gbwt_merge {
     }
 
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        time: 10
+        memory: 15 + " GB"
+        disks: "local-disk 10 SSD"
         docker: vg_docker
     }
 }
@@ -415,7 +424,7 @@ task xg_index {
 
     command <<<
         set -exu -o pipefail
-        vg index --threads "$(nproc)" -x "~{graph_name}.xg" ~{xg_options} "~{vg}"
+        vg index --threads "$(nproc --all)" -x "~{graph_name}.xg" ~{xg_options} "~{vg}"
     >>>
 
     output {
@@ -423,9 +432,10 @@ task xg_index {
     }
 
     runtime {
+        time: 240
         cpu: 32
-        memory: 100 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: 50 + " GB"
+        disks: "local-disk 10 SSD"
         docker: vg_docker
     }
 }
@@ -449,9 +459,10 @@ task prune_graph {
     }
 
     runtime {
-        cpu: 16
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        time: 10
+        cpu: 8
+        memory: 5 + " GB"
+        disks: "local-disk 10 SSD"
         docker: vg_docker
     }
 }
@@ -475,7 +486,7 @@ task prune_graph_with_haplotypes {
             contig_gbwt="${p[1]}"
             nm=$(basename "${contig_vg}" .vg)
             contig_pruned_vg="${nm}.pruned.vg"
-            vg prune --threads 16 -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
+            vg prune --threads 2 -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
             echo "$contig_pruned_vg" >> contigs_pruned_vg
         done < "inputs"
     >>>
@@ -486,9 +497,10 @@ task prune_graph_with_haplotypes {
     }
 
     runtime {
-        cpu: 16
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        time: 180
+        cpu: 2
+        memory: 20 + " GB"
+        disks: "local-disk 10 SSD"
         docker: vg_docker
     }
 }
@@ -505,7 +517,7 @@ task gcsa_index {
 
     command <<<
         set -exu -o pipefail
-        vg index --threads "$(nproc)" -p -g "~{graph_name}.gcsa" -f "~{id_map}" ~{gcsa_options} ~{sep=" " contigs_pruned_vg}
+        vg index --threads "$(nproc --all)" -p -g "~{graph_name}.gcsa" -f "~{id_map}" ~{gcsa_options} ~{sep=" " contigs_pruned_vg}
     >>>
 
     output {
@@ -516,8 +528,8 @@ task gcsa_index {
     runtime {
         time: 1200
         cpu: 32
-        memory: 120 + " GB"
-        disks: "local-disk 800 SSD"
+        memory: 80 + " GB"
+        disks: "local-disk 50 SSD"
         docker: vg_docker
     }
 }

@@ -80,16 +80,16 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
                 in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf,
-                in_vgcall_disk=100,
-                in_vgcall_mem=50
+                in_vgcall_disk=10,
+                in_vgcall_mem=5
         }
         call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
                 in_vg_container=VG_CONTAINER,
-                in_vgcall_disk=100,
-                in_vgcall_mem=50
+                in_vgcall_disk=10,
+                in_vgcall_mem=5
         }
     }
     File cohort_vcf_output = select_first([bgzipCohortPhasedVCF.output_merged_vcf, COHORT_JOINT_VCF])
@@ -168,8 +168,9 @@ task runSplitJointGenotypedVCF {
         Array[File]+ contig_vcfs = read_lines("contig_vcf_list.txt")
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        time: 30
+        memory: 5 + " GB"
+        disks: "local-disk 10 SSD"
         docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
     }
 }
@@ -223,8 +224,9 @@ task runWhatsHapPhasing {
         File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf.gz"
     }
     runtime {
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        time: 360
+        memory: 30 + " GB"
+        disks: "local-disk 10 SSD"
         docker: "quay.io/biocontainers/whatshap:0.18--py37h6bb024c_0"
     }
 }

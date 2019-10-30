@@ -26,10 +26,10 @@ workflow vgMultiMapCall {
         File REF_INDEX_FILE                             # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                              # Path to .dict file of the REF_FILE fasta reference
         Int SPLIT_READ_CORES = 32
-        Int SPLIT_READ_DISK = 200
+        Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 32
-        Int MAP_DISK = 100
-        Int MAP_MEM = 100
+        Int MAP_DISK = 10
+        Int MAP_MEM = 60
         Int MERGE_GAM_CORES = 56
         Int MERGE_GAM_DISK = 400
         Int MERGE_GAM_MEM = 100
@@ -311,8 +311,9 @@ task splitReads {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
+        time: 60
         cpu: in_split_read_cores
-        memory: "40 GB"
+        memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
         docker: in_vg_container
     }
@@ -490,6 +491,7 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -573,7 +575,7 @@ task sortMDTagBAMFile {
         File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
     }
     runtime {
-        time: 200
+        time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -622,8 +624,8 @@ task runPICARD {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 180
-        memory: in_map_mem + " GB"
+        time: 60
+        memory: 5 + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:2.20.4"
     }
@@ -661,7 +663,8 @@ task mergeAlignmentBAMChunks {
         File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
-        memory: in_map_mem + " GB"
+        time: 240
+        memory: 5 + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
