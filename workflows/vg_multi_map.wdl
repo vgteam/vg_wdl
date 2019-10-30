@@ -9,6 +9,7 @@ workflow vgMultiMapCall {
     input {
         Boolean VGMPMAP_MODE = true                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
         Boolean SURJECT_MODE = true                     # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
+        Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
         Boolean GOOGLE_CLEANUP_MODE = false             # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
@@ -107,18 +108,20 @@ workflow vgMultiMapCall {
         # Surject GAM alignment files to BAM if SURJECT_MODE set to true
         File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file])
         # Cleanup input reads after use
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
-                input:
-                    previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
-                    current_task_output = vg_map_algorithm_chunk_gam_output
+        if (CLEANUP_FILES) {
+            if (GOOGLE_CLEANUP_MODE) {
+                call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
+                    input:
+                        previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
+                        current_task_output = vg_map_algorithm_chunk_gam_output
+                }
             }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
-                input:
-                    previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
-                    current_task_output = vg_map_algorithm_chunk_gam_output
+            if (!GOOGLE_CLEANUP_MODE) {
+                call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
+                    input:
+                        previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
+                        current_task_output = vg_map_algorithm_chunk_gam_output
+                }
             }
         }
         if (SURJECT_MODE) {
@@ -156,18 +159,20 @@ workflow vgMultiMapCall {
                     in_map_mem=MAP_MEM
             }
             # Cleanup intermediate surject files after use
-            if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
-                    input:
-                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
-                        current_task_output = runPICARD.mark_dupped_reordered_bam
+            if (CLEANUP_FILES) {
+                if (GOOGLE_CLEANUP_MODE) {
+                    call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
+                        input:
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
+                            current_task_output = runPICARD.mark_dupped_reordered_bam
+                    }
                 }
-            }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
-                    input:
-                        previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
-                        current_task_output = runPICARD.mark_dupped_reordered_bam
+                if (!GOOGLE_CLEANUP_MODE) {
+                    call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
+                        input:
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
+                            current_task_output = runPICARD.mark_dupped_reordered_bam
+                    }
                 }
             }
         }
@@ -180,22 +185,27 @@ workflow vgMultiMapCall {
         call mergeAlignmentBAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
+                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
+                in_map_mem=MAP_MEM
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
         File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
-                input:
-                    previous_task_outputs = alignment_chunk_bam_files_valid,
-                    current_task_output = merged_bam_file_output
+        if (CLEANUP_FILES) {
+            if (GOOGLE_CLEANUP_MODE) {
+                call cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
+                    input:
+                        previous_task_outputs = alignment_chunk_bam_files_valid,
+                        current_task_output = merged_bam_file_output
+                }
             }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
-                input:
-                    previous_task_outputs = alignment_chunk_bam_files_valid,
-                    current_task_output = merged_bam_file_output
+            if (!GOOGLE_CLEANUP_MODE) {
+                call cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
+                    input:
+                        previous_task_outputs = alignment_chunk_bam_files_valid,
+                        current_task_output = merged_bam_file_output
+                }
             }
         }
     } 
@@ -211,18 +221,20 @@ workflow vgMultiMapCall {
                 in_merge_gam_time=MERGE_GAM_TIME
         }
         # Cleanup gam chunk files after use
-        if (GOOGLE_CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
-                input:
-                    previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-                    current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+        if (CLEANUP_FILES) {
+            if (GOOGLE_CLEANUP_MODE) {
+                call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
+                    input:
+                        previous_task_outputs = vg_map_algorithm_chunk_gam_output,
+                        current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+                }
             }
-        }
-        if (!GOOGLE_CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
-                input:
-                    previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-                    current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+            if (!GOOGLE_CLEANUP_MODE) {
+                call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
+                    input:
+                        previous_task_outputs = vg_map_algorithm_chunk_gam_output,
+                        current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
+                }
             }
         }
     }
@@ -250,7 +262,7 @@ task cleanUpUnixFilesystem {
     >>>
     runtime {
         time: 10
-        docker: "null"
+        docker: "ubuntu:latest"
         continueOnReturnCode: true
     }
 }
@@ -528,11 +540,11 @@ task sortMDTagBAMFile {
               -r ID:1 -r LB:lib1 -r SM:~{in_sample_name} -r PL:illumina -r PU:unit1 \
               - \
             | samtools view \
-              -@ 32 \
+              -@ ~{in_map_cores} \
               -h -O SAM \
               - \
             | samtools view \
-              -@ 32 \
+              -@ ~{in_map_cores} \
               -h -O BAM \
               - \
             | samtools calmd \
@@ -610,7 +622,7 @@ task runPICARD {
         File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 60
+        time: 180
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         docker: "broadinstitute/picard:2.20.4"
@@ -621,9 +633,12 @@ task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -635,57 +650,20 @@ task mergeAlignmentBAMChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
-          ${in_sample_name}_merged.positionsorted.bam \
-          ${sep=" " in_alignment_bam_chunk_files} \
+          -f -p -c --threads ~{in_map_cores} \
+          ~{in_sample_name}_merged.positionsorted.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
-          ${in_sample_name}_merged.positionsorted.bam
-    }
+          ~{in_sample_name}_merged.positionsorted.bam
+    >>>
     output {
-        File merged_bam_file = "${in_sample_name}_merged.positionsorted.bam"
-        File merged_bam_file_index = "${in_sample_name}_merged.positionsorted.bam.bai"
+        File merged_bam_file = "~{in_sample_name}_merged.positionsorted.bam"
+        File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-# TODO: Duplicate task of mergeAlignmentBAMChunksVGMPMAP
-task mergeIndelRealignedBAMs {
-    input {
-        String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
-    }
-
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools merge \
-          -f -p -c --threads 32 \
-          ${in_sample_name}_merged.indel_realigned.bam \
-          ${sep=" " in_alignment_bam_chunk_files} \
-        && samtools index \
-          ${in_sample_name}_merged.indel_realigned.bam
-    }
-    output {
-        File merged_indel_realigned_bam_file = "${in_sample_name}_merged.indel_realigned.bam"
-        File merged_indel_realigned_bam_file_index = "${in_sample_name}_merged.indel_realigned.bam.bai"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
 }

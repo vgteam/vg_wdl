@@ -79,13 +79,17 @@ workflow vgTrioPipeline {
         call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
             input:
                 in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
-                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
+                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf,
+                in_vgcall_disk=100,
+                in_vgcall_mem=50
         }
         call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=100,
+                in_vgcall_mem=50
         }
     }
     File cohort_vcf_output = select_first([bgzipCohortPhasedVCF.output_merged_vcf, COHORT_JOINT_VCF])

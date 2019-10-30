@@ -126,7 +126,7 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
-        docker: "null"
+        docker: "ubuntu:latest"
         continueOnReturnCode: true
     }
 }
@@ -184,7 +184,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ 32 \
+              -@ "$(nproc)" \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -213,7 +213,7 @@ task runGATKIndelRealigner {
         File in_reference_dict_file
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -225,26 +225,26 @@ task runGATKIndelRealigner {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        ln -s ${in_bam_file.left} input_bam_file.bam
-        ln -s ${in_bam_file.right} input_bam_file.bam.bai
+        ln -s ~{in_bam_file.left} input_bam_file.bam
+        ln -s ~{in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
-          -nt 32 \
-          -R ${in_reference_file} \
+          -nt "$(nproc)" \
+          -R ~{in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
           --remove_program_records \
           --disable_bam_indexing \
-          -R ${in_reference_file} \
+          -R ~{in_reference_file} \
           --targetIntervals forIndelRealigner.intervals \
           -I input_bam_file.bam \
-          --out ${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
-    }
+          --out ~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
+    >>>
     output {
-        File indel_realigned_bam = "${in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
+        File indel_realigned_bam = "~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam"
     }
     runtime {
         time: 1200
@@ -260,7 +260,7 @@ task mergeIndelRealignedBAMs {
         Array[File] in_alignment_bam_chunk_files
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -272,15 +272,15 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
-          ${in_sample_name}_merged.indel_realigned.bam \
-          ${sep=" " in_alignment_bam_chunk_files} \
+          -f -p -c --threads "$(nproc)" \
+          ~{in_sample_name}_merged.indel_realigned.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
-          ${in_sample_name}_merged.indel_realigned.bam
-    }
+          ~{in_sample_name}_merged.indel_realigned.bam
+    >>>
     output {
-        File merged_indel_realigned_bam_file = "${in_sample_name}_merged.indel_realigned.bam"
-        File merged_indel_realigned_bam_file_index = "${in_sample_name}_merged.indel_realigned.bam.bai"
+        File merged_indel_realigned_bam_file = "~{in_sample_name}_merged.indel_realigned.bam"
+        File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
         memory: 100 + " GB"

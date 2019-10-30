@@ -5,10 +5,10 @@ version 1.0
 ## Description: Trio-backed VG mapping and variant calling workflow for mother-father-child trio datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
-import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_multi_call.wdl" as vgMultiCallWorkflow
-import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
+import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
+import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+import "./vg_multi_call.wdl" as vgMultiCallWorkflow
+import "./vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
     meta {
@@ -39,7 +39,7 @@ workflow vgTrioPipeline {
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
-        File SNPEFF_DATABASE                                # Path to snpeff database .zip file for snpEff annotation functionality.
+        File? SNPEFF_DATABASE                                # Path to snpeff database .zip file for snpEff annotation functionality.
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 200
         Int MAP_CORES = 32
@@ -55,13 +55,13 @@ workflow vgTrioPipeline {
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
-        String DRAGEN_REF_INDEX_NAME                        # Dragen module based reference index directory (e.g. "hs37d5_v7")
-        String UDPBINFO_PATH                                # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
-        String HELIX_USERNAME                               # The nih helix username which holds a user directory in UDPBINFO_PATH
+        String DRAGEN_REF_INDEX_NAME = ""                   # Dragen module based reference index directory (e.g. "hs37d5_v7")
+        String UDPBINFO_PATH = ""                           # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
+        String HELIX_USERNAME = ""                          # The nih helix username which holds a user directory in UDPBINFO_PATH
         Array[String]+ CONTIGS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "MT"]
         File REF_FASTA_GZ
         File PED_FILE
-        File GEN_MAP_FILES
+        File? GEN_MAP_FILES
         String GRAPH_NAME
         Boolean VGMPMAP_MODE = true                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
         Boolean DRAGEN_MODE = false                     # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
@@ -69,6 +69,7 @@ workflow vgTrioPipeline {
         Boolean MAKE_SNARLS = false                     # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
+        Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
         String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
@@ -105,6 +106,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
             VGMPMAP_MODE=VGMPMAP_MODE,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true
     }
     call vgMultiMapWorkflow.vgMultiMapCall as paternalMapWorkflow {
@@ -133,6 +135,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
             VGMPMAP_MODE=VGMPMAP_MODE,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true
     }
     call vgMultiMapWorkflow.vgMultiMapCall as probandMapWorkflow {
@@ -161,6 +164,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
             VGMPMAP_MODE=VGMPMAP_MODE,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true
     }
     
@@ -180,7 +184,6 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
-            SNPEFF_DATABASE=SNPEFF_DATABASE,
             CHUNK_GAM_CORES=CHUNK_GAM_CORES,
             CHUNK_GAM_DISK=CHUNK_GAM_DISK,
             CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -193,6 +196,7 @@ workflow vgTrioPipeline {
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
+            CLEANUP_FILES=CLEANUP_FILES,
             SNPEFF_ANNOTATION=false
     }
     call vgMultiCallWorkflow.vgMultiMapCall as paternalCallWorkflow {
@@ -208,7 +212,6 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
-            SNPEFF_DATABASE=SNPEFF_DATABASE,
             CHUNK_GAM_CORES=CHUNK_GAM_CORES,
             CHUNK_GAM_DISK=CHUNK_GAM_DISK,
             CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -222,6 +225,7 @@ workflow vgTrioPipeline {
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
+            CLEANUP_FILES=CLEANUP_FILES,
             PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
@@ -237,7 +241,6 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
-            SNPEFF_DATABASE=SNPEFF_DATABASE,
             CHUNK_GAM_CORES=CHUNK_GAM_CORES,
             CHUNK_GAM_DISK=CHUNK_GAM_DISK,
             CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -251,6 +254,7 @@ workflow vgTrioPipeline {
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false,
+            CLEANUP_FILES=CLEANUP_FILES,
             PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     
@@ -272,7 +276,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=gatkJointGenotyper1st.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {
@@ -326,13 +332,17 @@ workflow vgTrioPipeline {
         call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
             input:
                 in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
-                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf
+                in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     File cohort_vcf_output = select_first([bgzipCohortPhasedVCF.output_merged_vcf, output_joint_genotyped_vcf])
@@ -392,6 +402,7 @@ workflow vgTrioPipeline {
                 MERGE_GAM_MEM=MERGE_GAM_MEM,
                 MERGE_GAM_TIME=MERGE_GAM_TIME,
                 VGMPMAP_MODE=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 SURJECT_MODE=true
         }
     }
@@ -417,7 +428,6 @@ workflow vgTrioPipeline {
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
-            SNPEFF_DATABASE=SNPEFF_DATABASE,
             CHUNK_GAM_CORES=CHUNK_GAM_CORES,
             CHUNK_GAM_DISK=CHUNK_GAM_DISK,
             CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -430,6 +440,7 @@ workflow vgTrioPipeline {
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
+            CLEANUP_FILES=CLEANUP_FILES,
             SNPEFF_ANNOTATION=false
     }
     if (numSilbings > 1) {
@@ -446,7 +457,6 @@ workflow vgTrioPipeline {
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
                 REF_DICT_FILE=REF_DICT_FILE,
-                SNPEFF_DATABASE=SNPEFF_DATABASE,
                 CHUNK_GAM_CORES=CHUNK_GAM_CORES,
                 CHUNK_GAM_DISK=CHUNK_GAM_DISK,
                 CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -460,6 +470,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
@@ -477,7 +488,6 @@ workflow vgTrioPipeline {
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
                 REF_DICT_FILE=REF_DICT_FILE,
-                SNPEFF_DATABASE=SNPEFF_DATABASE,
                 CHUNK_GAM_CORES=CHUNK_GAM_CORES,
                 CHUNK_GAM_DISK=CHUNK_GAM_DISK,
                 CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -491,6 +501,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
@@ -508,7 +519,6 @@ workflow vgTrioPipeline {
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
                 REF_DICT_FILE=REF_DICT_FILE,
-                SNPEFF_DATABASE=SNPEFF_DATABASE,
                 CHUNK_GAM_CORES=CHUNK_GAM_CORES,
                 CHUNK_GAM_DISK=CHUNK_GAM_DISK,
                 CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -522,6 +532,7 @@ workflow vgTrioPipeline {
                 DRAGEN_MODE=DRAGEN_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false,
+                CLEANUP_FILES=CLEANUP_FILES,
                 PREVIOUS_WORKFLOW_OUTPUT="null"
         }
     }
@@ -549,7 +560,9 @@ workflow vgTrioPipeline {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_merged_vcf_file=gatkJointGenotyper2nd.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER
+                in_vg_container=VG_CONTAINER,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (DRAGEN_MODE) {
@@ -567,17 +580,23 @@ workflow vgTrioPipeline {
     File output_2nd_joint_genotyped_vcf = select_first([bgzip2ndGATKGVCF.output_merged_vcf, dragenJointGenotyper2nd.dragen_joint_genotyped_vcf])
     File output_2nd_joint_genotyped_vcf_index = select_first([bgzip2ndGATKGVCF.output_merged_vcf_index, dragenJointGenotyper2nd.dragen_joint_genotyped_vcf_index])
     # Run snpEff annotation on final VCF as desired
-    if (SNPEFF_ANNOTATION) {
+    if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
         call vgMultiMapCallWorkflow.normalizeVCF as normalizeCohortVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_bgzip_vcf_file=output_2nd_joint_genotyped_vcf,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call vgMultiMapCallWorkflow.snpEffAnnotateVCF as snpEffAnnotateCohortVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_normalized_vcf_file=normalizeCohortVCF.output_normalized_vcf,
                 in_snpeff_database=SNPEFF_DATABASE,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     if (!SNPEFF_ANNOTATION) {
@@ -612,16 +631,7 @@ task runGATKCombineGenotypeGVCFs {
     }
 
     command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
+        set -exu -o pipefail
 
         gatk IndexFeatureFile \
             -F ${in_gvcf_file_maternal} \
@@ -664,17 +674,7 @@ task runDragenJointGenotyper {
     String paternal_gvcf_file_name = basename(in_gvcf_file_paternal)
 
     command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
+        set -exu -o pipefail
 
         ## Copy input GVCFs into directory that Dragen can access
         UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
@@ -759,18 +759,22 @@ task runWhatsHapPhasing {
         File? in_proband_bam
         File? in_proband_bam_index
         File in_ped_file
-        File in_genetic_map
+        File? in_genetic_map
         String in_contig
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
     }
-
+    
+    Boolean genetic_map_available = defined(in_genetic_map)
+    
     command <<<
         set -exu -o pipefail
-
-        tar -xvf ~{in_genetic_map}
-        if [[ ~{in_contig} == "Y" || ~{in_contig} == "MT" ]]; then
+        
+        if [ ~{genetic_map_available} == true ]; then
+            tar -xvf ~{in_genetic_map}
+        fi
+        if [[ ~{in_contig} == "Y" || ~{in_contig} == "MT" || ~{in_contig} == "ABOlocus" ]]; then
             GENMAP_OPTION_STRING=""
         elif [ ~{in_contig} == "X" ]; then
             GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chrX_nonPAR_combined_b37.txt --chromosome X"
