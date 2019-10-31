@@ -22,5 +22,6 @@
     "vgMapCallSV.VGCALL_DISK": 200,
     "vgMapCallSV.VGCALL_MEM": 100,
     "vgMapCallSV.GOOGLE_CLEANUP_MODE": "true",
-    "vgMapCallSV.CLEANUP_MODE": "false"
+    "vgMapCallSV.CLEANUP_MODE": "false",
+    "vgMapCallSV.PREEMPRIBLE": 0
 }

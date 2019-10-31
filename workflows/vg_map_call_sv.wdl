@@ -4,17 +4,17 @@ workflow vgMapCallSV {
     meta {
 	author: "Jean Monlong"
         email: "jmonlong@ucsc.edu"
-        description: "Read mapping and SV genotyping using vg."
+        description: "Read mapping and SV genotyping using vg. It takes as inputs reads in FASTQ and graphs containing the structural variants to genotype. The graphs files required include the XG and GCSA indexes. Including the snarls index is optional but speeds up the computation. It outputs a VCF file." 
     }
     input {
         String SAMPLE_NAME                      # The sample name
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline
         File XG_FILE                            # Path to .xg index file
         File GCSA_FILE                          # Path to .gcsa index file
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
-        File? SNARL_FILE                         # Path to snarl index file
+        File? SNARL_FILE                        # (OPTIONAL) Path to snarl index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
@@ -27,9 +27,10 @@ workflow vgMapCallSV {
         Int MERGE_GAM_DISK = 400
         Int MERGE_GAM_MEM = 100
         Int MERGE_GAM_TIME = 1200
-        Int VGCALL_CORES = 32
-        Int VGCALL_DISK = 100
-        Int VGCALL_MEM = 64
+        Int VGCALL_CORES = 10
+        Int VGCALL_DISK = 200
+        Int VGCALL_MEM = 100
+        Int PREEMPTIBLE = 0
         Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         Boolean CLEANUP_MODE = true             # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
     }
@@ -42,7 +43,8 @@ workflow vgMapCallSV {
         in_vg_container=VG_CONTAINER,
         in_reads_per_chunk=READS_PER_CHUNK,
         in_split_read_cores=SPLIT_READ_CORES,
-        in_split_read_disk=SPLIT_READ_DISK
+        in_split_read_disk=SPLIT_READ_DISK,
+        in_preemptible=PREEMPTIBLE
     }
     call splitReads as secondReadPair {
         input:
@@ -51,7 +53,8 @@ workflow vgMapCallSV {
         in_vg_container=VG_CONTAINER,
         in_reads_per_chunk=READS_PER_CHUNK,
         in_split_read_cores=SPLIT_READ_CORES,
-        in_split_read_disk=SPLIT_READ_DISK
+        in_split_read_disk=SPLIT_READ_DISK,
+        in_preemptible=PREEMPTIBLE
     }
     
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
@@ -59,7 +62,8 @@ workflow vgMapCallSV {
         call extractPathNames {
             input:
             in_xg_file=XG_FILE,
-            in_vg_container=VG_CONTAINER
+            in_vg_container=VG_CONTAINER,
+            in_preemptible=PREEMPTIBLE
         }
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
@@ -81,7 +85,8 @@ workflow vgMapCallSV {
             in_sample_name=SAMPLE_NAME,
             in_map_cores=MAP_CORES,
             in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
+            in_map_mem=MAP_MEM,
+            in_preemptible=PREEMPTIBLE
         }
         
         File vg_map_algorithm_chunk_gam_output = runVGMAP.chunk_gam_file
@@ -90,14 +95,16 @@ workflow vgMapCallSV {
             call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
                 input:
                 previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
-                current_task_output = vg_map_algorithm_chunk_gam_output
+                current_task_output = vg_map_algorithm_chunk_gam_output,
+                in_preemptible=PREEMPTIBLE
             }
         }
         if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
             call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
                 input:
                 previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
-                current_task_output = vg_map_algorithm_chunk_gam_output
+                current_task_output = vg_map_algorithm_chunk_gam_output,
+                in_preemptible=PREEMPTIBLE
             }
         }
     }
@@ -115,20 +122,23 @@ workflow vgMapCallSV {
         in_merge_gam_disk=MERGE_GAM_DISK,
         in_merge_gam_mem=MERGE_GAM_MEM,
         in_merge_gam_time=MERGE_GAM_TIME,
+        in_preemptible=PREEMPTIBLE
     }
     # Cleanup gam chunk files after use
     if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
         call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
             input:
             previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-            current_task_output = mergeAlignmentGAMChunks.merged_gam_file
+            current_task_output = mergeAlignmentGAMChunks.merged_gam_file,
+            in_preemptible=PREEMPTIBLE
         }
     }
     if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
         call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
             input:
             previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-            current_task_output = mergeAlignmentGAMChunks.merged_gam_file
+            current_task_output = mergeAlignmentGAMChunks.merged_gam_file,
+            in_preemptible=PREEMPTIBLE
         }
     }
     call runVGPackCaller {
@@ -140,21 +150,24 @@ workflow vgMapCallSV {
         in_vg_container=VG_CONTAINER,
         in_vgcall_cores=VGCALL_CORES,
         in_vgcall_disk=VGCALL_DISK,
-        in_vgcall_mem=VGCALL_MEM
+        in_vgcall_mem=VGCALL_MEM,
+        in_preemptible=PREEMPTIBLE
     }
     # Cleanup vg call input files after use
     if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
         call cleanUpGoogleFilestore as cleanUpVGPackCallInputsGoogle {
             input:
             previous_task_outputs = [mergeAlignmentGAMChunks.merged_gam_file],
-            current_task_output = runVGPackCaller.output_vcf
+            current_task_output = runVGPackCaller.output_vcf,
+            in_preemptible=PREEMPTIBLE
         }
     }
     if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
         call cleanUpUnixFilesystem as cleanUpVGPackCallInputsUnix {
             input:
             previous_task_outputs = [mergeAlignmentGAMChunks.merged_gam_file],
-            current_task_output = runVGPackCaller.output_vcf
+            current_task_output = runVGPackCaller.output_vcf,
+            in_preemptible=PREEMPTIBLE
         }
     }
     
@@ -176,6 +189,7 @@ task cleanUpUnixFilesystem {
     input {
         Array[String] previous_task_outputs
         String current_task_output
+        Int in_preemptible
     }
     command <<<
         set -eux -o pipefail
@@ -184,6 +198,7 @@ task cleanUpUnixFilesystem {
     runtime {
         docker: "ubuntu"
         continueOnReturnCode: true
+        preemptible: in_preemptible
     }
 }
 
@@ -191,6 +206,7 @@ task cleanUpGoogleFilestore {
     input {
         Array[String] previous_task_outputs
         String current_task_output
+        Int in_preemptible
     }
     command {
         set -eux -o pipefail
@@ -199,6 +215,7 @@ task cleanUpGoogleFilestore {
     runtime {
         docker: "google/cloud-sdk"
         continueOnReturnCode: true
+        preemptible: in_preemptible
     }
 }
 
@@ -210,6 +227,7 @@ task splitReads {
         Int in_reads_per_chunk
         Int in_split_read_cores
         Int in_split_read_disk
+        Int in_preemptible
     }
     
     command <<< 
@@ -235,6 +253,7 @@ task splitReads {
         memory: "40 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
         docker: in_vg_container
+        preemptible: in_preemptible
     }
 }
 
@@ -242,6 +261,7 @@ task extractPathNames {
     input {
         File in_xg_file
         String in_vg_container
+        Int in_preemptible
     }
 
     command {
@@ -258,6 +278,7 @@ task extractPathNames {
         memory: "20 GB"
         disks: "local-disk 50 SSD"
         docker: in_vg_container
+        preemptible: in_preemptible
     }
 }
 
@@ -274,6 +295,7 @@ task runVGMAP {
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
+        Int in_preemptible
     }
     
     Boolean gbwt_options = defined(in_gbwt_file)
@@ -312,6 +334,7 @@ task runVGMAP {
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
         docker: in_vg_container
+        preemptible: in_preemptible
     }
 }
 
@@ -325,6 +348,7 @@ task mergeAlignmentGAMChunks {
         Int in_merge_gam_mem
         Int in_merge_gam_time
         Boolean sort_gam = false
+        Int in_preemptible
     }
     
     command <<<
@@ -358,6 +382,7 @@ task mergeAlignmentGAMChunks {
         disks: "local-disk " + in_merge_gam_disk  + " SSD"
         time: in_merge_gam_time
         docker: in_vg_container
+        preemptible: in_preemptible
     }
 }
 
@@ -371,6 +396,7 @@ task runVGPackCaller {
         Int in_vgcall_cores
         Int in_vgcall_disk
         Int in_vgcall_mem
+        Int in_preemptible
     }
 
     Boolean snarl_options = defined(in_snarl_file)
@@ -422,5 +448,6 @@ task runVGPackCaller {
         maxRetries: 3
         disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: in_vg_container
+        preemptible: in_preemptible
     }
 }
