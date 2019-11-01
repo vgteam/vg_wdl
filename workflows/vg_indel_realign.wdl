@@ -188,7 +188,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ 2 \
+              -@ "$(nproc --all)" \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -203,7 +203,7 @@ task splitBAMbyPath {
     runtime {
         time: 400
         memory: 10 + " GB"
-        cpu: 2
+        cpu: 16
         disks: "local-disk 10 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
