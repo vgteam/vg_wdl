@@ -147,31 +147,20 @@ workflow vgMultiMapCall {
                     in_map_mem=MAP_MEM,
                     in_vgmpmap_mode=VGMPMAP_MODE
             }
-            call runPICARD {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=sortMDTagBAMFile.sorted_bam_file,
-                    in_bam_file_index=sortMDTagBAMFile.sorted_bam_file_index,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE,
-                    in_map_cores=MAP_CORES,
-                    in_map_mem=MAP_MEM
-            }
             # Cleanup intermediate surject files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                         input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
-                            current_task_output = runPICARD.mark_dupped_reordered_bam
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file],
+                            current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                         input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
-                            current_task_output = runPICARD.mark_dupped_reordered_bam
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file],
+                            current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
                     }
                 }
             }
@@ -180,7 +169,7 @@ workflow vgMultiMapCall {
 
     if (SURJECT_MODE) {
         # Merge chunked alignments from surjected GAM files
-        Array[File?] alignment_chunk_bam_files_maybes = runPICARD.mark_dupped_reordered_bam
+        Array[File?] alignment_chunk_bam_files_maybes = sortMDTagBAMFile.mark_dupped_reordered_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
         call mergeAlignmentBAMChunks {
             input:
@@ -569,17 +558,29 @@ task sortMDTagBAMFile {
             && samtools index \
               ~{in_sample_name}_positionsorted.mdtag.bam
         fi
+        java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+          PROGRAM_RECORD_ID=null \
+          VALIDATION_STRINGENCY=LENIENT \
+          I=${in_sample_name}_positionsorted.mdtag.bam \
+          O=${in_sample_name}.mdtag.dupmarked.bam \
+          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
+        && rm -f ${in_sample_name}_positionsorted.mdtag.bam ${in_sample_name}_positionsorted.mdtag.bam.bai \
+        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
+            VALIDATION_STRINGENCY=LENIENT \
+            REFERENCE=${in_reference_file} \
+            INPUT=${in_sample_name}.mdtag.dupmarked.bam \
+            OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
+        && rm -f ${in_sample_name}.mdtag.dupmarked.bam
     >>>
     output {
-        File sorted_bam_file = "${in_sample_name}_positionsorted.mdtag.bam"
-        File sorted_bam_file_index = "${in_sample_name}_positionsorted.mdtag.bam.bai"
+        File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
         time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
+        docker: "quay.io/cmarkello/samtools_picard:latest"
     }
 }
 
