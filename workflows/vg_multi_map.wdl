@@ -558,22 +558,22 @@ task sortMDTagBAMFile {
             && samtools index \
               ~{in_sample_name}_positionsorted.mdtag.bam
         fi
-        java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+        java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
           PROGRAM_RECORD_ID=null \
           VALIDATION_STRINGENCY=LENIENT \
-          I=${in_sample_name}_positionsorted.mdtag.bam \
-          O=${in_sample_name}.mdtag.dupmarked.bam \
+          I=~{in_sample_name}_positionsorted.mdtag.bam \
+          O=~{in_sample_name}.mdtag.dupmarked.bam \
           M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && rm -f ${in_sample_name}_positionsorted.mdtag.bam ${in_sample_name}_positionsorted.mdtag.bam.bai \
-        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
+        && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai \
+        && java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
             VALIDATION_STRINGENCY=LENIENT \
-            REFERENCE=${in_reference_file} \
-            INPUT=${in_sample_name}.mdtag.dupmarked.bam \
-            OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && rm -f ${in_sample_name}.mdtag.dupmarked.bam
+            REFERENCE=~{in_reference_file} \
+            INPUT=~{in_sample_name}.mdtag.dupmarked.bam \
+            OUTPUT=~{in_sample_name}.mdtag.dupmarked.reordered.bam \
+        && rm -f ~{in_sample_name}.mdtag.dupmarked.bam
     >>>
     output {
-        File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
+        File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
         time: 60
@@ -584,53 +584,6 @@ task sortMDTagBAMFile {
     }
 }
 
-task runPICARD {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-        Int in_map_cores
-        String in_map_mem
-    }
-
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
-          PROGRAM_RECORD_ID=null \
-          VALIDATION_STRINGENCY=LENIENT \
-          I=${in_bam_file} \
-          O=${in_sample_name}.mdtag.dupmarked.bam \
-          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && java -Xmx${in_map_mem}g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
-            VALIDATION_STRINGENCY=LENIENT \
-            REFERENCE=${in_reference_file} \
-            INPUT=${in_sample_name}.mdtag.dupmarked.bam \
-            OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && rm -f ${in_sample_name}.mdtag.dupmarked.bam
-    }
-    output {
-        File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
-    }
-    runtime {
-        time: 60
-        memory: 5 + " GB"
-        cpu: in_map_cores
-        docker: "broadinstitute/picard:2.20.4"
-    }
-}
 
 task mergeAlignmentBAMChunks {
     input {
