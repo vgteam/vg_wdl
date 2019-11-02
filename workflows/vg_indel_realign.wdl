@@ -188,7 +188,7 @@ task splitBAMbyPath {
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
-              -@ "$(nproc)" \
+              -@ "$(nproc --all)" \
               -h -O BAM \
               input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
             && samtools index \
@@ -203,7 +203,7 @@ task splitBAMbyPath {
     runtime {
         time: 400
         memory: 10 + " GB"
-        cpu: 2
+        cpu: 16
         disks: "local-disk 10 SSD"
         docker: "biocontainers/samtools:v1.3_cv3"
     }
@@ -236,7 +236,7 @@ task runGATKIndelRealigner {
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
-          -nt "$(nproc)" \
+          -nt "$(nproc --all)" \
           -R ~{in_reference_file} \
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals \
@@ -277,7 +277,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads "$(nproc)" \
+          -f -p -c --threads "$(nproc --all)" \
           ~{in_sample_name}_merged.indel_realigned.bam \
           ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
