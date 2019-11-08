@@ -114,10 +114,10 @@ if [ $RUN_SMALL_TEST == false ]; then
         VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
         VGMPMAP_MODE='false' \
         SPLIT_READ_CORES=16 \
-        SPLIT_READ_DISK=50 \
-        MAP_CORES=32 \
-        MAP_DISK=100 \
-        MAP_MEM=100 \
+        SPLIT_READ_DISK=10 \
+        MAP_CORES=16 \
+        MAP_DISK=10 \
+        MAP_MEM=60 \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
 else

@@ -25,9 +25,9 @@ workflow vgMultiMapCall {
         File REF_FILE                                   # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                             # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                              # Path to .dict file of the REF_FILE fasta reference
-        Int SPLIT_READ_CORES = 32
+        Int SPLIT_READ_CORES = 16
         Int SPLIT_READ_DISK = 10
-        Int MAP_CORES = 32
+        Int MAP_CORES = 16
         Int MAP_DISK = 10
         Int MAP_MEM = 60
         Int MERGE_GAM_CORES = 56
@@ -378,6 +378,7 @@ task runVGMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
+        time: 120
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -439,6 +440,7 @@ task runVGMPMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
+        time: 120
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -480,7 +482,7 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        time: 60
+        time: 90
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -576,7 +578,7 @@ task sortMDTagBAMFile {
         File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 60
+        time: 90
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
