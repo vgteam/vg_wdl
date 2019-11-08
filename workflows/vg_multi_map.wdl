@@ -300,7 +300,7 @@ task splitReads {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
-        time: 60
+        time: 120
         cpu: in_split_read_cores
         memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
@@ -378,7 +378,7 @@ task runVGMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
-        time: 120
+        time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -440,7 +440,7 @@ task runVGMPMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
-        time: 120
+        time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
