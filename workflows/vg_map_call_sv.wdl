@@ -8,8 +8,11 @@ workflow vgMapCallSV {
     }
     input {
         String SAMPLE_NAME                      # The sample name
-        File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
-        File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
+        File? INPUT_READ_FILE_1                 # Input sample 1st read pair fastq.gz
+        File? INPUT_READ_FILE_2                 # Input sample 2nd read pair fastq.gz
+        File? INPUT_CRAM_FILE                   # Input CRAM file
+        File? CRAM_REF                          # Genome fasta file associated with the CRAM file
+        File? CRAM_REF_INDEX                    # Index of the fasta file associated with the CRAM file
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline
         File XG_FILE                            # Path to .xg index file
         File GCSA_FILE                          # Path to .gcsa index file
@@ -18,6 +21,8 @@ workflow vgMapCallSV {
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
         File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
+        Int CRAM_CONVERT_CORES = 16
+        Int CRAM_CONVERT_DISK = 200
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 200
         Int MAP_CORES = 32
@@ -34,7 +39,20 @@ workflow vgMapCallSV {
         Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         Boolean CLEANUP_MODE = true             # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
     }
-    
+
+    if(!defined(INPUT_READ_FILE_1) && defined(INPUT_CRAM_FILE) && defined(CRAM_REF_INDEX) && defined(CRAM_REF)){
+        call convertCram {
+            input:
+            in_cram_file=INPUT_CRAM_FILE,
+            in_ref_file=CRAM_REF,
+            in_ref_index_file=CRAM_REF_INDEX,
+            in_cram_convert_cores=CRAM_CONVERT_CORES,
+            in_cram_convert_disk=CRAM_CONVERT_DISK,
+            in_preemptible=PREEMPTIBLE
+        }
+        INPUT_READ_FILE_1=convertCram.fastq1
+        INPUT_READ_FILE_2=convertCram.fastq2
+    }
     # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
         input:
@@ -56,7 +74,6 @@ workflow vgMapCallSV {
         in_split_read_disk=SPLIT_READ_DISK,
         in_preemptible=PREEMPTIBLE
     }
-    
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
     if (!defined(PATH_LIST_FILE)) {
         call extractPathNames {
@@ -219,9 +236,45 @@ task cleanUpGoogleFilestore {
     }
 }
 
+task convertCram {
+    input {
+        File? in_cram_file
+        File? in_ref_file
+        File? in_ref_index_file
+        Int in_cram_convert_cores
+        Int in_cram_convert_disk
+        Int in_preemptible
+    }
+    command <<< 
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        samtools view -h -@ ${in_cram_convert_cores} -T ${in_ref_file} ${in_cram_file} | samtools fastq -N -1 R1.fastq.gz -2 R2.fastq.gz -N -c 1 -
+    >>>
+    output {
+        File fastq1='R1.fastq.gz'
+        File fastq2='R2.fastq.gz'
+    }
+    runtime {
+        cpu: in_cram_convert_cores
+        memory: "50 GB"
+        disks: "local-disk " + in_cram_convert_disk + " SSD"
+        docker: "broadinstitute/genomes-in-the-cloud:2.3.1-1500064817"
+        preemptible: in_preemptible
+    }
+}
+
 task splitReads {
     input {
-        File in_read_file
+        File? in_read_file
         String in_pair_id
         String in_vg_container
         Int in_reads_per_chunk
