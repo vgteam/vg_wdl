@@ -50,13 +50,13 @@ workflow vgMapCallSV {
             in_cram_convert_disk=CRAM_CONVERT_DISK,
             in_preemptible=PREEMPTIBLE
         }
-        INPUT_READ_FILE_1=convertCram.fastq1
-        INPUT_READ_FILE_2=convertCram.fastq2
     }
+    File in_read_file1 = select_first([INPUT_READ_FILE_1, convertCram.fastq1])
+    File in_read_file2 = select_first([INPUT_READ_FILE_2, convertCram.fastq2])
     # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
         input:
-        in_read_file=INPUT_READ_FILE_1,
+        in_read_file=in_read_file1,
         in_pair_id="1",
         in_vg_container=VG_CONTAINER,
         in_reads_per_chunk=READS_PER_CHUNK,
@@ -66,7 +66,7 @@ workflow vgMapCallSV {
     }
     call splitReads as secondReadPair {
         input:
-        in_read_file=INPUT_READ_FILE_2,
+        in_read_file=in_read_file2,
         in_pair_id="2",
         in_vg_container=VG_CONTAINER,
         in_reads_per_chunk=READS_PER_CHUNK,
@@ -257,7 +257,7 @@ task convertCram {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        samtools view -h -@ ${in_cram_convert_cores} -T ${in_ref_file} ${in_cram_file} | samtools fastq -N -1 R1.fastq.gz -2 R2.fastq.gz -N -c 1 -
+        samtools view -h -@ ~{in_cram_convert_cores} -T ~{in_ref_file} ~{in_cram_file} | samtools fastq -1 R1.fastq.gz -2 R2.fastq.gz -N -c 1 -
     >>>
     output {
         File fastq1='R1.fastq.gz'
@@ -267,7 +267,7 @@ task convertCram {
         cpu: in_cram_convert_cores
         memory: "50 GB"
         disks: "local-disk " + in_cram_convert_disk + " SSD"
-        docker: "broadinstitute/genomes-in-the-cloud:2.3.1-1500064817"
+        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
         preemptible: in_preemptible
     }
 }
