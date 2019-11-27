@@ -48,7 +48,7 @@ workflow vgMapCallSV {
             in_ref_index_file=CRAM_REF_INDEX,
             in_cram_convert_cores=CRAM_CONVERT_CORES,
             in_cram_convert_disk=CRAM_CONVERT_DISK,
-            in_preemptible=PREEMPTIBLE
+            in_preemptible=false
         }
     }
     File in_read_file1 = select_first([INPUT_READ_FILE_1, convertCram.fastq1])
@@ -257,7 +257,7 @@ task convertCram {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        samtools view -h -@ ~{in_cram_convert_cores} -T ~{in_ref_file} ~{in_cram_file} | samtools fastq -1 R1.fastq.gz -2 R2.fastq.gz -N -c 1 -
+        samtools collate ~{in_cram_file} | samtools view -h -@ ~{in_cram_convert_cores} -T ~{in_ref_file} - | samtools fastq -1 R1.fastq.gz -2 R2.fastq.gz -s singletons.fastq.gz -0 weird.fastq.gz -N -c 1 -
     >>>
     output {
         File fastq1='R1.fastq.gz'
