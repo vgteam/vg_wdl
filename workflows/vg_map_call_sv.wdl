@@ -48,7 +48,7 @@ workflow vgMapCallSV {
             in_ref_index_file=CRAM_REF_INDEX,
             in_cram_convert_cores=CRAM_CONVERT_CORES,
             in_cram_convert_disk=CRAM_CONVERT_DISK,
-            in_preemptible=false
+            in_preemptible=0
         }
     }
     File in_read_file1 = select_first([INPUT_READ_FILE_1, convertCram.fastq1])
