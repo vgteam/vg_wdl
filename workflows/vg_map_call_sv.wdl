@@ -257,7 +257,7 @@ task convertCram {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        samtools collate ~{in_cram_file} | samtools view -h -@ ~{in_cram_convert_cores} -T ~{in_ref_file} - | samtools fastq -1 R1.fastq.gz -2 R2.fastq.gz -s singletons.fastq.gz -0 weird.fastq.gz -N -c 1 -
+        samtools view -h -@ ~{in_cram_convert_cores} -T ~{in_ref_file} ~{in_cram_file} | samtools fastq -1 R1.fastq.gz -2 R2.fastq.gz -s singletons.fastq.gz -0 weird.fastq.gz -N -c 1 -
     >>>
     output {
         File fastq1='R1.fastq.gz'
