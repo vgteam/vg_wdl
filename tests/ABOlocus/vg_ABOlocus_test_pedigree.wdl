@@ -138,7 +138,8 @@ task check_trio_bams {
         set -eux -o pipefail
         
         n_mom_reads=$(expr $(zcat ~{mom_fastq_1_gz} | wc -l) / 2)
-        if [ "$n_mom_reads" -ne "$(samtools view ~{mom_bam} | wc -l)" ]; then
+        n_mom_aligned_reads=$(samtools view ~{mom_bam} | wc -l)
+        if [ "$n_mom_reads" -ne "$n_mom_aligned_reads" ]; then
             echo "wrong read count for maternal alignments" >&2
             exit 1
         fi
@@ -146,7 +147,8 @@ task check_trio_bams {
         samtools view "~{mom_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_mom_identical
         
         n_dad_reads=$(expr $(zcat ~{dad_fastq_1_gz} | wc -l) / 2)
-        if [ "$n_dad_reads" -ne "$(samtools view ~{dad_bam} | wc -l)" ]; then
+        n_dad_aligned_reads=$(samtools view ~{dad_bam} | wc -l)
+        if [ "$n_dad_reads" -ne "$n_dad_aligned_reads" ]; then
             echo "wrong read count for paternal alignments" >&2
             exit 1
         fi
@@ -154,7 +156,8 @@ task check_trio_bams {
         samtools view "~{dad_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_dad_identical
         
         n_child_reads=$(expr $(zcat ~{child_fastq_1_gz} | wc -l) / 2)
-        if [ "$n_child_reads" -ne "$(samtools view ~{child_bam} | wc -l)" ]; then
+        n_child_aligned_reads=$(samtools view ~{child_bam} | wc -l)
+        if [ "$n_child_reads" -ne "$n_child_aligned_reads" ]; then
             echo "wrong read count for child alignments" >&2
             exit 1
         fi
