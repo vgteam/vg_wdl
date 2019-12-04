@@ -321,7 +321,7 @@ workflow vgTrioPipeline {
     Array[Pair[File,File]] read_pair_files_list = zip(SIBLING_INPUT_READ_FILE_1_LIST, SIBLING_INPUT_READ_FILE_2_LIST)
     scatter (read_pair_set in zip(read_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] read_pair_files = read_pair_set.left
-        call vgMultiMapCallWorkflow.vgMultiMapCall {
+        call vgMultiMapCallWorkflow.vgMultiMapCall as 2ndIterationSiblingMapCall {
             input:
                 INPUT_READ_FILE_1=read_pair_files.left,
                 INPUT_READ_FILE_2=read_pair_files.right,
@@ -363,11 +363,11 @@ workflow vgTrioPipeline {
                 SNPEFF_ANNOTATION=false
         }
     }
-    Array[File?] output_sibling_bam_list_maybes = vgMultiMapCall.output_bam
-    Array[File?] output_sibling_bam_index_list_maybes = vgMultiMapCall.output_bam_index
+    Array[File?] output_sibling_bam_list_maybes = 2ndIterationSiblingMapCall.output_bam
+    Array[File?] output_sibling_bam_index_list_maybes = 2ndIterationSiblingMapCall.output_bam_index
     Array[File] output_sibling_bam_list = select_all(output_sibling_bam_list_maybes)
     Array[File] output_sibling_bam_index_list = select_all(output_sibling_bam_index_list_maybes)
-    Array[File?] gvcf_files_siblings_maybes = vgMultiMapCall.output_vcf
+    Array[File?] gvcf_files_siblings_maybes = 2ndIterationSiblingMapCall.output_vcf
     Array[File] gvcf_files_siblings = select_all(gvcf_files_siblings_maybes)
     
     
@@ -469,7 +469,7 @@ workflow vgTrioPipeline {
     Array[Pair[File,File]] bam_pair_files_list = zip(output_sibling_bam_list, output_sibling_bam_index_list)
     scatter (bam_pair_set in zip(bam_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] bam_pair_files = bam_pair_set.left
-        call vgIndelRealignmentWorkflow.vgMultiMapCall {
+        call vgIndelRealignmentWorkflow.vgMultiMapCall as siblingIndelRealignmentWorkflow {
             input:
                 INPUT_BAM_FILE=bam_pair_files.left,
                 INPUT_BAM_FILE_INDEX=bam_pair_files.right,
@@ -485,8 +485,8 @@ workflow vgTrioPipeline {
                 MAP_MEM=MAP_MEM
         }
     }
-    Array[File?] output_sibling_indel_bam_list_maybes = vgMultiMapCall.output_bam
-    Array[File?] output_sibling_indel_bam_index_list_maybes = vgMultiMapCall.output_bam_index
+    Array[File?] output_sibling_indel_bam_list_maybes = siblingIndelRealignmentWorkflow.output_bam
+    Array[File?] output_sibling_indel_bam_index_list_maybes = siblingIndelRealignmentWorkflow.output_bam_index
     
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
