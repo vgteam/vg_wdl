@@ -6,8 +6,6 @@ version 1.0
 ## Reference: https://github.com/vgteam/vg/wiki
 
 import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
-import "./vg_multi_map.wdl" as vgMultiMapWorkflow
-import "./vg_multi_call.wdl" as vgMultiCallWorkflow
 import "./vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
@@ -77,10 +75,10 @@ workflow vgTrioPipeline {
     File PROBAND_INPUT_READ_FILE_2 = SIBLING_INPUT_READ_FILE_2_LIST[0]  # Input proband 2nd read pair fastq.gz
     String SAMPLE_NAME_PROBAND = SAMPLE_NAME_SIBLING_LIST[0]            # Sample name for the proband
         
-    ###################################
-    ## Run mapping workflows on Trio ##
-    ###################################
-    call vgMultiMapWorkflow.vgMultiMapCall as maternalMapWorkflow {
+    #######################################################
+    ## Run mapping and variant calling workflows on Trio ##
+    #######################################################
+    call vgMultiMapCallWorkflow.vgMultiMapCall as maternalMapCallWorkflow {
         input:
             INPUT_READ_FILE_1=MATERNAL_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=MATERNAL_INPUT_READ_FILE_2,
@@ -105,11 +103,23 @@ workflow vgTrioPipeline {
             MERGE_GAM_DISK=MERGE_GAM_DISK,
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            CHUNK_GAM_CORES=CHUNK_GAM_CORES,
+            CHUNK_GAM_DISK=CHUNK_GAM_DISK,
+            CHUNK_GAM_MEM=CHUNK_GAM_MEM,
+            VGCALL_CORES=VGCALL_CORES,
+            VGCALL_DISK=VGCALL_DISK,
+            VGCALL_MEM=VGCALL_MEM,
+            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
+            UDPBINFO_PATH=UDPBINFO_PATH,
+            HELIX_USERNAME=HELIX_USERNAME,
+            VGMPMAP_MODE=false,
             CLEANUP_FILES=CLEANUP_FILES,
-            SURJECT_MODE=true
+            SURJECT_MODE=true,
+            DRAGEN_MODE=DRAGEN_MODE,
+            GVCF_MODE=true,
+            SNPEFF_ANNOTATION=false
     }
-    call vgMultiMapWorkflow.vgMultiMapCall as paternalMapWorkflow {
+    call vgMultiMapCallWorkflow.vgMultiMapCall as paternalMapCallWorkflow {
         input:
             INPUT_READ_FILE_1=PATERNAL_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=PATERNAL_INPUT_READ_FILE_2,
@@ -134,11 +144,23 @@ workflow vgTrioPipeline {
             MERGE_GAM_DISK=MERGE_GAM_DISK,
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            CHUNK_GAM_CORES=CHUNK_GAM_CORES,
+            CHUNK_GAM_DISK=CHUNK_GAM_DISK,
+            CHUNK_GAM_MEM=CHUNK_GAM_MEM,
+            VGCALL_CORES=VGCALL_CORES,
+            VGCALL_DISK=VGCALL_DISK,
+            VGCALL_MEM=VGCALL_MEM,
+            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
+            UDPBINFO_PATH=UDPBINFO_PATH,
+            HELIX_USERNAME=HELIX_USERNAME,
+            VGMPMAP_MODE=false,
             CLEANUP_FILES=CLEANUP_FILES,
-            SURJECT_MODE=true
+            SURJECT_MODE=true,
+            DRAGEN_MODE=DRAGEN_MODE,
+            GVCF_MODE=true,
+            SNPEFF_ANNOTATION=false
     }
-    call vgMultiMapWorkflow.vgMultiMapCall as probandMapWorkflow {
+    call vgMultiMapCallWorkflow.vgMultiMapCall as probandMapCallWorkflow {
         input:
             INPUT_READ_FILE_1=PROBAND_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=PROBAND_INPUT_READ_FILE_2,
@@ -163,27 +185,6 @@ workflow vgTrioPipeline {
             MERGE_GAM_DISK=MERGE_GAM_DISK,
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
-            CLEANUP_FILES=CLEANUP_FILES,
-            SURJECT_MODE=true
-    }
-    
-    ###########################################
-    ## Run variant calling workflows on Trio ##
-    ###########################################
-    call vgMultiCallWorkflow.vgMultiMapCall as maternalCallWorkflow {
-        input:
-            INPUT_BAM_FILE=maternalMapWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=maternalMapWorkflow.output_bam_index,
-            SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
-            VG_CONTAINER=VG_CONTAINER,
-            CHUNK_BASES=CHUNK_BASES,
-            OVERLAP=OVERLAP,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
             CHUNK_GAM_CORES=CHUNK_GAM_CORES,
             CHUNK_GAM_DISK=CHUNK_GAM_DISK,
             CHUNK_GAM_MEM=CHUNK_GAM_MEM,
@@ -193,69 +194,12 @@ workflow vgTrioPipeline {
             DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
+            VGMPMAP_MODE=false,
+            CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
-            CLEANUP_FILES=CLEANUP_FILES,
             SNPEFF_ANNOTATION=false
-    }
-    call vgMultiCallWorkflow.vgMultiMapCall as paternalCallWorkflow {
-        input:
-            INPUT_BAM_FILE=paternalMapWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=paternalMapWorkflow.output_bam_index,
-            SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
-            VG_CONTAINER=VG_CONTAINER,
-            CHUNK_BASES=CHUNK_BASES,
-            OVERLAP=OVERLAP,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-            CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-            CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-            VGCALL_CORES=VGCALL_CORES,
-            VGCALL_DISK=VGCALL_DISK,
-            VGCALL_MEM=VGCALL_MEM,
-            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-            UDPBINFO_PATH=UDPBINFO_PATH,
-            HELIX_USERNAME=HELIX_USERNAME,
-            SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
-            GVCF_MODE=true,
-            SNPEFF_ANNOTATION=false,
-            CLEANUP_FILES=CLEANUP_FILES,
-            PREVIOUS_WORKFLOW_OUTPUT="null"
-    }
-    call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
-        input:
-            INPUT_BAM_FILE=probandMapWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=probandMapWorkflow.output_bam_index,
-            SAMPLE_NAME=SAMPLE_NAME_PROBAND,
-            VG_CONTAINER=VG_CONTAINER,
-            CHUNK_BASES=CHUNK_BASES,
-            OVERLAP=OVERLAP,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-            CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-            CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-            VGCALL_CORES=VGCALL_CORES,
-            VGCALL_DISK=VGCALL_DISK,
-            VGCALL_MEM=VGCALL_MEM,
-            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-            UDPBINFO_PATH=UDPBINFO_PATH,
-            HELIX_USERNAME=HELIX_USERNAME,
-            SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
-            GVCF_MODE=true,
-            SNPEFF_ANNOTATION=false,
-            CLEANUP_FILES=CLEANUP_FILES,
-            PREVIOUS_WORKFLOW_OUTPUT="null"
     }
     
     ###############################
@@ -265,9 +209,9 @@ workflow vgTrioPipeline {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper1st {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
-                in_gvcf_files_siblings=[probandCallWorkflow.output_vcf],
+                in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
+                in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
+                in_gvcf_files_siblings=[probandMapCallWorkflow.output_vcf],
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
@@ -285,9 +229,9 @@ workflow vgTrioPipeline {
         call runDragenJointGenotyper as dragenJointGenotyper1st {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
-                in_gvcf_files_siblings=[probandCallWorkflow.output_vcf],
+                in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
+                in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
+                in_gvcf_files_siblings=[probandMapCallWorkflow.output_vcf],
                 in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                 in_udp_data_dir=UDPBINFO_PATH,
                 in_helix_username=HELIX_USERNAME
@@ -315,12 +259,12 @@ workflow vgTrioPipeline {
                 input:
                     in_cohort_sample_name=SAMPLE_NAME_PROBAND,
                     joint_genotyped_vcf=contig_pair.right,
-                    in_maternal_bam=maternalMapWorkflow.output_bam,
-                    in_maternal_bam_index=maternalMapWorkflow.output_bam_index,
-                    in_paternal_bam=paternalMapWorkflow.output_bam,
-                    in_paternal_bam_index=paternalMapWorkflow.output_bam_index,
-                    in_proband_bam=probandMapWorkflow.output_bam,
-                    in_proband_bam_index=probandMapWorkflow.output_bam_index,
+                    in_maternal_bam=maternalMapCallWorkflow.output_bam,
+                    in_maternal_bam_index=maternalMapCallWorkflow.output_bam_index,
+                    in_paternal_bam=paternalMapCallWorkflow.output_bam,
+                    in_paternal_bam_index=paternalMapCallWorkflow.output_bam_index,
+                    in_proband_bam=probandMapCallWorkflow.output_bam,
+                    in_proband_bam_index=probandMapCallWorkflow.output_bam_index,
                     in_ped_file=PED_FILE,
                     in_genetic_map=GEN_MAP_FILES,
                     in_contig=contig_pair.left,
@@ -370,13 +314,13 @@ workflow vgTrioPipeline {
             vg_docker=VG_CONTAINER
     }
     
-    ##################################################################################
-    ## Run mapping workflow of proband and sibling reads against the parental graph ##
-    ##################################################################################
+    ######################################################################################################
+    ## Run mapping and variant calling workflow of proband and sibling reads against the parental graph ##
+    ######################################################################################################
     Array[Pair[File,File]] read_pair_files_list = zip(SIBLING_INPUT_READ_FILE_1_LIST, SIBLING_INPUT_READ_FILE_2_LIST)
     scatter (read_pair_set in zip(read_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] read_pair_files = read_pair_set.left
-        call vgMultiMapWorkflow.vgMultiMapCall {
+        call vgMultiMapCallWorkflow.vgMultiMapCall {
             input:
                 INPUT_READ_FILE_1=read_pair_files.left,
                 INPUT_READ_FILE_2=read_pair_files.right,
@@ -401,146 +345,30 @@ workflow vgTrioPipeline {
                 MERGE_GAM_DISK=MERGE_GAM_DISK,
                 MERGE_GAM_MEM=MERGE_GAM_MEM,
                 MERGE_GAM_TIME=MERGE_GAM_TIME,
+                CHUNK_GAM_CORES=CHUNK_GAM_CORES,
+                CHUNK_GAM_DISK=CHUNK_GAM_DISK,
+                CHUNK_GAM_MEM=CHUNK_GAM_MEM,
+                VGCALL_CORES=VGCALL_CORES,
+                VGCALL_DISK=VGCALL_DISK,
+                VGCALL_MEM=VGCALL_MEM,
+                DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
+                UDPBINFO_PATH=UDPBINFO_PATH,
+                HELIX_USERNAME=HELIX_USERNAME,
                 VGMPMAP_MODE=false,
                 CLEANUP_FILES=CLEANUP_FILES,
-                SURJECT_MODE=true
+                SURJECT_MODE=true,
+                DRAGEN_MODE=DRAGEN_MODE,
+                GVCF_MODE=true,
+                SNPEFF_ANNOTATION=false
         }
     }
     Array[File?] output_sibling_bam_list_maybes = vgMultiMapCall.output_bam
     Array[File?] output_sibling_bam_index_list_maybes = vgMultiMapCall.output_bam_index
     Array[File] output_sibling_bam_list = select_all(output_sibling_bam_list_maybes)
     Array[File] output_sibling_bam_index_list = select_all(output_sibling_bam_index_list_maybes)
+    Array[File?] gvcf_files_siblings_maybes = vgMultiMapCall.output_vcf
+    Array[File] gvcf_files_siblings = select_all(gvcf_files_siblings_maybes)
     
-    ###########################################################
-    ## Run variant calling workflows on proband and siblings ##
-    ###########################################################
-    Int numSilbings = length(SAMPLE_NAME_SIBLING_LIST)
-    call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow2 {
-        input:
-            INPUT_BAM_FILE=output_sibling_bam_list[0],
-            INPUT_BAM_FILE_INDEX=output_sibling_bam_index_list[0],
-            SAMPLE_NAME=SAMPLE_NAME_SIBLING_LIST[0],
-            VG_CONTAINER=VG_CONTAINER,
-            CHUNK_BASES=CHUNK_BASES,
-            OVERLAP=OVERLAP,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-            CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-            CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-            VGCALL_CORES=VGCALL_CORES,
-            VGCALL_DISK=VGCALL_DISK,
-            VGCALL_MEM=VGCALL_MEM,
-            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-            UDPBINFO_PATH=UDPBINFO_PATH,
-            HELIX_USERNAME=HELIX_USERNAME,
-            SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
-            GVCF_MODE=true,
-            CLEANUP_FILES=CLEANUP_FILES,
-            SNPEFF_ANNOTATION=false
-    }
-    if (numSilbings > 1) {
-        call vgMultiCallWorkflow.vgMultiMapCall as sibling1CallWorkflow {
-            input:
-                INPUT_BAM_FILE=output_sibling_bam_list[1],
-                INPUT_BAM_FILE_INDEX=output_sibling_bam_index_list[1],
-                SAMPLE_NAME=SAMPLE_NAME_SIBLING_LIST[1],
-                VG_CONTAINER=VG_CONTAINER,
-                CHUNK_BASES=CHUNK_BASES,
-                OVERLAP=OVERLAP,
-                PATH_LIST_FILE=PATH_LIST_FILE,
-                XG_FILE=XG_FILE,
-                REF_FILE=REF_FILE,
-                REF_INDEX_FILE=REF_INDEX_FILE,
-                REF_DICT_FILE=REF_DICT_FILE,
-                CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-                CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-                CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-                VGCALL_CORES=VGCALL_CORES,
-                VGCALL_DISK=VGCALL_DISK,
-                VGCALL_MEM=VGCALL_MEM,
-                DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-                UDPBINFO_PATH=UDPBINFO_PATH,
-                HELIX_USERNAME=HELIX_USERNAME,
-                SURJECT_MODE=true,
-                DRAGEN_MODE=DRAGEN_MODE,
-                GVCF_MODE=true,
-                SNPEFF_ANNOTATION=false,
-                CLEANUP_FILES=CLEANUP_FILES,
-                PREVIOUS_WORKFLOW_OUTPUT="null"
-        }
-    }
-    if (numSilbings > 2) {
-        call vgMultiCallWorkflow.vgMultiMapCall as sibling2CallWorkflow {
-            input:
-                INPUT_BAM_FILE=output_sibling_bam_list[2],
-                INPUT_BAM_FILE_INDEX=output_sibling_bam_index_list[2],
-                SAMPLE_NAME=SAMPLE_NAME_SIBLING_LIST[2],
-                VG_CONTAINER=VG_CONTAINER,
-                CHUNK_BASES=CHUNK_BASES,
-                OVERLAP=OVERLAP,
-                PATH_LIST_FILE=PATH_LIST_FILE,
-                XG_FILE=XG_FILE,
-                REF_FILE=REF_FILE,
-                REF_INDEX_FILE=REF_INDEX_FILE,
-                REF_DICT_FILE=REF_DICT_FILE,
-                CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-                CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-                CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-                VGCALL_CORES=VGCALL_CORES,
-                VGCALL_DISK=VGCALL_DISK,
-                VGCALL_MEM=VGCALL_MEM,
-                DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-                UDPBINFO_PATH=UDPBINFO_PATH,
-                HELIX_USERNAME=HELIX_USERNAME,
-                SURJECT_MODE=true,
-                DRAGEN_MODE=DRAGEN_MODE,
-                GVCF_MODE=true,
-                SNPEFF_ANNOTATION=false,
-                CLEANUP_FILES=CLEANUP_FILES,
-                PREVIOUS_WORKFLOW_OUTPUT="null"
-        }
-    }
-    if (numSilbings > 3) {
-        call vgMultiCallWorkflow.vgMultiMapCall as sibling3CallWorkflow {
-            input:
-                INPUT_BAM_FILE=output_sibling_bam_list[3],
-                INPUT_BAM_FILE_INDEX=output_sibling_bam_index_list[3],
-                SAMPLE_NAME=SAMPLE_NAME_SIBLING_LIST[3],
-                VG_CONTAINER=VG_CONTAINER,
-                CHUNK_BASES=CHUNK_BASES,
-                OVERLAP=OVERLAP,
-                PATH_LIST_FILE=PATH_LIST_FILE,
-                XG_FILE=XG_FILE,
-                REF_FILE=REF_FILE,
-                REF_INDEX_FILE=REF_INDEX_FILE,
-                REF_DICT_FILE=REF_DICT_FILE,
-                CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-                CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-                CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-                VGCALL_CORES=VGCALL_CORES,
-                VGCALL_DISK=VGCALL_DISK,
-                VGCALL_MEM=VGCALL_MEM,
-                DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-                UDPBINFO_PATH=UDPBINFO_PATH,
-                HELIX_USERNAME=HELIX_USERNAME,
-                SURJECT_MODE=true,
-                DRAGEN_MODE=DRAGEN_MODE,
-                GVCF_MODE=true,
-                SNPEFF_ANNOTATION=false,
-                CLEANUP_FILES=CLEANUP_FILES,
-                PREVIOUS_WORKFLOW_OUTPUT="null"
-        }
-    }
-    File proband_gvcf = probandCallWorkflow2.output_vcf
-    File? sibling1_gvcf = sibling1CallWorkflow.output_vcf
-    File? sibling2_gvcf = sibling2CallWorkflow.output_vcf
-    File? sibling3_gvcf = sibling3CallWorkflow.output_vcf
-    Array[File] gvcf_files_siblings = select_all([proband_gvcf, sibling1_gvcf, sibling2_gvcf, sibling3_gvcf])
     
     #######################################################
     ## Run 2nd trio joint genotyping on new proband GVCF ##
@@ -549,8 +377,8 @@ workflow vgTrioPipeline {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper2nd {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
+                in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
+                in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=gvcf_files_siblings,
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
@@ -569,8 +397,8 @@ workflow vgTrioPipeline {
         call runDragenJointGenotyper as dragenJointGenotyper2nd {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
-                in_gvcf_file_maternal=maternalCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalCallWorkflow.output_vcf,
+                in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
+                in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=gvcf_files_siblings,
                 in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
                 in_udp_data_dir=UDPBINFO_PATH,
@@ -605,10 +433,10 @@ workflow vgTrioPipeline {
     
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        File? output_maternal_bam = maternalMapWorkflow.output_bam
-        File? output_maternal_bam_index = maternalMapWorkflow.output_bam_index
-        File? output_paternal_bam = paternalMapWorkflow.output_bam
-        File? output_paternal_bam_index = paternalMapWorkflow.output_bam_index
+        File? output_maternal_bam = maternalMapCallWorkflow.output_bam
+        File? output_maternal_bam_index = maternalMapCallWorkflow.output_bam_index
+        File? output_paternal_bam = paternalMapCallWorkflow.output_bam
+        File? output_paternal_bam_index = paternalMapCallWorkflow.output_bam_index
         Array[File] output_gvcf_files_siblings = gvcf_files_siblings
         Array[File] final_output_sibling_bam_list = output_sibling_bam_list
         Array[File] final_output_sibling_bam_index_list = output_sibling_bam_index_list
@@ -689,7 +517,7 @@ task runDragenJointGenotyper {
         TMP_DIR="/staging/~{in_helix_username}/tmp" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} ${DRAGEN_SIBLING_VCF_INPUT}" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} ${DRAGEN_SIBLING_VCF_INPUT}\"\' && \
         mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/" && \

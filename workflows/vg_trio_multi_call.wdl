@@ -100,8 +100,7 @@ workflow vgTrioPipeline {
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
-            SNPEFF_ANNOTATION=false,
-            PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then maternalCallWorkflow.output_vcf else "null"
+            SNPEFF_ANNOTATION=false
     }
     call vgMultiCallWorkflow.vgMultiMapCall as probandCallWorkflow {
         input:
@@ -129,8 +128,7 @@ workflow vgTrioPipeline {
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
             GVCF_MODE=true,
-            SNPEFF_ANNOTATION=false,
-            PREVIOUS_WORKFLOW_OUTPUT= if DRAGEN_MODE then paternalCallWorkflow.output_vcf else "null"
+            SNPEFF_ANNOTATION=false
     }
     
     ###############################
@@ -268,7 +266,7 @@ task runDragenJointGenotyper {
         TMP_DIR="/staging/~{in_helix_username}/tmp" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{proband_gvcf_file_name}" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{proband_gvcf_file_name}\"\' && \
         mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/" && \
