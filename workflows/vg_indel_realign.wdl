@@ -176,8 +176,8 @@ task extractPathNames {
 task splitBAMbyPath {
     input {
         String in_sample_name
-        File in_merged_bam_file
-        File in_merged_bam_file_index
+        File? in_merged_bam_file
+        File? in_merged_bam_file_index
         File in_path_list_file
     }
 
