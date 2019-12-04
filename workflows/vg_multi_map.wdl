@@ -29,7 +29,7 @@ workflow vgMultiMapCall {
         Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 16
         Int MAP_DISK = 10
-        Int MAP_MEM = 60
+        Int MAP_MEM = 100
         Int MERGE_GAM_CORES = 56
         Int MERGE_GAM_DISK = 400
         Int MERGE_GAM_MEM = 100
@@ -482,7 +482,7 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        time: 90
+        time: 180
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"

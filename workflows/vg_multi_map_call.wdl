@@ -166,31 +166,20 @@ workflow vgMultiMapCall {
                     in_map_mem=MAP_MEM,
                     in_vgmpmap_mode=VGMPMAP_MODE
             }
-            call runPICARD {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=sortMDTagBAMFile.sorted_bam_file,
-                    in_bam_file_index=sortMDTagBAMFile.sorted_bam_file_index,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE,
-                    in_map_cores=MAP_CORES,
-                    in_map_mem=MAP_MEM
-            }
             # Cleanup intermediate surject files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                         input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
-                            current_task_output = runPICARD.mark_dupped_reordered_bam
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file],
+                            current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                         input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file, sortMDTagBAMFile.sorted_bam_file, sortMDTagBAMFile.sorted_bam_file_index],
-                            current_task_output = runPICARD.mark_dupped_reordered_bam
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file],
+                            current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
                     }
                 }
             }
@@ -202,7 +191,7 @@ workflow vgMultiMapCall {
     ##############################################
     if (SURJECT_MODE) {
         # Merge chunked alignments from surjected GAM files
-        Array[File?] alignment_chunk_bam_files_maybes = runPICARD.mark_dupped_reordered_bam
+        Array[File?] alignment_chunk_bam_files_maybes = sortMDTagBAMFile.mark_dupped_reordered_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
         call mergeAlignmentBAMChunks {
             input:
@@ -812,66 +801,29 @@ task sortMDTagBAMFile {
             && samtools index \
               ~{in_sample_name}_positionsorted.mdtag.bam
         fi
+        java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+          PROGRAM_RECORD_ID=null \
+          VALIDATION_STRINGENCY=LENIENT \
+          I=~{in_sample_name}_positionsorted.mdtag.bam \
+          O=~{in_sample_name}.mdtag.dupmarked.bam \
+          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
+        && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai \
+        && java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
+            VALIDATION_STRINGENCY=LENIENT \
+            REFERENCE=~{in_reference_file} \
+            INPUT=~{in_sample_name}.mdtag.dupmarked.bam \
+            OUTPUT=~{in_sample_name}.mdtag.dupmarked.reordered.bam \
+        && rm -f ~{in_sample_name}.mdtag.dupmarked.bam
     >>>
     output {
-        File sorted_bam_file = "~{in_sample_name}_positionsorted.mdtag.bam"
-        File sorted_bam_file_index = "~{in_sample_name}_positionsorted.mdtag.bam.bai"
+        File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
         time: 60
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
-    }
-}
-
-task runPICARD {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-        Int in_map_cores
-        String in_map_mem
-    }
-    
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        java -Xmx80g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
-          PROGRAM_RECORD_ID=null \
-          VALIDATION_STRINGENCY=LENIENT \
-          I=${in_bam_file} \
-          O=${in_sample_name}.mdtag.dupmarked.bam \
-          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && java -Xmx80g -XX:ParallelGCThreads=${in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
-            PROGRAM_RECORD_ID=null \
-            VALIDATION_STRINGENCY=LENIENT \
-            REFERENCE=${in_reference_file} \
-            INPUT=${in_sample_name}.mdtag.dupmarked.bam \
-            OUTPUT=${in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && rm -f ${in_sample_name}.mdtag.dupmarked.bam
-    }
-    output {
-        File mark_dupped_reordered_bam = "${in_sample_name}.mdtag.dupmarked.reordered.bam"
-    }
-    runtime {
-        time: 60
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        docker: "broadinstitute/picard:2.20.4"
+        docker: "quay.io/cmarkello/samtools_picard:latest"
     }
 }
 
@@ -1082,7 +1034,7 @@ task runDragenCaller {
         TMP_DIR="/staging/~{in_helix_username}/tmp" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
         mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
@@ -1127,7 +1079,7 @@ task runDragenCallerGVCF {
         TMP_DIR="/staging/~{in_helix_username}/tmp" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
         mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \

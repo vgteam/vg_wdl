@@ -118,7 +118,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         SPLIT_READ_DISK=10 \
         MAP_CORES=16 \
         MAP_DISK=10 \
-        MAP_MEM=60 \
+        MAP_MEM=80 \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
         -d ${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.part_1.sh
 else
