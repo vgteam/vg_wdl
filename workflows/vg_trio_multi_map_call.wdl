@@ -321,7 +321,7 @@ workflow vgTrioPipeline {
     Array[Pair[File,File]] read_pair_files_list = zip(SIBLING_INPUT_READ_FILE_1_LIST, SIBLING_INPUT_READ_FILE_2_LIST)
     scatter (read_pair_set in zip(read_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] read_pair_files = read_pair_set.left
-        call vgMultiMapCallWorkflow.vgMultiMapCall as 2ndIterationSiblingMapCall {
+        call vgMultiMapCallWorkflow.vgMultiMapCall as secondIterationSiblingMapCall {
             input:
                 INPUT_READ_FILE_1=read_pair_files.left,
                 INPUT_READ_FILE_2=read_pair_files.right,
@@ -363,11 +363,11 @@ workflow vgTrioPipeline {
                 SNPEFF_ANNOTATION=false
         }
     }
-    Array[File?] output_sibling_bam_list_maybes = 2ndIterationSiblingMapCall.output_bam
-    Array[File?] output_sibling_bam_index_list_maybes = 2ndIterationSiblingMapCall.output_bam_index
+    Array[File?] output_sibling_bam_list_maybes = secondIterationSiblingMapCall.output_bam
+    Array[File?] output_sibling_bam_index_list_maybes = secondIterationSiblingMapCall.output_bam_index
     Array[File] output_sibling_bam_list = select_all(output_sibling_bam_list_maybes)
     Array[File] output_sibling_bam_index_list = select_all(output_sibling_bam_index_list_maybes)
-    Array[File?] gvcf_files_siblings_maybes = 2ndIterationSiblingMapCall.output_vcf
+    Array[File?] gvcf_files_siblings_maybes = secondIterationSiblingMapCall.output_vcf
     Array[File] gvcf_files_siblings = select_all(gvcf_files_siblings_maybes)
     
     
