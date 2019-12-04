@@ -8,8 +8,8 @@ version 1.0
 workflow vgMultiMapCall {
     input {
         Boolean GOOGLE_CLEANUP_MODE = false         # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
-        File INPUT_BAM_FILE                         # Input sample surjected .bam file
-        File INPUT_BAM_FILE_INDEX                   # Input sample .bai index of surjected .bam file.
+        File? INPUT_BAM_FILE                         # Input sample surjected .bam file
+        File? INPUT_BAM_FILE_INDEX                   # Input sample .bai index of surjected .bam file.
         String SAMPLE_NAME                          # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         File? PATH_LIST_FILE                        # (OPTIONAL) Text file where each line is a path name in the XG index
