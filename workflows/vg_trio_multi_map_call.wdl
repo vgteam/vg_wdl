@@ -7,6 +7,7 @@ version 1.0
 
 import "./vg_multi_map_call.wdl" as vgMultiMapCallWorkflow
 import "./vg_construct_and_index.wdl" as vgConstructWorkflow
+import "./vg_indel_realign.wdl" as vgIndelRealignmentWorkflow
 
 workflow vgTrioPipeline {
     meta {
@@ -431,15 +432,71 @@ workflow vgTrioPipeline {
         File final_vcf_output = output_2nd_joint_genotyped_vcf
     }
     
+    ######################################################
+    ## Run indel realignment workflows on pedigree bams ##
+    ######################################################
+    call vgIndelRealignmentWorkflow.vgMultiMapCall as maternalIndelRealignmentWorkflow {
+        input:
+            INPUT_BAM_FILE=maternalMapCallWorkflow.output_bam,
+            INPUT_BAM_FILE_INDEX=maternalMapCallWorkflow.output_bam_index,
+            SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
+            VG_CONTAINER=VG_CONTAINER,
+            PATH_LIST_FILE=PATH_LIST_FILE,
+            XG_FILE=XG_FILE,
+            REF_FILE=REF_FILE,
+            REF_INDEX_FILE=REF_INDEX_FILE,
+            REF_DICT_FILE=REF_DICT_FILE,
+            MAP_CORES=MAP_CORES,
+            MAP_DISK=MAP_DISK,
+            MAP_MEM=MAP_MEM
+    }
+    call vgIndelRealignmentWorkflow.vgMultiMapCall as paternalIndelRealignmentWorkflow {
+        input:
+            INPUT_BAM_FILE=paternalMapCallWorkflow.output_bam,
+            INPUT_BAM_FILE_INDEX=paternalMapCallWorkflow.output_bam_index,
+            SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
+            VG_CONTAINER=VG_CONTAINER,
+            PATH_LIST_FILE=PATH_LIST_FILE,
+            XG_FILE=XG_FILE,
+            REF_FILE=REF_FILE,
+            REF_INDEX_FILE=REF_INDEX_FILE,
+            REF_DICT_FILE=REF_DICT_FILE,
+            MAP_CORES=MAP_CORES,
+            MAP_DISK=MAP_DISK,
+            MAP_MEM=MAP_MEM
+    }
+
+    Array[Pair[File,File]] bam_pair_files_list = zip(output_sibling_bam_list, output_sibling_bam_index_list)
+    scatter (bam_pair_set in zip(bam_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
+        Pair[File,File] bam_pair_files = bam_pair_set.left
+        call vgIndelRealignmentWorkflow.vgMultiMapCall {
+            input:
+                INPUT_BAM_FILE=bam_pair_files.left,
+                INPUT_BAM_FILE_INDEX=bam_pair_files.right,
+                SAMPLE_NAME=bam_pair_set.right,
+                VG_CONTAINER=VG_CONTAINER,
+                PATH_LIST_FILE=PATH_LIST_FILE,
+                XG_FILE=XG_FILE,
+                REF_FILE=REF_FILE,
+                REF_INDEX_FILE=REF_INDEX_FILE,
+                REF_DICT_FILE=REF_DICT_FILE,
+                MAP_CORES=MAP_CORES,
+                MAP_DISK=MAP_DISK,
+                MAP_MEM=MAP_MEM
+        }
+    }
+    Array[File?] output_sibling_indel_bam_list_maybes = vgMultiMapCall.output_bam
+    Array[File?] output_sibling_indel_bam_index_list_maybes = vgMultiMapCall.output_bam_index
+    
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        File? output_maternal_bam = maternalMapCallWorkflow.output_bam
-        File? output_maternal_bam_index = maternalMapCallWorkflow.output_bam_index
-        File? output_paternal_bam = paternalMapCallWorkflow.output_bam
-        File? output_paternal_bam_index = paternalMapCallWorkflow.output_bam_index
+        File? output_maternal_bam = maternalIndelRealignmentWorkflow.output_bam
+        File? output_maternal_bam_index = maternalIndelRealignmentWorkflow.output_bam_index
+        File? output_paternal_bam = paternalIndelRealignmentWorkflow.output_bam
+        File? output_paternal_bam_index = paternalIndelRealignmentWorkflow.output_bam_index
         Array[File] output_gvcf_files_siblings = gvcf_files_siblings
-        Array[File] final_output_sibling_bam_list = output_sibling_bam_list
-        Array[File] final_output_sibling_bam_index_list = output_sibling_bam_index_list
+        Array[File] final_output_sibling_bam_list = select_all(output_sibling_indel_bam_list_maybes)
+        Array[File] final_output_sibling_bam_index_list = select_all(output_sibling_indel_bam_index_list_maybes)
     }
 }
 

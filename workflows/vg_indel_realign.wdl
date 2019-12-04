@@ -33,7 +33,7 @@ workflow vgMultiMapCall {
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
     
     ##############################################
-    # Run the linear alignment calling procedure #
+    # Run the indel realignment procedure #
     ##############################################
     # Split merged alignment by contigs list
     call splitBAMbyPath {
