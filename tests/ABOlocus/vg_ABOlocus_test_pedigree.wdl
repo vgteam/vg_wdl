@@ -138,7 +138,7 @@ task check_trio_bams {
         set -eux -o pipefail
         
         n_mom_reads=$(expr $(zcat ~{mom_fastq_1_gz} | wc -l) / 2)
-        n_mom_aligned_reads=$(samtools view ~{mom_bam} | wc -l)
+        n_mom_aligned_reads=$(expr $(samtools view ~{mom_bam} | wc -l) / 2)
         echo "$n_mom_reads"
         echo "$n_mom_aligned_reads"
         if [ "$n_mom_reads" -ne "$n_mom_aligned_reads" ]; then
