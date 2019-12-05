@@ -92,6 +92,9 @@ workflow vg_ABOlocus_test {
         Int n_mom_reads = check_trio_bams.n_mom_reads
         Int n_dad_reads = check_trio_bams.n_dad_reads
         Int n_child_reads = check_trio_bams.n_child_reads
+        Int n_mom_aligned_reads = check_trio_bams.n_mom_aligned_reads
+        Int n_dad_aligned_reads = check_trio_bams.n_dad_aligned_reads
+        Int n_child_aligned_reads = check_trio_bams.n_child_aligned_reads
         Int mom_reads_aligned_identically = check_trio_bams.mom_reads_aligned_identically
         Int dad_reads_aligned_identically = check_trio_bams.dad_reads_aligned_identically
         Int child_reads_aligned_identically = check_trio_bams.child_reads_aligned_identically
@@ -138,27 +141,36 @@ task check_trio_bams {
         set -eux -o pipefail
         
         n_mom_reads=$(expr $(zcat ~{mom_fastq_1_gz} | wc -l) / 2)
-        if [ "$n_mom_reads" -ne "$(samtools view ~{mom_bam} | wc -l)" ]; then
+        n_mom_aligned_reads=$(samtools view ~{mom_bam} | wc -l)
+        diff_mom_aligned_source_reads=$(($n_mom_reads - $n_mom_aligned_reads))
+        if [ ${diff_mom_aligned_source_reads#-} -gt 5 ]; then
             echo "wrong read count for maternal alignments" >&2
             exit 1
         fi
         echo "$n_mom_reads" > n_mom_reads
+        echo "$n_mom_aligned_reads" > n_mom_aligned_reads
         samtools view "~{mom_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_mom_identical
         
         n_dad_reads=$(expr $(zcat ~{dad_fastq_1_gz} | wc -l) / 2)
-        if [ "$n_dad_reads" -ne "$(samtools view ~{dad_bam} | wc -l)" ]; then
+        n_dad_aligned_reads=$(samtools view ~{dad_bam} | wc -l)
+        diff_dad_aligned_source_reads=$(($n_dad_reads - $n_dad_aligned_reads))
+        if [ ${diff_dad_aligned_source_reads#-} -gt 5 ]; then
             echo "wrong read count for paternal alignments" >&2
             exit 1
         fi
         echo "$n_dad_reads" > n_dad_reads
+        echo "$n_dad_aligned_reads" > n_dad_aligned_reads
         samtools view "~{dad_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_dad_identical
         
         n_child_reads=$(expr $(zcat ~{child_fastq_1_gz} | wc -l) / 2)
-        if [ "$n_child_reads" -ne "$(samtools view ~{child_bam} | wc -l)" ]; then
+        n_child_aligned_reads=$(samtools view ~{child_bam} | wc -l)
+        diff_child_aligned_source_reads=$(($n_child_reads - $n_child_aligned_reads))
+        if [ ${diff_child_aligned_source_reads#-} -gt 5 ]; then
             echo "wrong read count for child alignments" >&2
             exit 1
         fi
         echo "$n_child_reads" > n_child_reads
+        echo "$n_child_aligned_reads" > n_child_aligned_reads
         samtools view "~{child_bam}" | perl -lane 'print if $F[5] =~ /^250M$/;' | wc -l > n_child_identical
     >>>
 
@@ -170,6 +182,9 @@ task check_trio_bams {
         Int n_mom_reads = read_int("n_mom_reads")
         Int n_dad_reads = read_int("n_dad_reads")
         Int n_child_reads = read_int("n_child_reads")
+        Int n_mom_aligned_reads = read_int("n_mom_aligned_reads")
+        Int n_dad_aligned_reads = read_int("n_dad_aligned_reads")
+        Int n_child_aligned_reads = read_int("n_child_aligned_reads")
         Int mom_reads_aligned_identically = read_int("n_mom_identical")
         Int dad_reads_aligned_identically = read_int("n_dad_identical")
         Int child_reads_aligned_identically = read_int("n_child_identical")
