@@ -139,6 +139,8 @@ task check_trio_bams {
         
         n_mom_reads=$(expr $(zcat ~{mom_fastq_1_gz} | wc -l) / 2)
         n_mom_aligned_reads=$(samtools view ~{mom_bam} | wc -l)
+        echo "$n_mom_reads"
+        echo "$n_mom_aligned_reads"
         if [ "$n_mom_reads" -ne "$n_mom_aligned_reads" ]; then
             echo "wrong read count for maternal alignments" >&2
             exit 1
