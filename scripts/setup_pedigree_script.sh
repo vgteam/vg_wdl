@@ -142,7 +142,7 @@ if [ $RUN_SMALL_TEST == false ]; then
         MAP_DISK=10 \
         MAP_MEM=80 \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_pedigree_workflow.sh
+        -d ${PROBAND_SAMPLE_NAME}_cohort_map_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_pedigree_workflow.sh
 else
     echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_trio_multi_map_call.wdl \
         MATERNAL_INPUT_READ_FILE_1='${READ_DATA_DIR}/${MATERNAL_SAMPLE_NAME}_read_pair_1.fq.gz' \
@@ -183,7 +183,7 @@ else
         MAP_DISK=10 \
         MAP_MEM=10 \
         -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_pedigree_workflow.sh
+        -d ${PROBAND_SAMPLE_NAME}_cohort_map_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_pedigree_workflow.sh
 fi
 
 exit
