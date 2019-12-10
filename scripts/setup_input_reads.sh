@@ -20,8 +20,9 @@ This script setups up input directories and downloads files needed to run a coho
 VG WDL pipeline on the NIH Biowulf Cluster.
 
 Inputs:
-    -i Cohort UDP ID (in format UDP####)
+    -l List of individuals in cohort by UDP ID (in format UDP#### UDP#### UDP#### ...)
     -w PATH to where the UDP cohort will be processed and where the input reads will be stored
+    -c PATH to where the UDP cohort raw read files are located
     -t (OPTIONAL, default=false) Set to 'true' if running workflow on small HG002 chr21 test data
     
 Outputs:
@@ -42,13 +43,16 @@ fi
 RUN_SMALL_TEST=false
 
 ## Parse through arguments
-while getopts "i:w:t:h" OPTION; do
+while getopts "l:w:c:t:h" OPTION; do
     case $OPTION in
-        i)
-            COHORT_NAME=$OPTARG
+        l)
+            COHORT_NAMES_LIST+=($OPTARG)
         ;;
         w)
             COHORT_WORKFLOW_DIR=$OPTARG
+        ;;
+        c)
+            INDIVIDUALS_DATA_DIR=$OPTARG
         ;;
         t)  
             RUN_SMALL_TEST=$OPTARG
@@ -77,20 +81,24 @@ fi
 cd ${READ_DATA_DIR}
 
 if [ $RUN_SMALL_TEST == false ]; then
-    COHORT_NAMES_LIST=($(ls /data/Udpdata/CMarkello/${COHORT_NAME}/ | grep 'UDP' | uniq))
     for SAMPLE_NAME in ${COHORT_NAMES_LIST[@]}
     do
-      INDIVIDUAL_DATA_DIR="/data/Udpdata/CMarkello/${COHORT_NAME}/${SAMPLE_NAME}"
-      PAIR_1_READS=()
-      PAIR_2_READS=()
-      LANE_NUMS=($(ls ${INDIVIDUAL_DATA_DIR} | awk -F'-' '{print $2}'| awk -F'_' '{print $1"_"$2}' | sort | uniq | xargs))
-      for LANE_NUM in ${LANE_NUMS[@]}
-      do
-        PAIR_1_READS+=(${INDIVIDUAL_DATA_DIR}/"$(ls ${INDIVIDUAL_DATA_DIR} | grep "${LANE_NUM}_1")")
-        PAIR_2_READS+=(${INDIVIDUAL_DATA_DIR}/"$(ls ${INDIVIDUAL_DATA_DIR} | grep "${LANE_NUM}_2")")
-      done
-      cat ${PAIR_1_READS[@]} > ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_1.fq.gz
-      cat ${PAIR_2_READS[@]} > ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_2.fq.gz
+      INDIVIDUAL_DATA_DIR="${INDIVIDUALS_DATA_DIR}/${SAMPLE_NAME}"
+      if [ $(find ${INDIVIDUAL_DATA_DIR} -name '*_R1.fastq.gz' | wc -l) -gt 0 ]; then
+        ln -s $(find ${INDIVIDUAL_DATA_DIR} -name '*_R1.fastq.gz') ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_1.fq.gz
+        ln -s $(find ${INDIVIDUAL_DATA_DIR} -name '*_R2.fastq.gz') ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_2.fq.gz
+      else
+        PAIR_1_READS=()
+        PAIR_2_READS=()
+        LANE_NUMS=($(find ${INDIVIDUAL_DATA_DIR} \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | awk -F'-' '{print $2}'| awk -F'_' '{print $1"_"$2}' | sort | uniq | xargs))
+        for LANE_NUM in ${LANE_NUMS[@]}
+        do
+          PAIR_1_READS+=("$(find ${INDIVIDUAL_DATA_DIR} \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | grep "${LANE_NUM}_1")")
+          PAIR_2_READS+=("$(find ${INDIVIDUAL_DATA_DIR} \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | grep "${LANE_NUM}_2")")
+        done
+        cat ${PAIR_1_READS[@]} > ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_1.fq.gz
+        cat ${PAIR_2_READS[@]} > ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_2.fq.gz
+      fi
     done
 else
     wget https://storage.googleapis.com/cmarkell-vg-wdl-dev/test_input_reads/HG002_chr21_1.tiny.2x250.fastq.gz -O ${READ_DATA_DIR}/HG002_read_pair_1.fq.gz
