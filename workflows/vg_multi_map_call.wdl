@@ -543,7 +543,7 @@ task splitReads {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
-        time: 60
+        time: 120
         cpu: in_split_read_cores
         memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
@@ -621,6 +621,7 @@ task runVGMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
+        time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -682,6 +683,7 @@ task runVGMPMAP {
         File chunk_gam_file = glob("*.gam")[0]
     }
     runtime {
+        time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -723,7 +725,7 @@ task runSurject {
         File chunk_bam_file = glob("*.bam")[0]
     }
     runtime {
-        time: 60
+        time: 180
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -819,7 +821,7 @@ task sortMDTagBAMFile {
         File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.reordered.bam"
     }
     runtime {
-        time: 60
+        time: 90
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -1045,7 +1047,7 @@ task runDragenCaller {
         File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
     }
     runtime {
-        memory: 50 + " GB"
+        memory: 20 + " GB"
     }
 }
 
@@ -1090,7 +1092,7 @@ task runDragenCallerGVCF {
         File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
     }
     runtime {
-        memory: 50 + " GB"
+        memory: 20 + " GB"
     }
 }
 
