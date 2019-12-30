@@ -98,50 +98,50 @@ echo "module load cromwell/40 python/3.6" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SA
 echo "source ${VG_WDL_DIR}/miniwdl_venv/bin/activate" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
 echo "cd ${COHORT_WORKFLOW_DIR}" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
 if [ $RUN_SMALL_TEST == false ]; then
-    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_siblings_multi_map.wdl \
-        ${SIB_READ_PAIR_1_LIST} \
-        ${SIB_READ_PAIR_2_LIST} \
-        ${SIB_ID_LIST} \
-        READS_PER_CHUNK=10000000 \
-        PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \
-        XG_FILE='${XG_FILE_PATH}' \
-        GCSA_FILE='${GCSA_FILE_PATH}' \
-        GCSA_LCP_FILE='${GCSA_LCP_FILE_PATH}' \
-        GBWT_FILE='${GBWT_FILE_PATH}' \
-        REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
-        REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
-        REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
-        VGMPMAP_MODE='false' \
-        SPLIT_READ_CORES=16 \
-        SPLIT_READ_DISK=10 \
-        MAP_CORES=16 \
-        MAP_DISK=10 \
-        MAP_MEM=80 \
-        -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
+    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_siblings_multi_map.wdl \\
+${SIB_READ_PAIR_1_LIST} \\
+${SIB_READ_PAIR_2_LIST} \\
+${SIB_ID_LIST} \\
+READS_PER_CHUNK=10000000 \\
+PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \\
+XG_FILE='${XG_FILE_PATH}' \\
+GCSA_FILE='${GCSA_FILE_PATH}' \\
+GCSA_LCP_FILE='${GCSA_LCP_FILE_PATH}' \\
+GBWT_FILE='${GBWT_FILE_PATH}' \\
+REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \\
+REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \\
+REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \\
+VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \\
+VGMPMAP_MODE='false' \\
+SPLIT_READ_CORES=16 \\
+SPLIT_READ_DISK=10 \\
+MAP_CORES=16 \\
+MAP_DISK=10 \\
+MAP_MEM=80 \\
+-c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
+-d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
 else
-    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_siblings_multi_map.wdl \
-        ${SIB_READ_PAIR_1_LIST} \
-        ${SIB_READ_PAIR_2_LIST} \
-        ${SIB_ID_LIST} \
-        READS_PER_CHUNK=100000 \
-        PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_21.txt' \
-        XG_FILE='${XG_FILE_PATH}' \
-        GCSA_FILE='${GCSA_FILE_PATH}' \
-        GCSA_LCP_FILE='${GCSA_LCP_FILE_PATH}' \
-        GBWT_FILE='${GBWT_FILE_PATH}' \
-        REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
-        REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
-        REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
-        SPLIT_READ_CORES=2 \
-        SPLIT_READ_DISK=10 \
-        MAP_CORES=4 \
-        MAP_DISK=10 \
-        MAP_MEM=10 \
-        -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
+    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_siblings_multi_map.wdl \\
+${SIB_READ_PAIR_1_LIST} \\
+${SIB_READ_PAIR_2_LIST} \\
+${SIB_ID_LIST} \\
+READS_PER_CHUNK=100000 \\
+PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_21.txt' \\
+XG_FILE='${XG_FILE_PATH}' \\
+GCSA_FILE='${GCSA_FILE_PATH}' \\
+GCSA_LCP_FILE='${GCSA_LCP_FILE_PATH}' \\
+GBWT_FILE='${GBWT_FILE_PATH}' \\
+REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \\
+REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \\
+REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \\
+VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \\
+SPLIT_READ_CORES=2 \\
+SPLIT_READ_DISK=10 \\
+MAP_CORES=4 \\
+MAP_DISK=10 \\
+MAP_MEM=10 \\
+-c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
+-d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_sibling_map.part_4.sh
 fi
 
 exit

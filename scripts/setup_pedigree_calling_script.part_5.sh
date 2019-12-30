@@ -103,47 +103,47 @@ echo "module load cromwell/40 python/3.6" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SA
 echo "source ${VG_WDL_DIR}/miniwdl_venv/bin/activate" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
 echo "cd ${COHORT_WORKFLOW_DIR}" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
 if [ $RUN_SMALL_TEST == false ]; then
-    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_pedigree_multi_call.wdl \
-        MATERNAL_GVCF='${MATERNAL_GVCF_PATH}' \
-        PATERNAL_GVCF='${PATERNAL_GVCF_PATH}' \
-        ${SIB_BAM_FILE_PARAMS} \
-        ${SIB_BAM_FILE_INDEX_PARAMS} \
-        ${SIB_ID_LIST} \
-        PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \
-        XG_FILE='${XG_FILE_PATH}' \
-        REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
-        REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
-        REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
-        SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \
-        DRAGEN_REF_INDEX_NAME='hs37d5_v7' \
-        UDPBINFO_PATH='Udpbinfo' \
-        HELIX_USERNAME='${USER}' \
-        DRAGEN_MODE='true' \
-        SNPEFF_ANNOTATION='true' \
-        -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
+    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_pedigree_multi_call.wdl \\
+MATERNAL_GVCF='${MATERNAL_GVCF_PATH}' \\
+PATERNAL_GVCF='${PATERNAL_GVCF_PATH}' \\
+${SIB_BAM_FILE_PARAMS} \\
+${SIB_BAM_FILE_INDEX_PARAMS} \\
+${SIB_ID_LIST} \\
+PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_whole_genome.txt' \\
+XG_FILE='${XG_FILE_PATH}' \\
+REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \\
+REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \\
+REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \\
+VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \\
+SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \\
+DRAGEN_REF_INDEX_NAME='hs37d5_v7' \\
+UDPBINFO_PATH='Udpbinfo' \\
+HELIX_USERNAME='${USER}' \\
+DRAGEN_MODE='true' \\
+SNPEFF_ANNOTATION='true' \\
+-c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
+-d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
 else
-    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_pedigree_multi_call.wdl \
-        MATERNAL_GVCF='${MATERNAL_GVCF_PATH}' \
-        PATERNAL_GVCF='${PATERNAL_GVCF_PATH}' \
-        ${SIB_BAM_FILE_PARAMS} \
-        ${SIB_BAM_FILE_INDEX_PARAMS} \
-        ${SIB_ID_LIST} \
-        PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_21.txt' \
-        XG_FILE='${XG_FILE_PATH}' \
-        REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
-        REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
-        REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
-        SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \
-        DRAGEN_REF_INDEX_NAME='hs37d5_v7' \
-        UDPBINFO_PATH='Udpbinfo' \
-        HELIX_USERNAME='${USER}' \
-        DRAGEN_MODE='true' \
-        SNPEFF_ANNOTATION='true' \
-        -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
+    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_2nd_iter_pedigree_multi_call.wdl \\
+MATERNAL_GVCF='${MATERNAL_GVCF_PATH}' \\
+PATERNAL_GVCF='${PATERNAL_GVCF_PATH}' \\
+${SIB_BAM_FILE_PARAMS} \\
+${SIB_BAM_FILE_INDEX_PARAMS} \\
+${SIB_ID_LIST} \\
+PATH_LIST_FILE='${WORKFLOW_INPUT_DIR}/path_list_21.txt' \\
+XG_FILE='${XG_FILE_PATH}' \\
+REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \\
+REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \\
+REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \\
+VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \\
+SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \\
+DRAGEN_REF_INDEX_NAME='hs37d5_v7' \\
+UDPBINFO_PATH='Udpbinfo' \\
+HELIX_USERNAME='${USER}' \\
+DRAGEN_MODE='true' \\
+SNPEFF_ANNOTATION='true' \\
+-c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
+-d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
 fi
 
 exit

@@ -100,58 +100,58 @@ echo "module load cromwell/40 python/3.6" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SA
 echo "source ${VG_WDL_DIR}/miniwdl_venv/bin/activate" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
 echo "cd ${COHORT_WORKFLOW_DIR}" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
 if [ $RUN_SMALL_TEST == false ]; then
-    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_trio_parental_graph_construction.wdl \
-        COHORT_JOINT_VCF='${COHORT_JOINT_VCF_PATH}' \
-        COHORT_JOINT_VCF_INDEX='${COHORT_JOINT_VCF_INDEX_PATH}' \
-        MATERNAL_INPUT_BAM_FILE='${MATERNAL_BAM_PATH}' \
-        MATERNAL_INPUT_BAM_FILE_INDEX='${MATERNAL_BAM_BAI_PATH}' \
-        PATERNAL_INPUT_BAM_FILE='${PATERNAL_BAM_PATH}' \
-        PATERNAL_INPUT_BAM_FILE_INDEX='${PATERNAL_BAM_BAI_PATH}' \
-        PROBAND_INPUT_BAM_FILE='${PROBAND_BAM_PATH}' \
-        PROBAND_INPUT_BAM_FILE_INDEX='${PROBAND_BAM_BAI_PATH}' \
-        SAMPLE_NAME_MATERNAL='${MATERNAL_SAMPLE_NAME}' \
-        SAMPLE_NAME_PATERNAL='${PATERNAL_SAMPLE_NAME}' \
-        SAMPLE_NAME_PROBAND='${PROBAND_SAMPLE_NAME}' \
-        REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
-        REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
-        REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
-        REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \
-        PED_FILE='${TRIO_PEDIGREE_FILE}' \
-        GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
-        GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
-        USE_HAPLOTYPES='true' \
-        MAKE_SNARLS='false' \
-        USE_DECOYS='true' \
-        -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
+    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_trio_parental_graph_construction.wdl \\
+COHORT_JOINT_VCF='${COHORT_JOINT_VCF_PATH}' \\
+COHORT_JOINT_VCF_INDEX='${COHORT_JOINT_VCF_INDEX_PATH}' \\
+MATERNAL_INPUT_BAM_FILE='${MATERNAL_BAM_PATH}' \\
+MATERNAL_INPUT_BAM_FILE_INDEX='${MATERNAL_BAM_BAI_PATH}' \\
+PATERNAL_INPUT_BAM_FILE='${PATERNAL_BAM_PATH}' \\
+PATERNAL_INPUT_BAM_FILE_INDEX='${PATERNAL_BAM_BAI_PATH}' \\
+PROBAND_INPUT_BAM_FILE='${PROBAND_BAM_PATH}' \\
+PROBAND_INPUT_BAM_FILE_INDEX='${PROBAND_BAM_BAI_PATH}' \\
+SAMPLE_NAME_MATERNAL='${MATERNAL_SAMPLE_NAME}' \\
+SAMPLE_NAME_PATERNAL='${PATERNAL_SAMPLE_NAME}' \\
+SAMPLE_NAME_PROBAND='${PROBAND_SAMPLE_NAME}' \\
+REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \\
+REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \\
+REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \\
+VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \\
+REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \\
+PED_FILE='${TRIO_PEDIGREE_FILE}' \\
+GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \\
+GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \\
+USE_HAPLOTYPES='true' \\
+MAKE_SNARLS='false' \\
+USE_DECOYS='true' \\
+-c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
+-d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
 else
-    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_trio_parental_graph_construction.wdl \
-        COHORT_JOINT_VCF='${COHORT_JOINT_VCF_PATH}' \
-        COHORT_JOINT_VCF_INDEX='${COHORT_JOINT_VCF_INDEX_PATH}' \
-        MATERNAL_INPUT_BAM_FILE='${MATERNAL_BAM_PATH}' \
-        MATERNAL_INPUT_BAM_FILE_INDEX='${MATERNAL_BAM_BAI_PATH}' \
-        PATERNAL_INPUT_BAM_FILE='${PATERNAL_BAM_PATH}' \
-        PATERNAL_INPUT_BAM_FILE_INDEX='${PATERNAL_BAM_BAI_PATH}' \
-        PROBAND_INPUT_BAM_FILE='${PROBAND_BAM_PATH}' \
-        PROBAND_INPUT_BAM_FILE_INDEX='${PROBAND_BAM_BAI_PATH}' \
-        SAMPLE_NAME_MATERNAL='${MATERNAL_SAMPLE_NAME}' \
-        SAMPLE_NAME_PATERNAL='${PATERNAL_SAMPLE_NAME}' \
-        SAMPLE_NAME_PROBAND='${PROBAND_SAMPLE_NAME}' \
-        REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \
-        REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \
-        REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \
-        VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \
-        CONTIGS='21' \
-        REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \
-        PED_FILE='${TRIO_PEDIGREE_FILE}' \
-        GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \
-        GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \
-        USE_HAPLOTYPES='true' \
-        MAKE_SNARLS='false' \
-        USE_DECOYS='false' \
-        -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \
-        -d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
+    echo "miniwdl cromwell ${VG_WDL_DIR}/vg_wdl/workflows/vg_trio_parental_graph_construction.wdl \\
+COHORT_JOINT_VCF='${COHORT_JOINT_VCF_PATH}' \\
+COHORT_JOINT_VCF_INDEX='${COHORT_JOINT_VCF_INDEX_PATH}' \\
+MATERNAL_INPUT_BAM_FILE='${MATERNAL_BAM_PATH}' \\
+MATERNAL_INPUT_BAM_FILE_INDEX='${MATERNAL_BAM_BAI_PATH}' \\
+PATERNAL_INPUT_BAM_FILE='${PATERNAL_BAM_PATH}' \\
+PATERNAL_INPUT_BAM_FILE_INDEX='${PATERNAL_BAM_BAI_PATH}' \\
+PROBAND_INPUT_BAM_FILE='${PROBAND_BAM_PATH}' \\
+PROBAND_INPUT_BAM_FILE_INDEX='${PROBAND_BAM_BAI_PATH}' \\
+SAMPLE_NAME_MATERNAL='${MATERNAL_SAMPLE_NAME}' \\
+SAMPLE_NAME_PATERNAL='${PATERNAL_SAMPLE_NAME}' \\
+SAMPLE_NAME_PROBAND='${PROBAND_SAMPLE_NAME}' \\
+REF_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa' \\
+REF_INDEX_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.fa.fai' \\
+REF_DICT_FILE='${WORKFLOW_INPUT_DIR}/hs37d5.dict' \\
+VG_CONTAINER='quay.io/vgteam/vg:v1.19.0' \\
+CONTIGS='21' \\
+REF_FASTA_GZ='${WORKFLOW_INPUT_DIR}/hs37d5.fa.gz' \\
+PED_FILE='${TRIO_PEDIGREE_FILE}' \\
+GEN_MAP_FILES='${WORKFLOW_INPUT_DIR}/genetic_map_GRCh37.tar' \\
+GRAPH_NAME='${PROBAND_SAMPLE_NAME}_parental_graph_wgs' \\
+USE_HAPLOTYPES='true' \\
+MAKE_SNARLS='false' \\
+USE_DECOYS='false' \\
+-c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
+-d ${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.part_3.sh
 fi
 
 exit
