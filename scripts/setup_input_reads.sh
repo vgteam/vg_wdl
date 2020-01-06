@@ -84,18 +84,22 @@ if [ $RUN_SMALL_TEST == false ]; then
     for SAMPLE_NAME in ${COHORT_NAMES_LIST[@]}
     do
       INDIVIDUAL_DATA_DIR="${INDIVIDUALS_DATA_DIR}/${SAMPLE_NAME}"
-      if [ $(find ${INDIVIDUAL_DATA_DIR} -name '*_R1.fastq.gz' | wc -l) -gt 0 ]; then
-        ln -s $(find ${INDIVIDUAL_DATA_DIR} -name '*_R1.fastq.gz') ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_1.fq.gz
-        ln -s $(find ${INDIVIDUAL_DATA_DIR} -name '*_R2.fastq.gz') ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_2.fq.gz
+      if [ $(find ${INDIVIDUAL_DATA_DIR}/ -name '*_R1.fastq.gz' | wc -l) -gt 0 ]; then
+        ln -s $(find ${INDIVIDUAL_DATA_DIR}/ -name '*_R1.fastq.gz') ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_1.fq.gz
+        ln -s $(find ${INDIVIDUAL_DATA_DIR}/ -name '*_R2.fastq.gz') ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_2.fq.gz
       else
         PAIR_1_READS=()
         PAIR_2_READS=()
-        LANE_NUMS=($(find ${INDIVIDUAL_DATA_DIR} \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | awk -F'-' '{print $2}'| awk -F'_' '{print $1"_"$2}' | sort | uniq | xargs))
+        LANE_NUMS=($(find ${INDIVIDUAL_DATA_DIR}/ \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | awk -F'-' '{print $2}'| awk -F'_' '{print $1"_"$2}' | sort | uniq | xargs))
         for LANE_NUM in ${LANE_NUMS[@]}
         do
-          PAIR_1_READS+=("$(find ${INDIVIDUAL_DATA_DIR} \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | grep "${LANE_NUM}_1")")
-          PAIR_2_READS+=("$(find ${INDIVIDUAL_DATA_DIR} \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | grep "${LANE_NUM}_2")")
+          PAIR_1_READS+=("$(find ${INDIVIDUAL_DATA_DIR}/ \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | grep "${LANE_NUM}_1")")
+          PAIR_2_READS+=("$(find ${INDIVIDUAL_DATA_DIR}/ \( \( \( -wholename '*WGS*Rawreads*HudsonAlpha_1*fastq.gz' -o -wholename '*fastq.gz' \) -not -wholename '*Baylor*' \) -not -wholename '*WES*' \) | grep "${LANE_NUM}_2")")
         done
+        echo "INDIVIDUAL_DATA_DIR: ${INDIVIDUAL_DATA_DIR}"
+        echo "LANE_NUMS: ${LANE_NUMS}"
+        echo "PAIR_1_READS: ${PAIR_1_READS[@]}"
+        echo "PAIR_2_READS: ${PAIR_2_READS[@]}"
         cat ${PAIR_1_READS[@]} > ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_1.fq.gz
         cat ${PAIR_2_READS[@]} > ${READ_DATA_DIR}/${SAMPLE_NAME}_read_pair_2.fq.gz
       fi
