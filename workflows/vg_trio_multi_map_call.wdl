@@ -38,7 +38,7 @@ workflow vgTrioPipeline {
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
-        File? SNPEFF_DATABASE                                # Path to snpeff database .zip file for snpEff annotation functionality.
+        File? SNPEFF_DATABASE                               # Path to snpeff database .zip file for snpEff annotation functionality.
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 200
         Int MAP_CORES = 32
@@ -571,7 +571,15 @@ task runDragenJointGenotyper {
         mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ && \
         cp ~{in_gvcf_file_maternal} ~{in_gvcf_file_paternal} ~{sep=" " in_gvcf_files_siblings} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ && \
         JOINT_GENOTYPE_DRAGEN_WORK_DIR="/staging/~{in_helix_username}/output_cohort_joint_call_~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp"
+        if [[ ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/ = *[[:space:]]* ]]; then
+            echo "ERROR: JOINT_GENOTYPE_DRAGEN_WORK_DIR variable contains whitespace"
+            exit 1
+        fi
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+            exit 1
+        fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} ${DRAGEN_SIBLING_VCF_INPUT}\"\' && \

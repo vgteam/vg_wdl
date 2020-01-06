@@ -451,7 +451,7 @@ task prune_graph {
     command {
         set -exu -o pipefail
         nm=$(basename "${contig_vg}" .vg)
-        vg prune --threads 16 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
+        vg prune --threads 2 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
     }
 
     output {
@@ -459,9 +459,9 @@ task prune_graph {
     }
 
     runtime {
-        time: 10
-        cpu: 8
-        memory: 5 + " GB"
+        time: 180
+        cpu: 2
+        memory: 20 + " GB"
         disks: "local-disk 10 SSD"
         docker: vg_docker
     }

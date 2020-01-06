@@ -118,6 +118,18 @@ tar -cvf ${PROBAND_SAMPLE_NAME}_workflow_outputs.tar ${OUTPUT_DIR}
 
 ## Delete intermediate workflow and input directories
 if [ $DEL_RAW_OUTPUT == true ]; then
+    if [[ $OUTPUT_DIR = *[[:space:]]* ]]; then 
+        echo "ERROR: OUTPUT_DIR variable contains whitespace"
+        exit 1
+    fi
+    if [[ $COHORT_WORKFLOW_DIR = *[[:space:]]* ]]; then 
+        echo "ERROR: COHORT_WORKFLOW_DIR variable contains whitespace"
+        exit 1
+    fi
+    if [[ $COHORT_WORKFLOW_DIR/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs = *[[:space:]]* ]]; then 
+        echo "ERROR: PROBAND_SAMPLE_NAME variable contains whitespace"
+        exit 1
+    fi
     rm -fr ${OUTPUT_DIR}
     rm -fr ${COHORT_WORKFLOW_DIR}/input_reads
     rm -fr ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs
