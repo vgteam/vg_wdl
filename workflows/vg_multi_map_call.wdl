@@ -41,18 +41,18 @@ workflow vgMultiMapCall {
         Int MAP_DISK = 10
         Int MAP_MEM = 60
         Int MERGE_GAM_CORES = 56
-        Int MERGE_GAM_DISK = 400
-        Int MERGE_GAM_MEM = 100
-        Int MERGE_GAM_TIME = 1200
+        Int MERGE_GAM_DISK = 100
+        Int MERGE_GAM_MEM = 40
+        Int MERGE_GAM_TIME = 2400
         Int CHUNK_GAM_CORES = 32
-        Int CHUNK_GAM_DISK = 400
+        Int CHUNK_GAM_DISK = 100
         Int CHUNK_GAM_MEM = 100
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 80
-        String DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
-        String UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
-        String HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
+        String DRAGEN_REF_INDEX_NAME = ""       # Dragen module based reference index directory (e.g. "hs37d5_v7")
+        String UDPBINFO_PATH = ""               # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
+        String HELIX_USERNAME = ""              # The nih helix username which holds a user directory in UDPBINFO_PATH
     }
     
     # Split input reads into chunks for parallelized mapping
@@ -1033,7 +1033,15 @@ task runDragenCaller {
         mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp"
+        if [[ ${DRAGEN_WORK_DIR_PATH}/ = *[[:space:]]* ]]; then
+            echo "ERROR: DRAGEN_WORK_DIR_PATH variable contains whitespace"
+            exit 1
+        fi
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+            exit 1
+        fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
@@ -1078,7 +1086,15 @@ task runDragenCallerGVCF {
         mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp"
+        if [[ ${DRAGEN_WORK_DIR_PATH}/ = *[[:space:]]* ]]; then
+            echo "ERROR: DRAGEN_WORK_DIR_PATH variable contains whitespace"
+            exit 1
+        fi
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+            exit 1
+        fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \

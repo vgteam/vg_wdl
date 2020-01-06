@@ -13,7 +13,7 @@ workflow vgMultiMapCall {
         String SAMPLE_NAME                          # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         File? PATH_LIST_FILE                        # (OPTIONAL) Text file where each line is a path name in the XG index
-        File XG_FILE                                # Path to .xg index file
+        File? XG_FILE                                # Path to .xg index file
         File REF_FILE                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                         # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                          # Path to .dict file of the REF_FILE fasta reference
@@ -152,7 +152,7 @@ task cleanUpGoogleFilestore {
 
 task extractPathNames {
     input {
-        File in_xg_file
+        File? in_xg_file
         String in_vg_container
     }
 
@@ -230,8 +230,8 @@ task runGATKIndelRealigner {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        ln -s ~{in_bam_file.left} input_bam_file.bam
-        ln -s ~{in_bam_file.right} input_bam_file.bam.bai
+        ln -f -s ~{in_bam_file.left} input_bam_file.bam
+        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           --remove_program_records \
           -drf DuplicateRead \

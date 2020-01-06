@@ -76,7 +76,11 @@ workflow vg_ABOlocus_test {
         PED_FILE = ped_file,
         SNPEFF_ANNOTATION = false,
         CLEANUP_FILES = false,
-        USE_DECOYS = false
+        USE_DECOYS = false,
+        DRAGEN_MODE = false,
+        DRAGEN_REF_INDEX_NAME = "hs37d5_ABOlocus",
+        UDPBINFO_PATH = "Udpbinfo",
+        HELIX_USERNAME = "markellocj"
     }
     
     call check_trio_bams { input:
@@ -89,6 +93,7 @@ workflow vg_ABOlocus_test {
     }
     
     output {
+        File output_cohort_vcf = vgtrio.output_cohort_vcf
         Int n_mom_reads = check_trio_bams.n_mom_reads
         Int n_dad_reads = check_trio_bams.n_dad_reads
         Int n_child_reads = check_trio_bams.n_child_reads

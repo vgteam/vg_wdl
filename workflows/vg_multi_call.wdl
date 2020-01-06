@@ -506,7 +506,15 @@ task runDragenCaller {
         mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp"
+        if [[ ${DRAGEN_WORK_DIR_PATH}/ = *[[:space:]]* ]]; then
+            echo "ERROR: DRAGEN_WORK_DIR_PATH variable contains whitespace"
+            exit 1
+        fi
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+            exit 1
+        fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
@@ -551,7 +559,15 @@ task runDragenCallerGVCF {
         mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
         DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp" && \
+        TMP_DIR="/staging/~{in_helix_username}/tmp"
+        if [[ ${DRAGEN_WORK_DIR_PATH}/ = *[[:space:]]* ]]; then
+            echo "ERROR: DRAGEN_WORK_DIR_PATH variable contains whitespace"
+            exit 1
+        fi
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+            exit 1
+        fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
