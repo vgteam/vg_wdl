@@ -119,7 +119,7 @@ SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \\
 DRAGEN_REF_INDEX_NAME='hs37d5_v7' \\
 UDPBINFO_PATH='Udpbinfo' \\
 HELIX_USERNAME='${USER}' \\
-DRAGEN_MODE='true' \\
+DRAGEN_MODE='false' \\
 SNPEFF_ANNOTATION='true' \\
 -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
 -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh
@@ -140,7 +140,7 @@ SNPEFF_DATABASE='${WORKFLOW_INPUT_DIR}/snpEff_v4_3_GRCh37.75.zip' \\
 DRAGEN_REF_INDEX_NAME='hs37d5_v7' \\
 UDPBINFO_PATH='Udpbinfo' \\
 HELIX_USERNAME='${USER}' \\
-DRAGEN_MODE='true' \\
+DRAGEN_MODE='false' \\
 SNPEFF_ANNOTATION='true' \\
 -c ${VG_WDL_DIR}/vg_wdl/workflows/custom_biowulf_cromwell_singularity.conf \\
 -d ${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs" >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh

@@ -25,7 +25,6 @@
   "vgTrioPipeline.MAP_DISK": 10,
   "vgTrioPipeline.MAP_MEM": 10,
   "vgTrioPipeline.DRAGEN_REF_INDEX_NAME": "",
-  "vgTrioPipeline.UDPBINFO_PATH": "",
   "vgTrioPipeline.HELIX_USERNAME": "",
   "vgTrioPipeline.REF_FASTA_GZ": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/hs37d5.fa.gz",
   "vgTrioPipeline.PED_FILE": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/HG002.ped",
