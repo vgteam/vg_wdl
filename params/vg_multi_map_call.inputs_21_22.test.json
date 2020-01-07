@@ -32,7 +32,6 @@
   "vgMultiMapCall.VGCALL_DISK": 100,
   "vgMultiMapCall.VGCALL_MEM": 50,
   "vgMultiMapCall.DRAGEN_REF_INDEX_NAME": "hs37d5_v7",
-  "vgMultiMapCall.UDPBINFO_PATH": "Udpwork/usr/markellocj",
   "vgMultiMapCall.HELIX_USERNAME": "markellocj",
   "vgMultiMapCall.RUN_VGMPMAP_ALGORITHM": "true",
   "vgMultiMapCall.RUN_LINEAR_CALLER": "true",

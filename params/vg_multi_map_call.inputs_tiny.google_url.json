@@ -32,7 +32,6 @@
   "vgPipeline.VGCALL_DISK": 50,
   "vgPipeline.VGCALL_MEM": 20,
   "vgPipeline.DRAGEN_REF_INDEX_NAME": "hs37d5_v7",
-  "vgPipeline.UDPBINFO_PATH": "Udpwork/usr/markellocj",
   "vgPipeline.HELIX_USERNAME": "markellocj",
   "vgPipeline.RUN_VGMPMAP_ALGORITHM": "true",
   "vgPipeline.RUN_LINEAR_CALLER": "true",

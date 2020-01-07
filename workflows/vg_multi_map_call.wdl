@@ -50,9 +50,9 @@ workflow vgMultiMapCall {
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 80
-        String DRAGEN_REF_INDEX_NAME = ""       # Dragen module based reference index directory (e.g. "hs37d5_v7")
-        String UDPBINFO_PATH = ""               # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
-        String HELIX_USERNAME = ""              # The nih helix username which holds a user directory in UDPBINFO_PATH
+        String DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
+        String UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
+        String HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
     }
     
     # Split input reads into chunks for parallelized mapping
