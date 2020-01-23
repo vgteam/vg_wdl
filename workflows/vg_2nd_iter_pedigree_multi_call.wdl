@@ -36,7 +36,7 @@ workflow vgTrioPipeline {
         String DRAGEN_REF_INDEX_NAME                        # Dragen module based reference index directory (e.g. "hs37d5_v7")
         String UDPBINFO_PATH                                # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
         String HELIX_USERNAME                               # The nih helix username which holds a user directory in UDPBINFO_PATH
-        Boolean DRAGEN_MODE                                 # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
+        Boolean DRAGEN_MODE = false                         # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean SNPEFF_ANNOTATION = false                   # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
     }
     
@@ -331,8 +331,8 @@ task runDragenJointGenotyper {
             echo "ERROR: JOINT_GENOTYPE_DRAGEN_WORK_DIR variable contains whitespace"
             exit 1
         fi
-        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
-            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ variable contains whitespace"
             exit 1
         fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
@@ -342,11 +342,17 @@ task runDragenJointGenotyper {
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper ~{in_sample_name}_dragen_joint_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} && \
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} && \
+        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
+            SIBLING_BASENAME="$(basename $sibling_gvcf_file)"
+            rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/${SIBLING_BASENAME}
+        done && \
+        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/
     >>>
     output {
-        File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz"
-        File dragen_joint_genotyped_vcf_index = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz.tbi"
+        File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.hard-filtered.vcf.gz"
+        File dragen_joint_genotyped_vcf_index = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.hard-filtered.vcf.gz.tbi"
     }
     runtime {
         memory: 50 + " GB"

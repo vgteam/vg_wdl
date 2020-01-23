@@ -20,7 +20,7 @@ workflow vgMultiMapCall {
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg@sha256:9b5a50376033fa228815ffae0a9affc33870e09214612b67d1cf5e710051a006"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         String PCR_INDEL_MODEL = "CONSERVATIVE"     # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
@@ -494,7 +494,7 @@ task cleanUpUnixFilesystem {
         cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
     >>>
     runtime {
-        docker: "ubuntu:latest"
+        docker: "ubuntu@sha256:2695d3e10e69cc500a16eae6d6629c803c43ab075fa5ce60813a0fc49c47e859"
         continueOnReturnCode: true
     }
 }
@@ -509,7 +509,7 @@ task cleanUpGoogleFilestore {
         gsutil rm -I < ${write_lines(previous_task_outputs)}
     }
     runtime {
-        docker: "google/cloud-sdk"
+        docker: "google/cloud-sdk@sha256:4ef6b0e969fa96f10acfd893644d100469e979f4384e5e70f58be5cb80593a8a"
         continueOnReturnCode: true
     }
 }
@@ -825,7 +825,7 @@ task sortMDTagBAMFile {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard:latest"
+        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
     }
 }
 
@@ -865,7 +865,7 @@ task mergeAlignmentBAMChunks {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
+        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
 
@@ -905,7 +905,7 @@ task splitBAMbyPath {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
+        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
 
@@ -953,7 +953,7 @@ task runGATKHaplotypeCaller {
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "broadinstitute/gatk:4.1.1.0"
+        docker: "broadinstitute/gatk@sha256:cc8981d0527e716775645b04a7f59e96a52ad59a7ae9788ddc47902384bf35aa"
     }
 }
 
@@ -1002,7 +1002,7 @@ task runGATKHaplotypeCallerGVCF {
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "broadinstitute/gatk:4.1.1.0"
+        docker: "broadinstitute/gatk@sha256:cc8981d0527e716775645b04a7f59e96a52ad59a7ae9788ddc47902384bf35aa"
     }
 }
 
@@ -1049,10 +1049,11 @@ task runDragenCaller {
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
+        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
     >>>
     output {
-        File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
+        File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.hard-filtered.vcf.gz"
     }
     runtime {
         memory: 20 + " GB"
@@ -1102,10 +1103,11 @@ task runDragenCallerGVCF {
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
+        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
     >>>
     output {
-        File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
+        File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.hard-filtered.gvcf.gz"
     }
     runtime {
         memory: 20 + " GB"
@@ -1350,7 +1352,7 @@ task runVCFClipper {
     runtime {
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
 
@@ -1386,7 +1388,7 @@ task concatClippedVCFChunks {
         time: 60
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
 
@@ -1458,7 +1460,7 @@ task normalizeVCF {
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
 
@@ -1494,7 +1496,7 @@ task snpEffAnnotateVCF {
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
+        docker: "quay.io/biocontainers/snpeff@sha256:6b2e1ab7902cf2436f4ff777e0a22bfba3e20881de5b6ea4fe792129bf89f228"
     }
 }
 

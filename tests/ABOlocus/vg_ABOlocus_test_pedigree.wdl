@@ -21,7 +21,7 @@ workflow vg_ABOlocus_test {
         File ref_dict_file
         File ref_file_gz
         File ped_file
-        String vg_docker = "quay.io/vgteam/vg:v1.19.0"
+        String vg_docker = 'quay.io/vgteam/vg@sha256:9b5a50376033fa228815ffae0a9affc33870e09214612b67d1cf5e710051a006'
     }
 
     # build & check the ABOlocus graph
@@ -78,9 +78,10 @@ workflow vg_ABOlocus_test {
         CLEANUP_FILES = false,
         USE_DECOYS = false,
         DRAGEN_MODE = false,
-        DRAGEN_REF_INDEX_NAME = "hs37d5_ABOlocus",
-        UDPBINFO_PATH = "Udpbinfo",
-        HELIX_USERNAME = "markellocj"
+        DRAGEN_REF_INDEX_NAME = "",
+        UDPBINFO_PATH = "",
+        HELIX_USERNAME = "",
+        VG_CONTAINER = vg_docker 
     }
     
     call check_trio_bams { input:
@@ -121,7 +122,7 @@ task bam_to_paired_fastq {
     >>>
 
     runtime {
-        docker: "quay.io/cmarkello/bamsplit:latest"
+        docker: "quay.io/cmarkello/bamsplit@sha256:5ebf24ab2647f481cdb2e0827aea12ba60ae7ede9eda9cb97ce58b5e6b7e2e0a"
     }
 
     output {
@@ -180,7 +181,7 @@ task check_trio_bams {
     >>>
 
     runtime {
-        docker: "quay.io/cmarkello/bamsplit:latest"
+        docker: "quay.io/cmarkello/bamsplit@sha256:5ebf24ab2647f481cdb2e0827aea12ba60ae7ede9eda9cb97ce58b5e6b7e2e0a"
     }
 
     output {
