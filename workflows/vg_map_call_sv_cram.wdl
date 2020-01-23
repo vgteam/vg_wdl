@@ -4,7 +4,7 @@ workflow vgMapCallSV {
     meta {
 	author: "Jean Monlong"
         email: "jmonlong@ucsc.edu"
-        description: "Read mapping and SV genotyping using vg. It takes as inputs reads in FASTQ and graphs containing the structural variants to genotype. The graphs files required include the XG and GCSA indexes. Including the snarls index is optional but speeds up the computation. It outputs a VCF file." 
+        description: "Read mapping and SV genotyping using vg. It takes a CRAM file and graphs containing the structural variants to genotype. The graphs files required include the XG and GCSA indexes. Including the snarls index is optional but speeds up the computation. It outputs a VCF file." 
     }
     input {
         String SAMPLE_NAME                      # The sample name
