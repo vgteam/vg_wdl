@@ -37,6 +37,7 @@ workflow vgMapCallSV {
         Boolean CLEANUP_MODE = true                        # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
     }
 
+    # Split the reads (CRAM file) in chunks (FASTQ) and map each chunk separately.
     scatter (chunk_id in range(MAX_CRAM_CHUNKS)){
         call splitCramFastq {
             input:
@@ -85,10 +86,7 @@ workflow vgMapCallSV {
         }
     }
     
-    ################################
-    # Run the VG calling procedure #
-    ################################
-    # Merge chunked graph alignments
+    # Merge chunked graph alignments (GAM files)
     call mergeAlignmentGAMChunks {
         input:
         in_sample_name=SAMPLE_NAME,
@@ -117,6 +115,8 @@ workflow vgMapCallSV {
             in_preemptible=PREEMPTIBLE
         }
     }
+
+    # Genotype variants using the packed graph approach
     call runVGPackCaller {
         input: 
         in_sample_name=SAMPLE_NAME,
@@ -147,13 +147,13 @@ workflow vgMapCallSV {
             in_preemptible=PREEMPTIBLE
         }
     }
-    
-    # Extract either the linear-based or graph-based VCF
-    File final_vcf_output = runVGPackCaller.output_vcf
+
+    # Save the VCF and potentially the packed graph and graph alignment files
     output {
-        File output_vcf = final_vcf_output
-        File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
-        File? output_gam_index = mergeAlignmentGAMChunks.merged_sorted_gam_gai_file
+        File output_vcf = runVGPackCaller.output_vcf
+        File output_vcf_index = runVGPackCaller.output_vcf_index
+        File? output_pack = runVGPackCaller.output_pack
+        File? output_gam = mergeAlignmentGAMChunks.merged_gam_file
     }
 }
 
@@ -196,6 +196,8 @@ task cleanUpGoogleFilestore {
     }
 }
 
+# Retrieve a chunk from a CRAM file and convert it to FASTQ
+# CRAM + (i,N) -> FASTQ_i_of_N
 task splitCramFastq {
     input {
         File in_cram_file
@@ -239,6 +241,8 @@ task splitCramFastq {
     }
 }
 
+# Map reads to a variation graph.
+# FASTQ + GRAPH INDEXES -> GAM
 task runVGMAP {
     input {
         File in_left_read_pair_chunk_file
@@ -295,6 +299,8 @@ task runVGMAP {
     }
 }
 
+# Merge GAMS
+# GAM_1_of_N + ... + GAM_N_of_N -> GAM
 task mergeAlignmentGAMChunks {
     input {
         String in_sample_name
@@ -343,6 +349,8 @@ task mergeAlignmentGAMChunks {
     }
 }
 
+# Create packed graph and genotype VCF
+# GAM + GRAPH INDEXES + VCF_original -> PACK + VCF_genotyped
 task runVGPackCaller {
     input {
         String in_sample_name
@@ -368,15 +376,15 @@ task runVGPackCaller {
         # cause the bash shell to treat unset variables as an error and exit immediately
         set -u
         # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
+        set -o xtrace7
         #to turn off echo do 'set +o xtrace'
 
         vg pack \
            -x ~{in_xg_file} \
            -g ~{in_gam_file} \
-           -q \
+           -Q 5 \
            -t ~{in_vgcall_cores} \
-           -o ~{graph_tag}.pack
+           -o ~{graph_tag}.~{in_sample_name}.pack
 
         SNARL_OPTION_STRING=""
         if [ ~{snarl_options} == true ]; then
@@ -386,22 +394,23 @@ task runVGPackCaller {
         tabix -f ~{in_vcf_file}
 
         vg call \
-           -k ~{graph_tag}.pack \
+           -k ~{graph_tag}.~{in_sample_name}.pack \
            -t ~{in_vgcall_cores} \
            -s ~{in_sample_name} ${SNARL_OPTION_STRING} \
            -v ~{in_vcf_file} \
-           ~{in_xg_file} > ~{graph_tag}.vcf
+           ~{in_xg_file} > ~{graph_tag}.unsorted.vcf
 
-        head -10000 ~{graph_tag}.vcf | grep "^#" >> ~{graph_tag}.sorted.vcf
-        if [ "$(cat ~{graph_tag}.vcf | grep -v '^#')" ]; then
-            cat ~{graph_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{graph_tag}.sorted.vcf
+        head -10000 ~{graph_tag}.unsorted.vcf | grep "^#" >> ~{graph_tag}.~{in_sample_name}.vcf
+        if [ "$(cat ~{graph_tag}.unsorted.vcf | grep -v '^#')" ]; then
+            cat ~{graph_tag}.unsorted.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{graph_tag}.~{in_sample_name}.vcf
         fi
-        bgzip ~{graph_tag}.sorted.vcf && \
-            tabix -f -p vcf ~{graph_tag}.sorted.vcf.gz
+        bgzip ~{graph_tag}.~{in_sample_name}.vcf && \
+            tabix -f -p vcf ~{graph_tag}.~{in_sample_name}.vcf.gz
     >>>
     output {
-        File output_vcf = "~{graph_tag}.sorted.vcf.gz"
-        File output_vcf_index = "~{graph_tag}.sorted.vcf.gz.tbi"
+        File output_vcf = "~{graph_tag}.~{in_sample_name}.vcf.gz"
+        File output_vcf_index = "~{graph_tag}.~{in_sample_name}.vcf.gz.tbi"
+        File output_pack = "~{graph_tag}.~{in_sample_name}.pack"
     }
     runtime {
         memory: in_vgcall_mem + " GB"
