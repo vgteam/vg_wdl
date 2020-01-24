@@ -4,24 +4,27 @@ workflow vgMapCallSV {
     meta {
 	author: "Jean Monlong"
         email: "jmonlong@ucsc.edu"
-        description: "Read mapping and SV genotyping using vg. It takes a CRAM file and graphs containing the structural variants to genotype. The graphs files required include the XG and GCSA indexes. Including the snarls index is optional but speeds up the computation. It outputs a VCF file." 
+        description: "Read mapping and SV genotyping using vg. It takes a CRAM file and graphs containing the structural variants to genotype. The XG and GCSA graph indexes as required, as well as the original VCF used to create the graph. Including the snarls index is optional but speeds up the computation. It outputs a VCF file.
+
+        The CRAM files are converted to FASTQ in chunks. This is used to parallelize the CRAM conversion jobs and the mapping jobs. It also makes them short enough that they can be run on cheaper instances (e.g. pre-emptible). The NB_CRAM_CHUNKS parameter controls the number of chunks (~15 recommended for 20x Illumina WGS). The MAX_CRAM_CHUNKS parameter can be used to down-sample the reads by using only chunks up to MAX_CRAM_CHUNKS. For example, with NB_CRAM_CHUNKS=15 and MAX_CRAM_CHUNKS=5 only the first 5 chunks will be used, leading to downsampling 1/3 of the reads.
+
+        To allow for preemptible instance, increase the PREEMPTIBLE attempts number parameter, e.g. PREEMPTIBLE=3." 
     }
     input {
-        String SAMPLE_NAME                      # The sample name
-        File INPUT_CRAM_FILE                   # Input CRAM file
-        File CRAM_REF                          # Genome fasta file associated with the CRAM file
-        File CRAM_REF_INDEX                    # Index of the fasta file associated with the CRAM file
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline
-        File XG_FILE                            # Path to .xg index file
-        File VCF_FILE                           # Path to .xg index file
-        File GCSA_FILE                          # Path to .gcsa index file
-        File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
-        File? SNARL_FILE                        # (OPTIONAL) Path to snarl index file
-        File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
-        File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
-        Int NB_CRAM_CHUNKS = 10
-        Int MAX_CRAM_CHUNKS = 10
-        Int CRAM_CONVERT_CORES = 16
+        String SAMPLE_NAME                                  # The sample name
+        File INPUT_CRAM_FILE                                # Input CRAM file
+        File CRAM_REF                                       # Genome fasta file associated with the CRAM file
+        File CRAM_REF_INDEX                                 # Index of the fasta file associated with the CRAM file
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.21.0"   # VG Container used in the pipeline
+        File XG_FILE                                        # Path to .xg index file
+        File VCF_FILE                                       # Path to the VCF used to create the graph
+        File GCSA_FILE                                      # Path to .gcsa index file
+        File GCSA_LCP_FILE                                  # Path to .gcsa.lcp index file
+        File? SNARL_FILE                                    # (OPTIONAL) Path to snarl index file
+        File? GBWT_FILE                                     # (OPTIONAL) Path to .gbwt index file
+        Int NB_CRAM_CHUNKS = 15                             # Number of chunks to split the reads in
+        Int MAX_CRAM_CHUNKS = 15                            # Number of chunks to actually analyze
+        Int CRAM_CONVERT_CORES = 16                         # Resources for the different tasks
         Int CRAM_CONVERT_DISK = 200
         Int MAP_CORES = 32
         Int MAP_DISK = 100
@@ -33,9 +36,9 @@ workflow vgMapCallSV {
         Int VGCALL_CORES = 10
         Int VGCALL_DISK = 200
         Int VGCALL_MEM = 100
-        Int PREEMPTIBLE = 0
-        Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
-        Boolean CLEANUP_MODE = true             # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
+        Int PREEMPTIBLE = 0                                # Number of attempts to use pre-emptible instances
+        Boolean GOOGLE_CLEANUP_MODE = false                # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        Boolean CLEANUP_MODE = true                        # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
     }
 
     scatter (chunk_id in range(MAX_CRAM_CHUNKS)){
@@ -236,44 +239,6 @@ task splitCramFastq {
         memory: "50 GB"
         disks: "local-disk " + in_cram_convert_disk + " SSD"
         docker: "jmonlong/samtools-jm:release-1.19jm0.2.1"
-        preemptible: in_preemptible
-    }
-}
-
-task splitReads {
-    input {
-        File? in_read_file
-        String in_pair_id
-        String in_vg_container
-        Int in_reads_per_chunk
-        Int in_split_read_cores
-        Int in_split_read_disk
-        Int in_preemptible
-    }
-    
-    command <<< 
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
-    >>>
-    output {
-        Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
-    }
-    runtime {
-        cpu: in_split_read_cores
-        memory: "40 GB"
-        disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: in_vg_container
         preemptible: in_preemptible
     }
 }
