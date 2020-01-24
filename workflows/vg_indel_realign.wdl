@@ -130,7 +130,7 @@ task cleanUpUnixFilesystem {
         memory: 2 + " GB"
         cpu: 2
         disks: "local-disk 10 SSD"
-        docker: "ubuntu:latest"
+        docker: "ubuntu@sha256:2695d3e10e69cc500a16eae6d6629c803c43ab075fa5ce60813a0fc49c47e859"
         continueOnReturnCode: true
     }
 }
@@ -145,7 +145,7 @@ task cleanUpGoogleFilestore {
         gsutil rm -I < ${write_lines(previous_task_outputs)}
     }
     runtime {
-        docker: "google/cloud-sdk"
+        docker: "google/cloud-sdk&sha256:4ef6b0e969fa96f10acfd893644d100469e979f4384e5e70f58be5cb80593a8a"
         continueOnReturnCode: true
     }
 }
@@ -205,7 +205,7 @@ task splitBAMbyPath {
         memory: 10 + " GB"
         cpu: 16
         disks: "local-disk 10 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
+        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
 
@@ -255,7 +255,7 @@ task runGATKIndelRealigner {
         time: 180
         memory: 20 + " GB"
         cpu: 32
-        docker: "broadinstitute/gatk3:3.8-1"
+        docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
     }
 }
 
@@ -291,7 +291,7 @@ task mergeIndelRealignedBAMs {
         memory: 100 + " GB"
         cpu: 32
         disks: "local-disk 100 SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
+        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
 
@@ -335,7 +335,7 @@ task sortMDTagBAMFile {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools:v1.3_cv3"
+        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
 

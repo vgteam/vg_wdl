@@ -522,10 +522,11 @@ task runDragenCaller {
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
+        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
     >>>
     output {
-        File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.vcf.gz"
+        File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.hard-filtered.vcf.gz"
     }
     runtime {
         memory: 50 + " GB"
@@ -575,10 +576,11 @@ task runDragenCallerGVCF {
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
+        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
     >>>
     output {
-        File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.gvcf.gz"
+        File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.hard-filtered.gvcf.gz"
     }
     runtime {
         memory: 50 + " GB"

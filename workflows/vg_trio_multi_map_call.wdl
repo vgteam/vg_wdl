@@ -517,7 +517,7 @@ task runGATKCombineGenotypeGVCFs {
 
     command {
         set -exu -o pipefail
-
+        
         gatk IndexFeatureFile \
             -F ${in_gvcf_file_maternal} \
         && gatk IndexFeatureFile \
@@ -540,7 +540,7 @@ task runGATKCombineGenotypeGVCFs {
     runtime {
         memory: 100 + " GB"
         cpu: 32
-        docker: "broadinstitute/gatk:4.1.1.0"
+        docker: "broadinstitute/gatk@sha256:cc8981d0527e716775645b04a7f59e96a52ad59a7ae9788ddc47902384bf35aa"
     }
 }
 
@@ -576,8 +576,8 @@ task runDragenJointGenotyper {
             echo "ERROR: JOINT_GENOTYPE_DRAGEN_WORK_DIR variable contains whitespace"
             exit 1
         fi
-        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
-            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
+        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ = *[[:space:]]* ]]; then
+            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ variable contains whitespace"
             exit 1
         fi
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
@@ -587,7 +587,13 @@ task runDragenJointGenotyper {
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper" && \
         ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper ~{in_sample_name}_dragen_joint_genotyper && \
-        rm -fr /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} && \
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} && \
+        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
+            SIBLING_BASENAME="$(basename $sibling_gvcf_file)"
+            rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/${SIBLING_BASENAME}
+        done && \
+        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/
     >>>
     output {
         File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz"
@@ -637,7 +643,7 @@ task runSplitJointGenotypedVCF {
     runtime {
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
-        docker: "quay.io/biocontainers/bcftools:1.9--h4da6232_0"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
 
@@ -690,7 +696,7 @@ task runWhatsHapPhasing {
     runtime {
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
-        docker: "quay.io/biocontainers/whatshap:0.18--py37h6bb024c_0"
+        docker: "quay.io/biocontainers/whatshap@sha256:cf82de1173a35a0cb063469a602eff2e8999b4cfc0f0ee9cef0dbaedafa5ab6c"
     }
 }
 
