@@ -4,11 +4,7 @@ workflow vgMapCallSV {
     meta {
 	author: "Jean Monlong"
         email: "jmonlong@ucsc.edu"
-        description: "Read mapping and SV genotyping using vg. It takes a CRAM file and graphs containing the structural variants to genotype. The XG and GCSA graph indexes as required, as well as the original VCF used to create the graph. Including the snarls index is optional but speeds up the computation. It outputs a VCF file.
-
-        The CRAM files are converted to FASTQ in chunks. This is used to parallelize the CRAM conversion jobs and the mapping jobs. It also makes them short enough that they can be run on cheaper instances (e.g. pre-emptible). The NB_CRAM_CHUNKS parameter controls the number of chunks (~15 recommended for 20x Illumina WGS). The MAX_CRAM_CHUNKS parameter can be used to down-sample the reads by using only chunks up to MAX_CRAM_CHUNKS. For example, with NB_CRAM_CHUNKS=15 and MAX_CRAM_CHUNKS=5 only the first 5 chunks will be used, leading to downsampling 1/3 of the reads.
-
-        To allow for preemptible instance, increase the PREEMPTIBLE attempts number parameter, e.g. PREEMPTIBLE=3." 
+        description: "Read mapping and SV genotyping using vg. It takes a CRAM file and graphs containing the structural variants to genotype. The XG and GCSA graph indexes as required, as well as the original VCF used to create the graph. Including the snarls index is optional but speeds up the computation. It outputs a VCF file. The CRAM files are converted to FASTQ in chunks. This is used to parallelize the CRAM conversion jobs and the mapping jobs. It also makes them short enough that they can be run on cheaper instances (e.g. pre-emptible). The NB_CRAM_CHUNKS parameter controls the number of chunks (~15 recommended for 20x Illumina WGS). The MAX_CRAM_CHUNKS parameter can be used to down-sample the reads by using only chunks up to MAX_CRAM_CHUNKS. For example, with NB_CRAM_CHUNKS=15 and MAX_CRAM_CHUNKS=5 only the first 5 chunks will be used, leading to downsampling 1/3 of the reads. To allow for preemptible instance, increase the PREEMPTIBLE attempts number parameter, e.g. PREEMPTIBLE=3." 
     }
     input {
         String SAMPLE_NAME                                  # The sample name
