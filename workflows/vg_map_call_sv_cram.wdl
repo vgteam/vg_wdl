@@ -376,7 +376,7 @@ task runVGPackCaller {
         # cause the bash shell to treat unset variables as an error and exit immediately
         set -u
         # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace7
+        set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
         vg pack \
