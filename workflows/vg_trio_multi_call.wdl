@@ -281,10 +281,7 @@ task runDragenJointGenotyper {
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper ~{in_sample_name}_dragen_joint_genotyper && \
         rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} && \
         rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} && \
-        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
-            SIBLING_BASENAME="$(basename $sibling_gvcf_file)"
-            rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/${SIBLING_BASENAME}
-        done && \
+        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{proband_gvcf_file_name} && \
         rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/
     >>>
     output {
