@@ -20,15 +20,12 @@ workflow vgMapCallSV {
         File? GBWT_FILE                                     # (OPTIONAL) Path to .gbwt index file
         Int NB_CRAM_CHUNKS = 15                             # Number of chunks to split the reads in
         Int MAX_CRAM_CHUNKS = 15                            # Number of chunks to actually analyze
-        Int CRAM_CONVERT_CORES = 16                         # Resources for the different tasks
+        Int CRAM_CONVERT_CORES = 3                          # Resources for the different tasks
         Int CRAM_CONVERT_DISK = 200
         Int MAP_CORES = 32
         Int MAP_DISK = 100
         Int MAP_MEM = 100
-        Int MERGE_GAM_CORES = 64
         Int MERGE_GAM_DISK = 400
-        Int MERGE_GAM_MEM = 100
-        Int MERGE_GAM_TIME = 1200
         Int VGCALL_CORES = 10
         Int VGCALL_DISK = 200
         Int VGCALL_MEM = 100
@@ -92,10 +89,7 @@ workflow vgMapCallSV {
         in_sample_name=SAMPLE_NAME,
         in_vg_container=VG_CONTAINER,
         in_alignment_gam_chunk_files=vg_map_algorithm_chunk_gam_output,
-        in_merge_gam_cores=MERGE_GAM_CORES,
         in_merge_gam_disk=MERGE_GAM_DISK,
-        in_merge_gam_mem=MERGE_GAM_MEM,
-        in_merge_gam_time=MERGE_GAM_TIME,
         in_preemptible=PREEMPTIBLE
     }
     # Cleanup gam chunk files after use
@@ -306,11 +300,7 @@ task mergeAlignmentGAMChunks {
         String in_sample_name
         String in_vg_container
         Array[File] in_alignment_gam_chunk_files
-        Int in_merge_gam_cores
         Int in_merge_gam_disk
-        Int in_merge_gam_mem
-        Int in_merge_gam_time
-        Boolean sort_gam = false
         Int in_preemptible
     }
     
@@ -326,24 +316,15 @@ task mergeAlignmentGAMChunks {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
-    VG_GAMSORT_COMMAND="touch ~{in_sample_name}_merged.sorted.gam ~{in_sample_name}_merged.sorted.gam.gai"
-    if [ ~{sort_gam} == true ]; then
-        VG_GAMSORT_COMMAND="vg gamsort ~{in_sample_name}_merged.gam -i ~{in_sample_name}_merged.sorted.gam.gai -t ~{in_merge_gam_cores} > ~{in_sample_name}_merged.sorted.gam"
-    fi
-    
     cat ~{sep=" " in_alignment_gam_chunk_files} > ~{in_sample_name}_merged.gam
-    ${VG_GAMSORT_COMMAND}
     >>>
     output {
-        File merged_sorted_gam_file = "~{in_sample_name}_merged.sorted.gam"
-        File merged_sorted_gam_gai_file = "~{in_sample_name}_merged.sorted.gam.gai"
         File merged_gam_file = "~{in_sample_name}_merged.gam"
     }
     runtime {
-        memory: in_merge_gam_mem + " GB"
-        cpu: in_merge_gam_cores
+        memory: "8 GB"
+        cpu: 1
         disks: "local-disk " + in_merge_gam_disk  + " SSD"
-        time: in_merge_gam_time
         docker: in_vg_container
         preemptible: in_preemptible
     }
