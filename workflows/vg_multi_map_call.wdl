@@ -9,7 +9,7 @@ workflow vgMultiMapCall {
     }
     
     input {
-        Boolean VGMPMAP_MODE = true             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
+        Boolean VGMPMAP_MODE = false             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
         Boolean DRAGEN_MODE = false             # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.

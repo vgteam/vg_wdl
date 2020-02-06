@@ -78,7 +78,7 @@ workflow vg_ABOlocus_test {
         CLEANUP_FILES = false,
         USE_DECOYS = false,
         DRAGEN_MODE = false,
-        DRAGEN_REF_INDEX_NAME = "hs37d5_ABOlocus",
+        DRAGEN_REF_INDEX_NAME = "",
         UDPBINFO_PATH = "",
         HELIX_USERNAME = "",
         VG_CONTAINER = vg_docker 
