@@ -41,7 +41,7 @@ workflow vgTrioPipeline {
         Int MERGE_GAM_DISK = 400
         Int MERGE_GAM_MEM = 100
         Int MERGE_GAM_TIME = 1200
-        Boolean VGMPMAP_MODE = true                         # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
+        Boolean VGMPMAP_MODE = false                         # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
     }
     
     ###################################

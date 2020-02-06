@@ -351,8 +351,8 @@ task runDragenJointGenotyper {
         rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/
     >>>
     output {
-        File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.hard-filtered.vcf.gz"
-        File dragen_joint_genotyped_vcf_index = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.hard-filtered.vcf.gz.tbi"
+        File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz"
+        File dragen_joint_genotyped_vcf_index = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz.tbi"
     }
     runtime {
         memory: 50 + " GB"

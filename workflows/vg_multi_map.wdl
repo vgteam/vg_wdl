@@ -7,7 +7,7 @@ version 1.0
 
 workflow vgMultiMapCall {
     input {
-        Boolean VGMPMAP_MODE = true                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
+        Boolean VGMPMAP_MODE = false                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
         Boolean SURJECT_MODE = true                     # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
         Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
         Boolean GOOGLE_CLEANUP_MODE = false             # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.

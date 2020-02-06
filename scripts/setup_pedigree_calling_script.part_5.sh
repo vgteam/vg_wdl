@@ -93,8 +93,8 @@ do
   SIB_BAM_FILE_INDEX_PARAMS+="SIBLING_BAM_FILE_INDEX_LIST='${SIB_BAM_FILE_INDEX_PATH}' "
   SIB_ID_LIST+="SAMPLE_NAME_SIBLING_LIST='${SIBLING_ID}' "
 done
-MATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_dragen_genotyped.gvcf.gz))
-PATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_dragen_genotyped.gvcf.gz))
+MATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_dragen_genotyped.hard-filtered.gvcf.gz))
+PATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_dragen_genotyped.hard-filtered.gvcf.gz))
 XG_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_parental_graph_construction.final_outputs/output_links -regex .*.xg))
 
 rm -f ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.part_5.sh

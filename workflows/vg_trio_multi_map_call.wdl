@@ -62,7 +62,7 @@ workflow vgTrioPipeline {
         File PED_FILE
         File? GEN_MAP_FILES
         String GRAPH_NAME
-        Boolean VGMPMAP_MODE = true                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
+        Boolean VGMPMAP_MODE = false                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
         Boolean DRAGEN_MODE = false                     # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean USE_HAPLOTYPES = true                   # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
         Boolean MAKE_SNARLS = false                     # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
@@ -113,7 +113,7 @@ workflow vgTrioPipeline {
             DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
-            VGMPMAP_MODE=false,
+            VGMPMAP_MODE=VGMPMAP_MODE,
             CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
@@ -154,7 +154,7 @@ workflow vgTrioPipeline {
             DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
-            VGMPMAP_MODE=false,
+            VGMPMAP_MODE=VGMPMAP_MODE,
             CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
@@ -195,7 +195,7 @@ workflow vgTrioPipeline {
             DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
             UDPBINFO_PATH=UDPBINFO_PATH,
             HELIX_USERNAME=HELIX_USERNAME,
-            VGMPMAP_MODE=false,
+            VGMPMAP_MODE=VGMPMAP_MODE,
             CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
             DRAGEN_MODE=DRAGEN_MODE,
@@ -355,7 +355,7 @@ workflow vgTrioPipeline {
                 DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
                 UDPBINFO_PATH=UDPBINFO_PATH,
                 HELIX_USERNAME=HELIX_USERNAME,
-                VGMPMAP_MODE=false,
+                VGMPMAP_MODE=VGMPMAP_MODE,
                 CLEANUP_FILES=CLEANUP_FILES,
                 SURJECT_MODE=true,
                 DRAGEN_MODE=DRAGEN_MODE,
