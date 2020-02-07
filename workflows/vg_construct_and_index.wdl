@@ -528,7 +528,7 @@ task gcsa_index {
     runtime {
         time: 1200
         cpu: 32
-        memory: 100 + " GB"
+        memory: 120 + " GB"
         disks: "local-disk 50 SSD"
         docker: vg_docker
     }
