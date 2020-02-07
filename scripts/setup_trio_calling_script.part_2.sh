@@ -81,12 +81,12 @@ while getopts "p:m:f:w:g:v:t:h" OPTION; do
     esac
 done
 
-MATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
-MATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
-PATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
-PATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
-PROBAND_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${PROBAND_SAMPLE_NAME}_merged.positionsorted.bam))
-PROBAND_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs/output_links -name ${PROBAND_SAMPLE_NAME}_merged.positionsorted.bam.bai))
+MATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs -wholename *output_links/*${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
+MATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs -wholename *output_links/*${MATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
+PATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs -wholename *output_links/*${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam))
+PATERNAL_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs -wholename *output_links/*${PATERNAL_SAMPLE_NAME}_merged.positionsorted.bam.bai))
+PROBAND_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs -wholename *output_links/*${PROBAND_SAMPLE_NAME}_merged.positionsorted.bam))
+PROBAND_BAM_BAI_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_map.final_outputs -wholename *output_links/*${PROBAND_SAMPLE_NAME}_merged.positionsorted.bam.bai))
 
 rm -f ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.part_2.sh
 echo '#!/bin/bash' >> ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.part_2.sh

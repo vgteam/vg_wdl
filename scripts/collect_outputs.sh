@@ -86,31 +86,31 @@ fi
 PROBAND_SAMPLE_NAME="${SIBLING_SAMPLE_NAMES[0]}"
 for SIBLING_ID in ${SIBLING_SAMPLE_NAMES[@]}
 do
-  SIB_BAM_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs/output_links -name ${SIBLING_ID}_merged.indel_realigned.bam))
-  SIB_BAM_FILE_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs/output_links -name ${SIBLING_ID}_merged.indel_realigned.bam.bai))
-  SIB_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs/output_links -name ${SIBLING_ID}_dragen_genotyped.hard-filtered.gvcf.gz))
+  SIB_BAM_FILE_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs -wholename *output_links/*${SIBLING_ID}_merged.indel_realigned.bam))
+  SIB_BAM_FILE_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs -wholename *output_links/*${SIBLING_ID}_merged.indel_realigned.bam.bai))
+  SIB_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs -wholename *output_links/*${SIBLING_ID}_dragen_genotyped.hard-filtered.gvcf.gz))
   cp ${SIB_BAM_FILE_PATH} "${OUTPUT_DIR}/${SIBLING_ID}_parent_aligned.bam"
   cp ${SIB_BAM_FILE_INDEX_PATH} "${OUTPUT_DIR}/${SIBLING_ID}_parent_aligned.bam.bai"
   cp ${SIB_GVCF_PATH} "${OUTPUT_DIR}/${SIBLING_ID}_parent_aligned.gvcf.gz"
 done
 
-MATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam))
-MATERNAL_BAM_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam.bai))
-MATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs/output_links -name ${MATERNAL_SAMPLE_NAME}_dragen_genotyped.hard-filtered.gvcf.gz))
+MATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs -wholename *output_links/*${MATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam))
+MATERNAL_BAM_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs -wholename *output_links/*${MATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam.bai))
+MATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs -wholename *output_links/*${MATERNAL_SAMPLE_NAME}_dragen_genotyped.hard-filtered.gvcf.gz))
 
 cp ${MATERNAL_BAM_PATH} "${OUTPUT_DIR}/${MATERNAL_SAMPLE_NAME}_snp1kg_aligned.bam"
 cp ${MATERNAL_BAM_INDEX_PATH} "${OUTPUT_DIR}/${MATERNAL_SAMPLE_NAME}_snp1kg_aligned.bam.bai"
 cp ${MATERNAL_GVCF_PATH} "${OUTPUT_DIR}/${MATERNAL_SAMPLE_NAME}_snp1kg_aligned.gvcf.gz"
 
-PATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam))
-PATERNAL_BAM_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam.bai))
-PATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs/output_links -name ${PATERNAL_SAMPLE_NAME}_dragen_genotyped.hard-filtered.gvcf.gz))
+PATERNAL_BAM_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs -wholename *output_links/*${PATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam))
+PATERNAL_BAM_INDEX_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_indel_realign.final_outputs -wholename *output_links/*${PATERNAL_SAMPLE_NAME}_merged.indel_realigned.bam.bai))
+PATERNAL_GVCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_trio_call.final_outputs -wholename *output_links/*${PATERNAL_SAMPLE_NAME}_dragen_genotyped.hard-filtered.gvcf.gz))
 
 cp ${PATERNAL_BAM_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.bam"
 cp ${PATERNAL_BAM_INDEX_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.bam.bai"
 cp ${PATERNAL_GVCF_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.gvcf.gz"
 
-JOINT_GENOTYPED_VCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs/output_links/vgTrioPipeline.output_cohort_vcf -name ${PROBAND_SAMPLE_NAME}.snpeff.unrolled.vcf))
+JOINT_GENOTYPED_VCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs/*_vgTrioPipeline/output_links/vgTrioPipeline.output_cohort_vcf -name ${PROBAND_SAMPLE_NAME}.snpeff.unrolled.vcf))
 
 cp ${JOINT_GENOTYPED_VCF_PATH} "${OUTPUT_DIR}/"
 
