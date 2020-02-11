@@ -110,7 +110,7 @@ cp ${PATERNAL_BAM_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.ba
 cp ${PATERNAL_BAM_INDEX_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.bam.bai"
 cp ${PATERNAL_GVCF_PATH} "${OUTPUT_DIR}/${PATERNAL_SAMPLE_NAME}_snp1kg_aligned.gvcf.gz"
 
-JOINT_GENOTYPED_VCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs/*_vgTrioPipeline/output_links/vgTrioPipeline.output_cohort_vcf -name ${PROBAND_SAMPLE_NAME}.snpeff.unrolled.vcf))
+JOINT_GENOTYPED_VCF_PATH=($(find ${COHORT_WORKFLOW_DIR}/${PROBAND_SAMPLE_NAME}_cohort_2nd_iter_pedigree_call.final_outputs -wholename *output_links/*${PROBAND_SAMPLE_NAME}.snpeff.unrolled.vcf))
 
 cp ${JOINT_GENOTYPED_VCF_PATH} "${OUTPUT_DIR}/"
 
