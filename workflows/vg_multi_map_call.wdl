@@ -1496,7 +1496,7 @@ task snpEffAnnotateVCF {
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/snpeff@sha256:6b2e1ab7902cf2436f4ff777e0a22bfba3e20881de5b6ea4fe792129bf89f228"
+        docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
     }
 }
 
