@@ -11,9 +11,9 @@ workflow vgMapCallSV {
         File INPUT_CRAM_FILE                                # Input CRAM file
         File CRAM_REF                                       # Genome fasta file associated with the CRAM file
         File CRAM_REF_INDEX                                 # Index of the fasta file associated with the CRAM file
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.21.0"   # VG Container used in the pipeline
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.22.0"   # VG Container used in the pipeline
         File XG_FILE                                        # Path to .xg index file
-        File VCF_FILE                                       # Path to the VCF used to create the graph
+        File? VCF_FILE                                      # Path to the VCF used to create the graph
         File GBWT_FILE                                      # Path to .gbwt index file
         File DIST_IDX_FILE                                  # Path to .dist index file
         File MIN_IDX_FILE                                   # Path to .min index file
@@ -330,7 +330,7 @@ task mergeAlignmentGAMChunks {
 task runVGPackCaller {
     input {
         String in_sample_name
-        File in_vcf_file
+        File? in_vcf_file
         File in_xg_file
         File in_gam_file
         File? in_snarl_file
@@ -342,6 +342,7 @@ task runVGPackCaller {
     }
 
     Boolean snarl_options = defined(in_snarl_file)
+    Boolean vcf_options = defined(in_vcf_file)
     String graph_tag = basename(in_xg_file, ".xg")
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -366,14 +367,17 @@ task runVGPackCaller {
         if [ ~{snarl_options} == true ]; then
           SNARL_OPTION_STRING="--snarls ~{in_snarl_file}"
         fi
-        
-        tabix -f ~{in_vcf_file}
+
+        VCF_OPTION_STRING=""
+        if [ ~{vcf_options} == true ]; then
+            tabix -f ~{in_vcf_file}
+          VCF_OPTION_STRING="-v ~{in_vcf_file}"
+        fi
 
         vg call \
            -k ~{graph_tag}.~{in_sample_name}.pack \
            -t ~{in_vgcall_cores} \
-           -s ~{in_sample_name} ${SNARL_OPTION_STRING} \
-           -v ~{in_vcf_file} \
+           -s ~{in_sample_name} ${SNARL_OPTION_STRING} ${VCF_OPTION_STRING} \
            ~{in_xg_file} > ~{graph_tag}.unsorted.vcf
 
         head -10000 ~{graph_tag}.unsorted.vcf | grep "^#" >> ~{graph_tag}.~{in_sample_name}.vcf
