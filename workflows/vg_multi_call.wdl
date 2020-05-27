@@ -515,12 +515,12 @@ task runDragenCaller {
             echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
             exit 1
         fi
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${TMP_DIR}" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
         mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
         rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
         rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
@@ -569,12 +569,12 @@ task runDragenCallerGVCF {
             echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
             exit 1
         fi
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${TMP_DIR}" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
         mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh 165.112.174.51 "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
+        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
         mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
         rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
         rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
