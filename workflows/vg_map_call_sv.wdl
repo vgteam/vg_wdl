@@ -490,7 +490,7 @@ task runVGPackCaller {
            ~{in_xg_file} > ~{graph_tag}.vcf
 
         head -10000 ~{graph_tag}.vcf | grep "^#" >> ~{graph_tag}.sorted.vcf
-        if [ "$(cat ~{graph_tag}.vcf | grep -v '^#')" ]; then
+        if [ "$(grep -c -v '^#' ~{graph_tag}.unsorted.vcf)" -gt 0 ]; then
             cat ~{graph_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{graph_tag}.sorted.vcf
         fi
         bgzip ~{graph_tag}.sorted.vcf && \
