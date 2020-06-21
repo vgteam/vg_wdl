@@ -11,48 +11,50 @@ workflow vgMapCallSV {
         File INPUT_CRAM_FILE                                # Input CRAM file
         File CRAM_REF                                       # Genome fasta file associated with the CRAM file
         File CRAM_REF_INDEX                                 # Index of the fasta file associated with the CRAM file
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.22.0"   # VG Container used in the pipeline
+        String VG_CONTAINER = "jmonlong/vg:6c7450a"         # VG Container used in the pipeline
         File XG_FILE                                        # Path to .xg index file
-        File? VCF_FILE                                      # Path to the VCF used to create the graph
         File GBWT_FILE                                      # Path to .gbwt index file
         File DIST_IDX_FILE                                  # Path to .dist index file
         File MIN_IDX_FILE                                   # Path to .min index file
+        File? VCF_FILE                                      # (OPTIONAL) Path to the VCF used to create the graph
         File? SNARL_FILE                                    # (OPTIONAL) Path to snarl index file
-        Int NB_CRAM_CHUNKS = 15                             # Number of chunks to split the reads in
-        Int MAX_CRAM_CHUNKS = 15                            # Number of chunks to actually analyze
+        File? REFPATH_FILE                                  # (OPTIONAL) Path to a file listing the reference paths
+        Int NB_CRAM_CHUNKS = 8                              # Number of chunks to split the reads in
+        Int MAX_CRAM_CHUNKS = 4                             # Number of chunks to actually analyze
         Boolean GIRAFFE_FAST_MODE = false                   # Set to 'true' to use the fast mode for the read mapping with giraffe
         String GIRAFFE_RESCUE_MODE = "gssw"                 # Rescue mode for the giraffe mapper. Either "gssw" (default) or "dozeu" (faster but currently a bit less accurate)
-        Int CRAM_CONVERT_CORES = 3                          # Resources for the different tasks
+        Int CRAM_CONVERT_CORES = 4                          # Resources for the different tasks
         Int CRAM_CONVERT_DISK = 200
         Int MAP_CORES = 32
         Int MAP_DISK = 100
         Int MAP_MEM = 100
         Int MERGE_GAF_DISK = 400
-        Int VGCALL_CORES = 10
+        Int VGCALL_CORES = 16
         Int VGCALL_DISK = 200
         Int VGCALL_MEM = 100
         Int PREEMPTIBLE = 0                                # Number of attempts to use pre-emptible instances
-        Boolean GOOGLE_CLEANUP_MODE = false                # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
-        Boolean CLEANUP_MODE = true                        # Set to 'false' to disable cleanup (useful to be able to use use call caching to restart workflows)
+        Boolean OUT_GAF = false                            # Should the chunked GAFs (aligned reads) be merged and part of the final output. Default if false.
     }
 
-    # Split the reads (CRAM file) in chunks (FASTQ) and map each chunk separately.
-    scatter (chunk_id in range(MAX_CRAM_CHUNKS)){
-        call splitCramFastq {
-            input:
-            in_cram_file=INPUT_CRAM_FILE,
-            in_ref_file=CRAM_REF,
-            in_ref_index_file=CRAM_REF_INDEX,
-            in_cram_convert_cores=CRAM_CONVERT_CORES,
-            in_cram_convert_disk=CRAM_CONVERT_DISK,
-            in_chunk_id=chunk_id,
-            in_nb_chunks=NB_CRAM_CHUNKS,
-            in_preemptible=PREEMPTIBLE
-        }
+    # Split the reads (CRAM file) in chunks (FASTQ)
+    call splitCramFastq {
+        input:
+        in_cram_file=INPUT_CRAM_FILE,
+        in_ref_file=CRAM_REF,
+        in_ref_index_file=CRAM_REF_INDEX,
+        in_cram_convert_cores=CRAM_CONVERT_CORES,
+        in_cram_convert_disk=CRAM_CONVERT_DISK,
+        in_nb_chunks=NB_CRAM_CHUNKS,
+        in_max_chunks=MAX_CRAM_CHUNKS,
+        in_preemptible=PREEMPTIBLE
+    }
+
+    # Map each chunk separately.
+    scatter (chunk_id in range(length(splitCramFastq.output_read_chunks_1))) {
         call runVGMAP {
             input:
-            in_left_read_pair_chunk_file=splitCramFastq.fastq1,
-            in_right_read_pair_chunk_file=splitCramFastq.fastq2,
+            in_left_read_pair_chunk_file=splitCramFastq.output_read_chunks_1[chunk_id],
+            in_right_read_pair_chunk_file=splitCramFastq.output_read_chunks_2[chunk_id],
             in_vg_container=VG_CONTAINER,
             in_xg_file=XG_FILE,
             in_min_file=MIN_IDX_FILE,
@@ -68,89 +70,40 @@ workflow vgMapCallSV {
             in_preemptible=PREEMPTIBLE
         }        
         File vg_map_algorithm_chunk_gaf_output = runVGMAP.chunk_gaf_file
-        # Cleanup input reads after use
-        if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-            call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
-                input:
-                previous_task_outputs = [splitCramFastq.fastq1, splitCramFastq.fastq2],
-                current_task_output = vg_map_algorithm_chunk_gaf_output,
-                in_preemptible=PREEMPTIBLE
-            }
-        }
-        if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-            call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
-                input:
-                previous_task_outputs = [splitCramFastq.fastq1, splitCramFastq.fastq2],
-                current_task_output = vg_map_algorithm_chunk_gaf_output,
-                in_preemptible=PREEMPTIBLE
-            }
-        }
     }
     
-    # Merge chunked graph alignments (GAF files)
-    call mergeAlignmentGAFChunks {
-        input:
-        in_sample_name=SAMPLE_NAME,
-        in_vg_container=VG_CONTAINER,
-        in_alignment_gaf_chunk_files=vg_map_algorithm_chunk_gaf_output,
-        in_merge_gaf_disk=MERGE_GAF_DISK,
-        in_preemptible=PREEMPTIBLE
-    }
-    # Cleanup gaf chunk files after use
-    if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-        call cleanUpGoogleFilestore as cleanUpGAFChunksGoogle {
-            input:
-            previous_task_outputs = vg_map_algorithm_chunk_gaf_output,
-            current_task_output = mergeAlignmentGAFChunks.merged_gaf_file,
-            in_preemptible=PREEMPTIBLE
-        }
-    }
-    if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-        call cleanUpUnixFilesystem as cleanUpGAFChunksUnix {
-            input:
-            previous_task_outputs = vg_map_algorithm_chunk_gaf_output,
-            current_task_output = mergeAlignmentGAFChunks.merged_gaf_file,
-            in_preemptible=PREEMPTIBLE
-        }
-    }
-
     # Genotype variants using the packed graph approach
     call runVGPackCaller {
         input: 
         in_sample_name=SAMPLE_NAME,
         in_vcf_file=VCF_FILE,
         in_xg_file=XG_FILE, 
-        in_gaf_file=mergeAlignmentGAFChunks.merged_gaf_file,
+        in_alignment_gaf_chunk_files=vg_map_algorithm_chunk_gaf_output,
         in_snarl_file=SNARL_FILE,
+        in_refpath_file=REFPATH_FILE,
         in_vg_container=VG_CONTAINER,
         in_vgcall_cores=VGCALL_CORES,
         in_vgcall_disk=VGCALL_DISK,
         in_vgcall_mem=VGCALL_MEM,
         in_preemptible=PREEMPTIBLE
     }
-    # Cleanup vg call input files after use
-    if (GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-        call cleanUpGoogleFilestore as cleanUpVGPackCallInputsGoogle {
-            input:
-            previous_task_outputs = [mergeAlignmentGAFChunks.merged_gaf_file],
-            current_task_output = runVGPackCaller.output_vcf,
-            in_preemptible=PREEMPTIBLE
-        }
-    }
-    if (!GOOGLE_CLEANUP_MODE && CLEANUP_MODE) {
-        call cleanUpUnixFilesystem as cleanUpVGPackCallInputsUnix {
-            input:
-            previous_task_outputs = [mergeAlignmentGAFChunks.merged_gaf_file],
-            current_task_output = runVGPackCaller.output_vcf,
-            in_preemptible=PREEMPTIBLE
-        }
-    }
 
+    if(OUT_GAF){
+        # Merge chunked graph alignments (GAF files)
+        call mergeAlignmentGAFChunks {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_vg_container=VG_CONTAINER,
+            in_alignment_gaf_chunk_files=vg_map_algorithm_chunk_gaf_output,
+            in_merge_gaf_disk=MERGE_GAF_DISK,
+            in_preemptible=PREEMPTIBLE
+        }
+    }
+    
     # Save the VCF and potentially the packed graph and graph alignment files
     output {
         File output_vcf = runVGPackCaller.output_vcf
         File output_vcf_index = runVGPackCaller.output_vcf_index
-        File? output_pack = runVGPackCaller.output_pack
         File? output_gaf = mergeAlignmentGAFChunks.merged_gaf_file
     }
 }
@@ -159,43 +112,8 @@ workflow vgMapCallSV {
 ### TASK DEFINITIONS ###
 ########################
 
-# Tasks for intermediate file cleanup
-task cleanUpUnixFilesystem {
-    input {
-        Array[String] previous_task_outputs
-        String current_task_output
-        Int in_preemptible
-    }
-    command <<<
-        set -eux -o pipefail
-        cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
-    >>>
-    runtime {
-        docker: "ubuntu"
-        continueOnReturnCode: true
-        preemptible: in_preemptible
-    }
-}
-
-task cleanUpGoogleFilestore {
-    input {
-        Array[String] previous_task_outputs
-        String current_task_output
-        Int in_preemptible
-    }
-    command {
-        set -eux -o pipefail
-        gsutil rm -I < ${write_lines(previous_task_outputs)}
-    }
-    runtime {
-        docker: "google/cloud-sdk"
-        continueOnReturnCode: true
-        preemptible: in_preemptible
-    }
-}
-
-# Retrieve a chunk from a CRAM file and convert it to FASTQ
-# CRAM + (i,N) -> FASTQ_i_of_N
+# Retrieve chunks from a CRAM file and convert them to FASTQ
+# CRAM + (k,N) -> FASTQ_1_of_N, FASTQ_2_of_N, ..., FASTQ_k_of_N
 task splitCramFastq {
     input {
         File in_cram_file
@@ -203,8 +121,8 @@ task splitCramFastq {
         File in_ref_index_file
         Int in_cram_convert_cores
         Int in_cram_convert_disk
-        Int in_chunk_id
         Int in_nb_chunks
+        Int in_max_chunks
         Int in_preemptible
     }
     command <<< 
@@ -219,22 +137,17 @@ task splitCramFastq {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        VIEW_CORES=""
-        if [ ~{in_cram_convert_cores} -gt 3 ]; then
-            VIEW_CORES="-@ $(( ~{in_cram_convert_cores} - 3 ))"
-        fi
-
-        samtools collate $VIEW_CORES -k ~{in_chunk_id} -K ~{in_nb_chunks} --reference ~{in_ref_file} -Ouf ~{in_cram_file} . | samtools fastq -1 R1.fastq.gz -2 R2.fastq.gz -0 o.fq.gz -s s.fq.gz -c 1 -N -
+        seq 0 ~{in_nb_chunks} | head -n ~{in_max_chunks} | parallel -j ~{in_cram_convert_cores} "samtools collate -k {} -K ~{in_nb_chunks} --reference ~{in_ref_file} -Ouf ~{in_cram_file} {} | samtools fastq -1 reads.{}.R1.fastq.gz -2 reads.{}.R2.fastq.gz -0 reads.{}.o.fq.gz -s reads.{}.s.fq.gz -c 1 -N -"
     >>>
     output {
-        File fastq1='R1.fastq.gz'
-        File fastq2='R2.fastq.gz'
+        Array[File] output_read_chunks_1 = glob("reads.*.R1.fastq.gz")
+        Array[File] output_read_chunks_2 = glob("reads.*.R2.fastq.gz")
     }
     runtime {
         cpu: in_cram_convert_cores
         memory: "50 GB"
         disks: "local-disk " + in_cram_convert_disk + " SSD"
-        docker: "jmonlong/samtools-jm:release-1.19jm0.2.1"
+        docker: "jmonlong/samtools-jm:release-1.19jm0.2.2"
         preemptible: in_preemptible
     }
 }
@@ -287,10 +200,10 @@ task runVGMAP {
           --gbwt-name ~{in_gbwt_file} \
           -o gaf \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-          -t ~{in_map_cores} > ~{in_sample_name}.~{in_chunk_id}.gaf
+          -t ~{in_map_cores} | gzip > ~{in_sample_name}.~{in_chunk_id}.gaf.gz
     >>>
     output {
-        File chunk_gaf_file = in_sample_name + '.' + in_chunk_id + '.gaf'
+        File chunk_gaf_file = in_sample_name + '.' + in_chunk_id + '.gaf.gz'
     }
     runtime {
         memory: in_map_mem + " GB"
@@ -324,7 +237,7 @@ task mergeAlignmentGAFChunks {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
-    cat ~{sep=" " in_alignment_gaf_chunk_files} | gzip > ~{in_sample_name}_merged.gaf.gz
+    cat ~{sep=" " in_alignment_gaf_chunk_files} > ~{in_sample_name}_merged.gaf.gz
     >>>
     output {
         File merged_gaf_file = "~{in_sample_name}_merged.gaf.gz"
@@ -345,8 +258,9 @@ task runVGPackCaller {
         String in_sample_name
         File? in_vcf_file
         File in_xg_file
-        File in_gaf_file
+        Array[File] in_alignment_gaf_chunk_files
         File? in_snarl_file
+        File? in_refpath_file
         String in_vg_container
         Int in_vgcall_cores
         Int in_vgcall_disk
@@ -356,6 +270,7 @@ task runVGPackCaller {
 
     Boolean snarl_options = defined(in_snarl_file)
     Boolean vcf_options = defined(in_vcf_file)
+    Boolean refpath_options = defined(in_refpath_file)
     String graph_tag = basename(in_xg_file, ".xg")
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -369,12 +284,12 @@ task runVGPackCaller {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        vg pack \
-           -x ~{in_xg_file} \
-           -a ~{in_gaf_file} \
-           -Q 5 \
-           -t ~{in_vgcall_cores} \
-           -o ~{graph_tag}.~{in_sample_name}.pack
+        cat ~{sep=" " in_alignment_gaf_chunk_files} | vg pack \
+                                                         -x ~{in_xg_file} \
+                                                         -a - \
+                                                         -Q 5 \
+                                                         -t ~{in_vgcall_cores} \
+                                                         -o ~{graph_tag}.~{in_sample_name}.pack
 
         SNARL_OPTION_STRING=""
         if [ ~{snarl_options} == true ]; then
@@ -387,10 +302,18 @@ task runVGPackCaller {
           VCF_OPTION_STRING="-v ~{in_vcf_file}"
         fi
 
+        REFPATH_OPTION_STRING=""
+        if [ ~{refpath_options} == true ]; then
+            for RP in `cat ~{in_refpath_file}`
+            do
+                REFPATH_OPTION_STRING="-p $RP $REFPATH_OPTION_STRING"
+            done
+        fi
+
         vg call \
            -k ~{graph_tag}.~{in_sample_name}.pack \
            -t ~{in_vgcall_cores} \
-           -s ~{in_sample_name} ${SNARL_OPTION_STRING} ${VCF_OPTION_STRING} \
+           -s ~{in_sample_name} ${SNARL_OPTION_STRING} ${VCF_OPTION_STRING} ${REFPATH_OPTION_STRING} \
            ~{in_xg_file} > ~{graph_tag}.unsorted.vcf
 
         head -10000 ~{graph_tag}.unsorted.vcf | grep "^#" >> ~{graph_tag}.~{in_sample_name}.vcf
