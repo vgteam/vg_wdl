@@ -198,6 +198,7 @@ task runVGMAP {
           --rescue-algorithm ~{in_rescue_mode} \
           -N ~{in_sample_name} \
           --gbwt-name ~{in_gbwt_file} \
+          -C 500 \
           -o gaf \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
           -t ~{in_map_cores} | gzip > ~{in_sample_name}.~{in_chunk_id}.gaf.gz
