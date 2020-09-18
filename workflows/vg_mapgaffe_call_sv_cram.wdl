@@ -11,7 +11,6 @@ workflow vgMapCallSV {
         File INPUT_CRAM_FILE                                # Input CRAM file
         File CRAM_REF                                       # Genome fasta file associated with the CRAM file
         File CRAM_REF_INDEX                                 # Index of the fasta file associated with the CRAM file
-        String VG_CONTAINER = "jmonlong/vg:6c7450a"         # VG Container used in the pipeline
         File XG_FILE                                        # Path to .xg index file
         File GBWT_FILE                                      # Path to .gbwt index file
         File DIST_IDX_FILE                                  # Path to .dist index file
@@ -55,7 +54,6 @@ workflow vgMapCallSV {
             input:
             in_left_read_pair_chunk_file=splitCramFastq.output_read_chunks_1[chunk_id],
             in_right_read_pair_chunk_file=splitCramFastq.output_read_chunks_2[chunk_id],
-            in_vg_container=VG_CONTAINER,
             in_xg_file=XG_FILE,
             in_min_file=MIN_IDX_FILE,
             in_dist_file=DIST_IDX_FILE,
@@ -81,7 +79,6 @@ workflow vgMapCallSV {
         in_alignment_gaf_chunk_files=vg_map_algorithm_chunk_gaf_output,
         in_snarl_file=SNARL_FILE,
         in_refpath_file=REFPATH_FILE,
-        in_vg_container=VG_CONTAINER,
         in_vgcall_cores=VGCALL_CORES,
         in_vgcall_disk=VGCALL_DISK,
         in_vgcall_mem=VGCALL_MEM,
@@ -93,7 +90,6 @@ workflow vgMapCallSV {
         call mergeAlignmentGAFChunks {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_vg_container=VG_CONTAINER,
             in_alignment_gaf_chunk_files=vg_map_algorithm_chunk_gaf_output,
             in_merge_gaf_disk=MERGE_GAF_DISK,
             in_preemptible=PREEMPTIBLE
@@ -162,7 +158,6 @@ task runVGMAP {
         File in_min_file
         File in_dist_file
         File in_gbwt_file
-        String in_vg_container
         String in_sample_name
         Int in_chunk_id
         Boolean in_fast_mode
@@ -210,7 +205,7 @@ task runVGMAP {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.27.0-25-g43e408ca1-t361-run"
         preemptible: in_preemptible
     }
 }
@@ -220,7 +215,6 @@ task runVGMAP {
 task mergeAlignmentGAFChunks {
     input {
         String in_sample_name
-        String in_vg_container
         Array[File] in_alignment_gaf_chunk_files
         Int in_merge_gaf_disk
         Int in_preemptible
@@ -247,7 +241,7 @@ task mergeAlignmentGAFChunks {
         memory: "8 GB"
         cpu: 1
         disks: "local-disk " + in_merge_gaf_disk  + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.27.0-25-g43e408ca1-t361-run"
         preemptible: in_preemptible
     }
 }
@@ -262,7 +256,6 @@ task runVGPackCaller {
         Array[File] in_alignment_gaf_chunk_files
         File? in_snarl_file
         File? in_refpath_file
-        String in_vg_container
         Int in_vgcall_cores
         Int in_vgcall_disk
         Int in_vgcall_mem
@@ -334,7 +327,7 @@ task runVGPackCaller {
         cpu: in_vgcall_cores
         maxRetries: 3
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.27.0-25-g43e408ca1-t361-run"
         preemptible: in_preemptible
     }
 }

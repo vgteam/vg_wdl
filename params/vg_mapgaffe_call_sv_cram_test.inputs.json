@@ -9,7 +9,6 @@
     "vgMapCallSV.DIST_IDX_FILE": "graph.dist",
     "vgMapCallSV.SNARL_FILE": "graph.snarls",
     "vgMapCallSV.GBWT_FILE": "graph.gbwt",
-    "vgMapCallSV.VG_CONTAINER": "jmonlong/vg:6c7450a",
     "vgMapCallSV.NB_CRAM_CHUNKS": 8,
     "vgMapCallSV.MAX_CRAM_CHUNKS": 4,
     "vgMapCallSV.CRAM_CONVERT_CORES": 4,
