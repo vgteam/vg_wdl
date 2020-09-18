@@ -4,7 +4,7 @@ workflow vgMapCallSV {
     meta {
 	author: "Jean Monlong"
         email: "jmonlong@ucsc.edu"
-        description: "Read mapping and SV genotyping using vg. This workflow uses the new and faster mapper (giraffe). It takes a CRAM file and graphs containing the structural variants to genotype. The XG, minimizer and distance graph indexes as required, as well as the original VCF used to create the graph. Including the snarls index is optional but speeds up the computation. It outputs a VCF file. The CRAM files are converted to FASTQ in chunks. This is used to parallelize the CRAM conversion jobs and the mapping jobs. It also makes them short enough that they can be run on cheaper instances (e.g. pre-emptible). The NB_CRAM_CHUNKS parameter controls the number of chunks (~15 recommended for 20x Illumina WGS). The MAX_CRAM_CHUNKS parameter can be used to down-sample the reads by using only chunks up to MAX_CRAM_CHUNKS. For example, with NB_CRAM_CHUNKS=15 and MAX_CRAM_CHUNKS=5 only the first 5 chunks will be used, leading to downsampling 1/3 of the reads. To allow for preemptible instance, increase the PREEMPTIBLE attempts number parameter, e.g. PREEMPTIBLE=3." 
+        description: "Read mapping and SV genotyping using vg. This workflow uses the new and faster mapper (giraffe). It takes a CRAM file and indexes for a graph containing the structural variants to genotype. The XG, minimizer and distance graph indexes as required. Including the snarls index is optional but speeds up the computation. \n\nIt outputs a VCF file. By default, the VCF contains SV calls in the context of the snarls in the graph (i.e. variant site/bubbles). This helps merging the calls from multiple samples that used the same input graph. However it contains additional flanking sequences in the REF/ALT fields so should be normalized (e.g. using 'bcftools norm -f REF.fa VCF.vcf') before comparing with other SV catalogs or annotating the variants. If you are sure you don't want this 'snarl calling' behavior, set SNARL_CALLING to false. Finally, if the graph was built using a VCF and you want to genotype SVs using that same VCF, pass it to VCF_FILE and switch off the SNARL_CALLING which is not useful in that case.\n\nThe CRAM files are converted to FASTQ in chunks. This is used to parallelize the CRAM conversion jobs and the mapping jobs. It also makes them short enough that they can be run on cheaper instances (e.g. pre-emptible). The NB_CRAM_CHUNKS parameter controls the number of chunks (~15 recommended for 20x Illumina WGS). The MAX_CRAM_CHUNKS parameter can be used to down-sample the reads by using only chunks up to MAX_CRAM_CHUNKS. For example, with NB_CRAM_CHUNKS=15 and MAX_CRAM_CHUNKS=5 only the first 5 chunks will be used, leading to downsampling 1/3 of the reads. To allow for preemptible instance, increase the PREEMPTIBLE attempts number parameter, e.g. PREEMPTIBLE=3." 
     }
     input {
         String SAMPLE_NAME                                  # The sample name
@@ -20,8 +20,9 @@ workflow vgMapCallSV {
         File? REFPATH_FILE                                  # (OPTIONAL) Path to a file listing the reference paths
         Int NB_CRAM_CHUNKS = 8                              # Number of chunks to split the reads in
         Int MAX_CRAM_CHUNKS = 4                             # Number of chunks to actually analyze
-        Boolean GIRAFFE_FAST_MODE = false                   # Set to 'true' to use the fast mode for the read mapping with giraffe
-        String GIRAFFE_RESCUE_MODE = "gssw"                 # Rescue mode for the giraffe mapper. Either "gssw" (default) or "dozeu" (faster but currently a bit less accurate)
+        Boolean GIRAFFE_FAST_MODE = true                    # Set to 'false' to not use the fast mode for the read mapping with giraffe
+        String GIRAFFE_RESCUE_MODE = "dozeu"                # Rescue mode for the giraffe mapper. Either "dozeu" (default) or "gssw" (slower but currently a bit more accurate)
+        Boolean SNARL_CALLING = true                        # Return SV calls in the snarl context. Easier to merge results across samples, although requires 'bcftools norm -f REF.fa' to clean it up.
         Int CRAM_CONVERT_CORES = 4                          # Resources for the different tasks
         Int CRAM_CONVERT_DISK = 200
         Int MAP_CORES = 32
@@ -77,6 +78,7 @@ workflow vgMapCallSV {
         in_vcf_file=VCF_FILE,
         in_xg_file=XG_FILE, 
         in_alignment_gaf_chunk_files=vg_map_algorithm_chunk_gaf_output,
+        in_snarl_calling=SNARL_CALLING,
         in_snarl_file=SNARL_FILE,
         in_refpath_file=REFPATH_FILE,
         in_vgcall_cores=VGCALL_CORES,
@@ -254,6 +256,7 @@ task runVGPackCaller {
         File? in_vcf_file
         File in_xg_file
         Array[File] in_alignment_gaf_chunk_files
+        Boolean in_snarl_calling
         File? in_snarl_file
         File? in_refpath_file
         Int in_vgcall_cores
@@ -304,10 +307,15 @@ task runVGPackCaller {
             done
         fi
 
+        SNARL_CALLING_OPTION_STRING=""
+        if [ ~{in_snarl_calling} == true ]; then
+            SNARL_CALLING_OPTION_STRING="-a"
+        fi
+
         vg call \
            -k ~{graph_tag}.~{in_sample_name}.pack \
            -t ~{in_vgcall_cores} \
-           -s ~{in_sample_name} ${SNARL_OPTION_STRING} ${VCF_OPTION_STRING} ${REFPATH_OPTION_STRING} \
+           -s ~{in_sample_name} ${SNARL_CALLING_OPTION_STRING} ${SNARL_OPTION_STRING} ${VCF_OPTION_STRING} ${REFPATH_OPTION_STRING} \
            ~{in_xg_file} > ~{graph_tag}.unsorted.vcf
 
         head -10000 ~{graph_tag}.unsorted.vcf | grep "^#" >> ~{graph_tag}.~{in_sample_name}.vcf

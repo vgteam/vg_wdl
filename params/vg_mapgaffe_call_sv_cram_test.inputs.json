@@ -3,7 +3,6 @@
     "vgMapCallSV.CRAM_REF": "ref.fa", 
     "vgMapCallSV.CRAM_REF_INDEX": "ref.fa.fai", 
     "vgMapCallSV.SAMPLE_NAME": "test_sample_SV",
-    "vgMapCallSV.VCF_FILE": "svs.vcf.gz",
     "vgMapCallSV.XG_FILE": "graph.xg",
     "vgMapCallSV.MIN_IDX_FILE": "graph.min",
     "vgMapCallSV.DIST_IDX_FILE": "graph.dist",
