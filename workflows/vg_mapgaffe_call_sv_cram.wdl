@@ -207,7 +207,7 @@ task runVGMAP {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.27.0-25-g43e408ca1-t361-run"
+        docker: "quay.io/vgteam/vg:v1.27.0-113-g47c1b30df-t362-run"
         preemptible: in_preemptible
     }
 }
@@ -243,7 +243,7 @@ task mergeAlignmentGAFChunks {
         memory: "8 GB"
         cpu: 1
         disks: "local-disk " + in_merge_gaf_disk  + " SSD"
-        docker: "quay.io/vgteam/vg:v1.27.0-25-g43e408ca1-t361-run"
+        docker: "quay.io/vgteam/vg:v1.27.0-113-g47c1b30df-t362-run"
         preemptible: in_preemptible
     }
 }
@@ -335,7 +335,7 @@ task runVGPackCaller {
         cpu: in_vgcall_cores
         maxRetries: 3
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.27.0-25-g43e408ca1-t361-run"
+        docker: "quay.io/vgteam/vg:v1.27.0-113-g47c1b30df-t362-run"
         preemptible: in_preemptible
     }
 }
