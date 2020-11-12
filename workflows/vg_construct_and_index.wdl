@@ -335,7 +335,7 @@ task gbwt_index {
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
-        vg index --threads "$(nproc --all)" -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
+        vg index --threads "$(nproc --all)" --force-phasing --discard-overlaps -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     >>>
 
     output {
