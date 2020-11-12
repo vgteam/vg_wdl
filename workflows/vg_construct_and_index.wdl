@@ -34,6 +34,9 @@ workflow vg_construct_and_index {
         # set true to include decoy sequences from reference genome FASTA into VG graph construction
         Boolean use_decoys = false
         
+        # set true to include structural variants from input vcfs into VG graph construction
+        Boolean use_svs = false
+        
         # regex to use in grep for extracting decoy contig names from reference FASTA
         String decoy_regex = ">GL\|>NC_007605\|>hs37d5"
         
@@ -48,6 +51,7 @@ workflow vg_construct_and_index {
             contig = p.left,
             vcf_gz = p.right,
             use_haplotypes = use_haplotypes,
+            use_svs = use_svs,
             vg_docker = vg_docker,
             construct_cores = 2
         }
@@ -65,6 +69,7 @@ workflow vg_construct_and_index {
                 ref_fasta_gz = ref_fasta_gz,
                 contig = contig,
                 use_haplotypes = false,
+                use_svs = false,
                 vg_docker = vg_docker,
                 construct_cores = 2
             }
@@ -212,7 +217,8 @@ task construct_graph {
         File? vcf_gz
         String contig
         Boolean use_haplotypes
-        String vg_construct_options="--node-max 32 --handle-sv"
+        Boolean use_svs
+        String vg_construct_options="--node-max 32"
         String vg_docker
         Int construct_cores
     }
@@ -227,8 +233,13 @@ task construct_graph {
             tabix "~{vcf_gz}"
             VCF_OPTION_STRING="-v ~{vcf_gz} --region-is-chrom"
         fi
+        
+        VG_SV_OPTION=""
+        if [ ~{use_svs} == true ]; then
+            VG_SV_OPTION="--handle-sv"
+        fi
 
-        vg construct --threads ~{construct_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg" \
+        vg construct --threads ~{construct_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ${VG_SV_OPTION} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg" \
         && rm -f ref.fa
     >>>
 
@@ -237,7 +248,7 @@ task construct_graph {
     }
 
     runtime {
-        time: 20
+        time: 200
         cpu: construct_cores
         memory: 5 + " GB"
         disks: "local-disk 10 SSD"
@@ -293,7 +304,7 @@ task combine_graphs {
         done < "~{write_lines(contigs_vg)}"
         xargs -n 999999 vg ids -j -m empty.id_map < all_contigs_uid_vg
         mkdir concat
-        xargs -n 999999 cat < all_contigs_uid_vg > "concat/${graph_name}.vg"
+        xargs -n 999999 vg combine < all_contigs_uid_vg > "concat/${graph_name}.vg"
     }
 
     output {
@@ -305,8 +316,8 @@ task combine_graphs {
     }
 
     runtime {
-        time: 180
-        memory: 20 + " GB"
+        time: 800
+        memory: 100 + " GB"
         docker: vg_docker
     }
 }
@@ -332,9 +343,9 @@ task gbwt_index {
     }
 
     runtime {
-        time: 30
+        time: 800
         cpu: 30
-        memory: 15 + " GB"
+        memory: 100 + " GB"
         disks: "local-disk 10 SSD"
         docker: vg_docker
     }
@@ -358,8 +369,8 @@ task gbwt_merge {
     }
 
     runtime {
-        time: 10
-        memory: 15 + " GB"
+        time: 100
+        memory: 100 + " GB"
         disks: "local-disk 10 SSD"
         docker: vg_docker
     }
