@@ -25,15 +25,18 @@ workflow vgTrioPipeline {
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Sample name for siblings where the proband file is listed first followed by the siblings
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.28.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int READS_PER_CHUNK = 10000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                                        # Path to .xg index file
-        File GCSA_FILE                                      # Path to .gcsa index file
-        File GCSA_LCP_FILE                                  # Path to .gcsa.lcp index file
+        File? GCSA_FILE                                     # (OPTIONAL) Path to .gcsa index file
+        File? GCSA_LCP_FILE                                 # (OPTIONAL) Path to .gcsa.lcp index file
         File? GBWT_FILE                                     # (OPTIONAL) Path to .gbwt index file
+        File? GGBWT_FILE                                    # (OPTIONAL) Path to .gg index file
+        File? DIST_FILE                                     # (OPTIONAL) Path to .dist index file
+        File? MIN_FILE                                      # (OPTIONAL) Path to .min index file
         File? SNARLS_FILE                                   # (OPTIONAL) Path to .snarls index file
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
@@ -54,21 +57,18 @@ workflow vgTrioPipeline {
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
-        String DRAGEN_REF_INDEX_NAME                        # Dragen module based reference index directory (e.g. "hs37d5_v7")
-        String UDPBINFO_PATH                                # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
-        String HELIX_USERNAME                               # The nih helix username which holds a user directory in UDPBINFO_PATH
         Array[String]+ CONTIGS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "MT"]
         File REF_FASTA_GZ
         File PED_FILE
         File? GEN_MAP_FILES
         String GRAPH_NAME
-        Boolean VGMPMAP_MODE = false                     # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm
-        Boolean DRAGEN_MODE = false                     # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
-        Boolean USE_HAPLOTYPES = true                   # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
+        String MAPPER = "GIRAFFE"                       # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
+        Boolean DEEPVARIANT_MODE = false                # Set to 'true' to use the DeepVariant variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
+        Boolean GIRAFFE_INDEXES = true                  # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
         Boolean MAKE_SNARLS = false                     # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
-        Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
+        Boolean CLEANUP_FILES = true                    # Set to 'false' to turn off intermediate file cleanup.
         String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
@@ -110,13 +110,10 @@ workflow vgTrioPipeline {
             VGCALL_CORES=VGCALL_CORES,
             VGCALL_DISK=VGCALL_DISK,
             VGCALL_MEM=VGCALL_MEM,
-            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-            UDPBINFO_PATH=UDPBINFO_PATH,
-            HELIX_USERNAME=HELIX_USERNAME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            MAPPER=MAPPER,
             CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
+            DEEPVARIANT_MODE=DEEPVARIANT_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false
     }
@@ -151,13 +148,10 @@ workflow vgTrioPipeline {
             VGCALL_CORES=VGCALL_CORES,
             VGCALL_DISK=VGCALL_DISK,
             VGCALL_MEM=VGCALL_MEM,
-            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-            UDPBINFO_PATH=UDPBINFO_PATH,
-            HELIX_USERNAME=HELIX_USERNAME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            MAPPER=MAPPER,
             CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
+            DEEPVARIANT_MODE=DEEPVARIANT_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false
     }
@@ -192,13 +186,10 @@ workflow vgTrioPipeline {
             VGCALL_CORES=VGCALL_CORES,
             VGCALL_DISK=VGCALL_DISK,
             VGCALL_MEM=VGCALL_MEM,
-            DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-            UDPBINFO_PATH=UDPBINFO_PATH,
-            HELIX_USERNAME=HELIX_USERNAME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            MAPPER=MAPPER,
             CLEANUP_FILES=CLEANUP_FILES,
             SURJECT_MODE=true,
-            DRAGEN_MODE=DRAGEN_MODE,
+            DEEPVARIANT_MODE=DEEPVARIANT_MODE,
             GVCF_MODE=true,
             SNPEFF_ANNOTATION=false
     }
@@ -206,7 +197,7 @@ workflow vgTrioPipeline {
     ###############################
     ## Run trio joint genotyping ##
     ###############################
-    if (!DRAGEN_MODE) {
+    if (!DEEPVARIANT_MODE) {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper1st {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
@@ -226,24 +217,21 @@ workflow vgTrioPipeline {
                 in_vgcall_mem=VGCALL_MEM
         }
     }
-    if (DRAGEN_MODE) {
-        call runDragenJointGenotyper as dragenJointGenotyper1st {
+    if (DEEPVARIANT_MODE) {
+        runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
             input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
-                in_gvcf_files_siblings=[probandMapCallWorkflow.output_vcf],
-                in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                in_udp_data_dir=UDPBINFO_PATH,
-                in_helix_username=HELIX_USERNAME
+                in_gvcf_files_siblings=[probandMapCallWorkflow.output_vcf]
         }
     }
     
     #####################################
     ## Run parental graph construction ##
     #####################################
-    File output_joint_genotyped_vcf = select_first([bgzipGATKGVCF.output_merged_vcf, dragenJointGenotyper1st.dragen_joint_genotyped_vcf])
-    File output_joint_genotyped_vcf_index = select_first([bgzipGATKGVCF.output_merged_vcf_index, dragenJointGenotyper1st.dragen_joint_genotyped_vcf_index])
+    File output_joint_genotyped_vcf = select_first([bgzipGATKGVCF.output_merged_vcf, deepVarJointGenotyper1st.joint_genotyped_vcf])
+    File output_joint_genotyped_vcf_index = select_first([bgzipGATKGVCF.output_merged_vcf_index, deepVarJointGenotyper1st.joint_genotyped_vcf_index])
     if (USE_HAPLOTYPES) {
         call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
             input:
@@ -308,7 +296,7 @@ workflow vgTrioPipeline {
             ref_fasta_gz=REF_FASTA_GZ,
             contigs=CONTIGS,
             contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
-            use_haplotypes=USE_HAPLOTYPES,
+            giraffe_indexes=USE_HAPLOTYPES,
             make_snarls=MAKE_SNARLS,
             use_decoys=USE_DECOYS,
             decoy_regex=DECOY_REGEX,
@@ -352,13 +340,10 @@ workflow vgTrioPipeline {
                 VGCALL_CORES=VGCALL_CORES,
                 VGCALL_DISK=VGCALL_DISK,
                 VGCALL_MEM=VGCALL_MEM,
-                DRAGEN_REF_INDEX_NAME=DRAGEN_REF_INDEX_NAME,
-                UDPBINFO_PATH=UDPBINFO_PATH,
-                HELIX_USERNAME=HELIX_USERNAME,
-                VGMPMAP_MODE=VGMPMAP_MODE,
+                MAPPER=MAPPER,
                 CLEANUP_FILES=CLEANUP_FILES,
                 SURJECT_MODE=true,
-                DRAGEN_MODE=DRAGEN_MODE,
+                DEEPVARIANT_MODE=DEEPVARIANT_MODE,
                 GVCF_MODE=true,
                 SNPEFF_ANNOTATION=false
         }
@@ -374,7 +359,7 @@ workflow vgTrioPipeline {
     #######################################################
     ## Run 2nd trio joint genotyping on new proband GVCF ##
     #######################################################
-    if (!DRAGEN_MODE) {
+    if (!DEEPVARIANT_MODE) {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper2nd {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
@@ -394,20 +379,17 @@ workflow vgTrioPipeline {
                 in_vgcall_mem=VGCALL_MEM
         }
     }
-    if (DRAGEN_MODE) {
-        call runDragenJointGenotyper as dragenJointGenotyper2nd {
+    if (DEEPVARIANT_MODE) {
+        runDeepVariantJointGenotyper as deepVarJointGenotyper2nd {
             input:
                 in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
                 in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
-                in_gvcf_files_siblings=gvcf_files_siblings,
-                in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                in_udp_data_dir=UDPBINFO_PATH,
-                in_helix_username=HELIX_USERNAME
+                in_gvcf_files_siblings=gvcf_files_siblings
         }
     }
-    File output_2nd_joint_genotyped_vcf = select_first([bgzip2ndGATKGVCF.output_merged_vcf, dragenJointGenotyper2nd.dragen_joint_genotyped_vcf])
-    File output_2nd_joint_genotyped_vcf_index = select_first([bgzip2ndGATKGVCF.output_merged_vcf_index, dragenJointGenotyper2nd.dragen_joint_genotyped_vcf_index])
+    File output_2nd_joint_genotyped_vcf = select_first([bgzip2ndGATKGVCF.output_merged_vcf, deepVarJointGenotyper2nd.joint_genotyped_vcf])
+    File output_2nd_joint_genotyped_vcf_index = select_first([bgzip2ndGATKGVCF.output_merged_vcf_index, deepVarJointGenotyper2nd.joint_genotyped_vcf_index])
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
         call vgMultiMapCallWorkflow.normalizeVCF as normalizeCohortVCF {
@@ -544,63 +526,42 @@ task runGATKCombineGenotypeGVCFs {
     }
 }
 
-task runDragenJointGenotyper {
+task runDeepVariantJointGenotyper {
     input {
         String in_sample_name
         File in_gvcf_file_maternal
         File in_gvcf_file_paternal
         Array[File]+ in_gvcf_files_siblings
-        String in_dragen_ref_index_name
-        String in_udp_data_dir
-        String in_helix_username
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
     }
 
-    String maternal_gvcf_file_name = basename(in_gvcf_file_maternal)
-    String paternal_gvcf_file_name = basename(in_gvcf_file_paternal)
-
-    command <<<
+    command {
         set -exu -o pipefail
-
-        ## Copy input GVCFs into directory that Dragen can access
-        UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
-        DRAGEN_SIBLING_VCF_INPUT=""
-        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
-            SIBLING_BASENAME="$(basename $sibling_gvcf_file)"
-            DRAGEN_SIBLING_VCF_INPUT+="--variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/${SIBLING_BASENAME} "
+        
+        tabix -f -p vcf ${in_gvcf_file_maternal}
+        tabix -f -p vcf ${in_gvcf_file_paternal}
+        for sibling_gvcf_file in ${sep=" " in_gvcf_files_siblings} ; do
+            tabix -f -p vcf "$sibling_gvcf_file"
         done
-        mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ && \
-        cp ~{in_gvcf_file_maternal} ~{in_gvcf_file_paternal} ~{sep=" " in_gvcf_files_siblings} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ && \
-        JOINT_GENOTYPE_DRAGEN_WORK_DIR="/staging/~{in_helix_username}/output_cohort_joint_call_~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp"
-        if [[ ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/ = *[[:space:]]* ]]; then
-            echo "ERROR: JOINT_GENOTYPE_DRAGEN_WORK_DIR variable contains whitespace"
-            exit 1
-        fi
-        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ = *[[:space:]]* ]]; then
-            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/ variable contains whitespace"
-            exit 1
-        fi
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} --enable-joint-genotyping true --intermediate-results-dir ${TMP_DIR} --output-directory ${JOINT_GENOTYPE_DRAGEN_WORK_DIR} --output-file-prefix cohort_joint_genotyped_~{in_sample_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} --variant /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} ${DRAGEN_SIBLING_VCF_INPUT}\"\' && \
-        mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "cp -R ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "rm -fr ${JOINT_GENOTYPE_DRAGEN_WORK_DIR}/" && \
-        mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_joint_genotyper ~{in_sample_name}_dragen_joint_genotyper && \
-        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{maternal_gvcf_file_name} && \
-        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/~{paternal_gvcf_file_name} && \
-        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
-            SIBLING_BASENAME="$(basename $sibling_gvcf_file)"
-            rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/${SIBLING_BASENAME}
-        done && \
-        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_cohort_gvcfs/
-    >>>
+         
+        /usr/local/bin/glnexus_cli \
+        --config DeepVariantWGS \
+        ${in_gvcf_file_maternal} \
+        ${in_gvcf_file_paternal} \
+        ${sep=" " in_gvcf_files_siblings} \
+        | bcftools view - | bgzip -c > ${in_sample_name}_cohort.jointgenotyped.vcf.gz \
+        && tabix -f -p vcf ${in_sample_name}_cohort.jointgenotyped.vcf.gz
+    }
     output {
-        File dragen_joint_genotyped_vcf = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz"
-        File dragen_joint_genotyped_vcf_index = "~{in_sample_name}_dragen_joint_genotyper/cohort_joint_genotyped_~{in_sample_name}.vcf.gz.tbi"
+        File joint_genotyped_vcf = "${in_sample_name}_cohort.jointgenotyped.vcf.gz"
+        File joint_genotyped_vcf_index = "${in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
-        memory: 50 + " GB"
+        memory: 100 + " GB"
+        cpu: 32
+        docker: "quay.io/mlin/glnexus:v1.2.7"
     }
 }
 

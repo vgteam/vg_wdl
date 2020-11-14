@@ -25,11 +25,8 @@ workflow vg_construct_and_index {
         # VCF for each contig
         Array[File]+ contigs_vcf_gz
 
-        # set true to GBWT index the VCF phased haplotypes
-        Boolean use_haplotypes = false
-        
-        # set true to generate SNARLS index of VG graph
-        Boolean make_snarls = false
+        # set true to build giraffe-required indexes
+        Boolean giraffe_indexes = false
         
         # set true to include decoy sequences from reference genome FASTA into VG graph construction
         Boolean use_decoys = false
@@ -41,7 +38,7 @@ workflow vg_construct_and_index {
         String decoy_regex = ">GL\|>NC_007605\|>hs37d5"
         
         # vg docker image tag
-        String vg_docker = "quay.io/vgteam/vg:v1.19.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.28.0"
     }
 
     # construct graph for each reference contig
@@ -50,7 +47,7 @@ workflow vg_construct_and_index {
             ref_fasta_gz = ref_fasta_gz,
             contig = p.left,
             vcf_gz = p.right,
-            use_haplotypes = use_haplotypes,
+            use_haplotypes = giraffe_indexes,
             use_svs = use_svs,
             vg_docker = vg_docker,
             construct_cores = 2
@@ -91,7 +88,7 @@ workflow vg_construct_and_index {
     }
 
     # make GBWT index, if so configured
-    if (use_haplotypes) {
+    if (giraffe_indexes) {
         scatter (p in zip(combine_graphs.contigs_uid_vg, contigs_vcf_gz)) {
             call gbwt_index { input:
                 vg = p.left,
@@ -109,22 +106,6 @@ workflow vg_construct_and_index {
         File? final_gbwt = if (defined(gbwt_merge.gbwt)) then gbwt_merge.gbwt else gbwt_index.gbwt[0]
     }
     
-    # make snarls index
-    if (make_snarls) {
-        scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
-            call snarls_index { input:
-                vg = contig_vg,
-                graph_name = graph_name,
-                vg_docker = vg_docker
-            }
-        }
-        call snarls_merge { input:
-            snarls = snarls_index.snarls,
-            graph_name = graph_name,
-            vg_docker = vg_docker
-        }
-    }
-    
     # make xg index
     call xg_index { input:
         graph_name = graph_name,
@@ -137,7 +118,7 @@ workflow vg_construct_and_index {
     # significantly if we're using haplotypes or not.
     # If setting prune_options, make sure to set prune_graph.prune_options or
     # prune_graph_with_haplotypes.prune_options according to the desired path.
-    if (!use_haplotypes) {
+    if (!giraffe_indexes) {
         scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
             call prune_graph { input:
                 contig_vg = contig_vg,
@@ -145,7 +126,7 @@ workflow vg_construct_and_index {
             }
         }
     }
-    if (use_haplotypes) {
+    if (giraffe_indexes) {
         call prune_graph_with_haplotypes { input:
             contigs_vg = combine_graphs.contigs_uid_vg,
             contigs_gbwt = select_first([gbwt_index.gbwt]),
@@ -169,21 +150,64 @@ workflow vg_construct_and_index {
         }
     }
     
-    # make GCSA index
-    call gcsa_index { input:
-        graph_name = graph_name,
-        contigs_pruned_vg = select_first([concat_pruned_vg_graph_lists.out, prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
-        id_map = select_first([prune_graph_with_haplotypes.pruned_id_map,combine_graphs.empty_id_map]),
-        vg_docker = vg_docker
+    if (giraffe_indexes) {
+        # make Trivial Snarls index
+        scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
+            call snarls_index { input:
+                vg = contig_vg,
+                graph_name = graph_name,
+                vg_docker = vg_docker,
+                construct_cores = 2
+            }
+        }
+        call snarls_merge { input:
+            snarls = snarls_index.snarls,
+            graph_name = graph_name,
+            vg_docker = vg_docker
+        }
+        # make Distance index
+        call dist_index { input:
+            graph_name = graph_name,
+            xg = xg_index.xg,
+            trivial_snarls = snarls_merge.merged_snarls,
+            construct_cores = 32
+        }
+        # make Graph GBWT index
+        call sampled_gbwt_index { input:
+            graph_name = graph_name,
+            merged_gbwt = final_gbwt,
+            xg = xg_index.xg,
+            construct_cores = 32
+        }
+        # make Minimizer index
+        call min_index { input:
+            graph_name = graph_name,
+            sampled_gbwt = sampled_gbwt_index.sampled_gbwt,
+            sampled_gg = sampled_gbwt_index.sampled_gg,
+            dist = dist_index.dist,
+            construct_cores = 32
+        }
+    }
+    if (!giraffe_indexes) {
+        # make GCSA index
+        call gcsa_index { input:
+            graph_name = graph_name,
+            contigs_pruned_vg = select_first([concat_pruned_vg_graph_lists.out, prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
+            id_map = select_first([prune_graph_with_haplotypes.pruned_id_map,combine_graphs.empty_id_map]),
+            vg_docker = vg_docker
+        }
     }
 
     output {
         File vg = combine_graphs.vg
         File xg = xg_index.xg
-        File gcsa = gcsa_index.gcsa
-        File gcsa_lcp = gcsa_index.lcp
-        File? gbwt = final_gbwt
+        File? gcsa = gcsa_index.gcsa
+        File? gcsa_lcp = gcsa_index.lcp
+        File? gbwt = select_first([sampled_gbwt_index.sampled_gbwt, final_gbwt])
+        File? ggbwt = sampled_gbwt_index.sampled_gg
         File? snarls = snarls_merge.merged_snarls
+        File? dist = dist_index.dist
+        File? min = min_index.min
     }
 }
 
@@ -382,12 +406,13 @@ task snarls_index {
         File vg
         String graph_name
         String vg_docker
+        Int construct_cores
     }
     
     command {
         set -exu -o pipefail
         nm=$(basename "~{vg}" .vg)
-        vg snarls -t ~{vg} > "$nm.snarls"
+        vg snarls -t ~{construct_cores} --include-trivial ~{vg} > "$nm.snarls"
     }
     
     output {
@@ -395,6 +420,7 @@ task snarls_index {
     }
      
     runtime {
+        cpu: construct_cores
         memory: 40 + " GB"
         disks: "local-disk 100 SSD"
         docker: vg_docker
@@ -445,6 +471,80 @@ task xg_index {
     runtime {
         time: 240
         cpu: 32
+        memory: 50 + " GB"
+        disks: "local-disk 10 SSD"
+        docker: vg_docker
+    }
+}
+
+# Make the distance index
+task dist_index { 
+    input {
+        String graph_name
+        File xg
+        File trivial_snarls
+        Int construct_cores
+    }
+    command <<<
+        set -exu -o pipefail
+        vg index --threads ~{construct_cores} -x ~{xg} -s ~{trivial_snarls} -j "~{graph_name}.dist"
+    >>>
+    output {
+        File dist = "~{graph_name}.dist"
+    }
+    runtime {
+        time: 240
+        cpu: construct_cores
+        memory: 50 + " GB"
+        disks: "local-disk 10 SSD"
+        docker: vg_docker
+    }
+}
+
+# Make the sampled gbwt and graph gbwt index
+task sampled_gbwt_index { 
+    input {
+        String graph_name
+        File gbwt
+        File xg
+        Int construct_cores
+    }
+    command <<<
+        set -exu -o pipefail
+        vg gbwt -l -n 16 --threads ~{construct_cores} ~{gbwt} -x ~{xg} -o "~{graph_name}.sampled.gbwt" -g "~{graph_name}.sampled.gg"
+    >>>
+    output {
+        File sampled_gbwt = "~{graph_name}.sampled.gbwt"
+        File sampled_gg = "~{graph_name}.sampled.gg"
+    }
+    runtime {
+        time: 240
+        cpu: construct_cores
+        memory: 50 + " GB"
+        disks: "local-disk 10 SSD"
+        docker: vg_docker
+    }
+}
+
+# Make the minimizer index
+task min_index { 
+    input {
+        String graph_name
+        File sampled_gbwt
+        File sampled_gg
+        File dist
+        Int construct_cores
+    }
+    command <<<
+        set -exu -o pipefail
+        vg minimizer --threads ~{construct_cores} -g ~{sampled_gbwt} -G ~{sampled_gg} -d ~{dist} -i "~{graph_name}.min"
+    >>>
+    output {
+        File min = "~{graph_name}.min"
+    }
+    runtime {
+        time: 240
+        cpu: construct_cores
         memory: 50 + " GB"
         disks: "local-disk 10 SSD"
         docker: vg_docker

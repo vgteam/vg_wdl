@@ -9,9 +9,9 @@ workflow vgMultiMapCall {
     }
     
     input {
-        Boolean VGMPMAP_MODE = false             # Set to 'false' to use "VG MAP" or set to 'true' to use "VG MPMAP" algorithm.
+        String MAPPER = "GIRAFFE"               # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
-        Boolean DRAGEN_MODE = false             # Set to 'true' to use the Dragen modules variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
+        Boolean DEEPVARIANT_MODE = false        # Set to 'true' to use the DeepVariant variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.
         Boolean SNPEFF_ANNOTATION = true        # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean SV_CALLER_MODE = false          # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
@@ -20,21 +20,24 @@ workflow vgMultiMapCall {
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg@sha256:9b5a50376033fa228815ffae0a9affc33870e09214612b67d1cf5e710051a006"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        String PCR_INDEL_MODEL = "CONSERVATIVE"     # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.28.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String PCR_INDEL_MODEL = "CONSERVATIVE" # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                      # Number of overlapping bases between each .gam chunk
         File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                            # Path to .xg index file
-        File GCSA_FILE                          # Path to .gcsa index file
-        File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
+        File? GCSA_FILE                         # Path to .gcsa index file
+        File? GCSA_LCP_FILE                     # Path to .gcsa.lcp index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
+        File? GGBWT_FILE                        # (OPTIONAL) Path to .gg index file
+        File? DIST_FILE                         # (OPTIONAL) Path to .dist index file
+        File? MIN_FILE                          # (OPTIONAL) Path to .min index file
         File? SNARLS_FILE                       # (OPTIONAL) Path to .snarls index file
         File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
-        File? SNPEFF_DATABASE                    # Path to snpeff database .zip file for snpEff annotation functionality.
+        File? SNPEFF_DATABASE                   # Path to snpeff database .zip file for snpEff annotation functionality.
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 32
@@ -50,9 +53,6 @@ workflow vgMultiMapCall {
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 80
-        String DRAGEN_REF_INDEX_NAME            # Dragen module based reference index directory (e.g. "hs37d5_v7")
-        String UDPBINFO_PATH                    # Udp data directory to use for Dragen module (e.g. "Udpbinfo", nih biowulf system only)
-        String HELIX_USERNAME                   # The nih helix username which holds a user directory in UDPBINFO_PATH
     }
     
     # Split input reads into chunks for parallelized mapping
@@ -90,7 +90,7 @@ workflow vgMultiMapCall {
     ################################################################
     Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-        if (VGMPMAP_MODE) {
+        if (MAPPER == "MPMAP") {
             call runVGMPMAP {
                 input:
                     in_left_read_pair_chunk_file=read_pair_chunk_files.left,
@@ -101,13 +101,15 @@ workflow vgMultiMapCall {
                     in_gcsa_lcp_file=GCSA_LCP_FILE,
                     in_gbwt_file=GBWT_FILE,
                     in_snarls_file=SNARLS_FILE,
+                    in_ref_dict=REF_DICT_FILE,
                     in_sample_name=SAMPLE_NAME,
+                    surject_output=SURJECT_MODE,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM
             }
         } 
-        if (!VGMPMAP_MODE) {
+        if (MAPPER == "MAP") {
             call runVGMAP {
                 input:
                     in_left_read_pair_chunk_file=read_pair_chunk_files.left,
@@ -117,7 +119,28 @@ workflow vgMultiMapCall {
                     in_gcsa_file=GCSA_FILE,
                     in_gcsa_lcp_file=GCSA_LCP_FILE,
                     in_gbwt_file=GBWT_FILE,
+                    in_ref_dict=REF_DICT_FILE,
                     in_sample_name=SAMPLE_NAME,
+                    surject_output=SURJECT_MODE,
+                    in_map_cores=MAP_CORES,
+                    in_map_disk=MAP_DISK,
+                    in_map_mem=MAP_MEM
+            }
+        }
+        if (MAPPER == "GIRAFFE") {
+            call runVGGIRAFFE {
+                input:
+                    in_left_read_pair_chunk_file=read_pair_chunk_files.left,
+                    in_right_read_pair_chunk_file=read_pair_chunk_files.right,
+                    in_vg_container=VG_CONTAINER,
+                    in_xg_file=XG_FILE,
+                    in_gbwt_file=GBWT_FILE,
+                    in_ggbwt_file=GGBWT_FILE,
+                    in_dist_file=DIST_FILE,
+                    in_min_file=MIN_FILE,
+                    in_ref_dict=REF_DICT_FILE,
+                    in_sample_name=SAMPLE_NAME,
+                    surject_output=SURJECT_MODE,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM
@@ -125,7 +148,7 @@ workflow vgMultiMapCall {
         }
         
         # Surject GAM alignment files to BAM if SURJECT_MODE set to true
-        File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file])
+        File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file, runVGGIRAFFE.chunk_gam_file])
         # Cleanup input reads after use
         if (CLEANUP_FILES) {
             if (GOOGLE_CLEANUP_MODE) {
@@ -144,20 +167,10 @@ workflow vgMultiMapCall {
             }
         }
         if (SURJECT_MODE) {
-            call runSurject {
-                input:
-                    in_gam_chunk_file=vg_map_algorithm_chunk_gam_output,
-                    in_xg_file=XG_FILE,
-                    in_vg_container=VG_CONTAINER,
-                    in_sample_name=SAMPLE_NAME,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
-            }
             call sortMDTagBAMFile {
                 input:
                     in_sample_name=SAMPLE_NAME,
-                    in_bam_chunk_file=runSurject.chunk_bam_file,
+                    in_bam_chunk_file=vg_map_algorithm_chunk_gam_output,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_reference_dict_file=REF_DICT_FILE,
@@ -171,14 +184,14 @@ workflow vgMultiMapCall {
                 if (GOOGLE_CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                         input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file],
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
                             current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                         input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output, runSurject.chunk_bam_file],
+                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
                             current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
                     }
                 }
@@ -221,23 +234,22 @@ workflow vgMultiMapCall {
         }
          
         # Run VCF variant calling procedure
-        if (!GVCF_MODE) {
-            # Run VCF genotypers
-            if (!DRAGEN_MODE) {
-                # Split merged alignment by contigs list
-                call splitBAMbyPath {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_merged_bam_file=merged_bam_file_output,
-                        in_merged_bam_file_index=merged_bam_file_index_output,
-                        in_path_list_file=pipeline_path_list_file,
-                        in_map_cores=MAP_CORES,
-                        in_map_disk=MAP_DISK,
-                        in_map_mem=MAP_MEM
-                }
-                # Run distributed GATK linear variant calling
-                scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
-                    # Run regular VCF genotypers
+        # Split merged alignment by contigs list
+        call splitBAMbyPath {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_merged_bam_file=merged_bam_file_output,
+                in_merged_bam_file_index=merged_bam_file_index_output,
+                in_path_list_file=pipeline_path_list_file,
+                in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
+                in_map_mem=MAP_MEM
+        }
+        # Run distributed GATK linear variant calling
+        scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
+            if (!GVCF_MODE) {
+                # Run regular VCF genotypers
+                if (!DEEPVARIANT_MODE) {
                     call runGATKHaplotypeCaller {
                         input:
                             in_sample_name=SAMPLE_NAME,
@@ -254,14 +266,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call cleanUpGoogleFilestore as cleanUpLinearCallerInputsGoogle {
+                            call cleanUpGoogleFilestore as cleanUpGATKCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCaller.genotyped_vcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call cleanUpUnixFilesystem as cleanUpLinearCallerInputsUnix {
+                            call cleanUpUnixFilesystem as cleanUpGATKCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCaller.genotyped_vcf
@@ -269,71 +281,129 @@ workflow vgMultiMapCall {
                         }
                     }
                 }
-                # Merge linear-based called VCFs
-                Array[File?] final_contig_vcf_output = runGATKHaplotypeCaller.genotyped_vcf
-                Array[File] final_contig_vcf_output_list = select_all(final_contig_vcf_output)
-                call concatClippedVCFChunks as concatLinearVCFChunks {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_clipped_vcf_chunk_files=final_contig_vcf_output_list,
-                        in_vgcall_disk=VGCALL_DISK,
-                        in_vgcall_mem=VGCALL_MEM
+                if (DEEPVARIANT_MODE) {
+                    call runDeepVariantCaller {
+                        input:
+                            in_sample_name=SAMPLE_NAME,
+                            in_bam_file=gatk_caller_input_files.left,
+                            in_bam_file_index=gatk_caller_input_files.right,
+                            in_pcr_indel_model=PCR_INDEL_MODEL,
+                            in_reference_file=REF_FILE,
+                            in_reference_index_file=REF_INDEX_FILE,
+                            in_reference_dict_file=REF_DICT_FILE,
+                            in_vgcall_cores=VGCALL_CORES,
+                            in_vgcall_disk=VGCALL_DISK,
+                            in_vgcall_mem=VGCALL_MEM
+                    }
+                    # Cleanup intermediate variant calling files after use
+                    if (CLEANUP_FILES) {
+                        if (GOOGLE_CLEANUP_MODE) {
+                            call cleanUpGoogleFilestore as cleanUpDeepVariantCallerInputsGoogle {
+                                input:
+                                    previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                    current_task_output = runDeepVariantCaller.genotyped_vcf
+                            }
+                        }
+                        if (!GOOGLE_CLEANUP_MODE) {
+                            call cleanUpUnixFilesystem as cleanUpDeepVariantCallerInputsUnix {
+                                input:
+                                    previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                    current_task_output = runDeepVariantCaller.genotyped_vcf
+                            }
+                        }
+                    }
                 }
-                call bgzipMergedVCF as bgzipGATKCalledVCF { 
-                    input: 
-                        in_sample_name=SAMPLE_NAME, 
-                        in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
-                        in_vg_container=VG_CONTAINER, 
-                        in_vgcall_disk=VGCALL_DISK,
-                        in_vgcall_mem=VGCALL_MEM
+            }    
+            # Run GVCF variant calling procedure
+            if (GVCF_MODE) {
+                # Run GVCF genotypers
+                if (!DEEPVARIANT_MODE) {
+                    call runGATKHaplotypeCallerGVCF {
+                        input:
+                            in_sample_name=SAMPLE_NAME,
+                            in_bam_file=gatk_caller_input_files.left,
+                            in_bam_file_index=gatk_caller_input_files.right,
+                            in_pcr_indel_model=PCR_INDEL_MODEL,
+                            in_reference_file=REF_FILE,
+                            in_reference_index_file=REF_INDEX_FILE,
+                            in_reference_dict_file=REF_DICT_FILE,
+                            in_vgcall_cores=VGCALL_CORES,
+                            in_vgcall_disk=VGCALL_DISK,
+                            in_vgcall_mem=VGCALL_MEM
+                    }
+                    # Cleanup intermediate variant calling files after use
+                    if (CLEANUP_FILES) {
+                        if (GOOGLE_CLEANUP_MODE) {
+                            call cleanUpGoogleFilestore as cleanUpGATKGVCFCallerInputsGoogle {
+                                input:
+                                    previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                    current_task_output = runGATKHaplotypeCallerGVCF.genotyped_vcf
+                            }
+                        }
+                        if (!GOOGLE_CLEANUP_MODE) {
+                            call cleanUpUnixFilesystem as cleanUpGATKGVCFCallerInputsUnix {
+                                input:
+                                    previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                    current_task_output = runGATKHaplotypeCallerGVCF.genotyped_vcf
+                            }
+                        }
+                    }
+                }
+                if (DEEPVARIANT_MODE) {
+                    call runDeepVariantCallerGVCF {
+                        input:
+                            in_sample_name=SAMPLE_NAME,
+                            in_bam_file=gatk_caller_input_files.left,
+                            in_bam_file_index=gatk_caller_input_files.right,
+                            in_pcr_indel_model=PCR_INDEL_MODEL,
+                            in_reference_file=REF_FILE,
+                            in_reference_index_file=REF_INDEX_FILE,
+                            in_reference_dict_file=REF_DICT_FILE,
+                            in_vgcall_cores=VGCALL_CORES,
+                            in_vgcall_disk=VGCALL_DISK,
+                            in_vgcall_mem=VGCALL_MEM
+                    }
+                    # Cleanup intermediate variant calling files after use
+                    if (CLEANUP_FILES) {
+                        if (GOOGLE_CLEANUP_MODE) {
+                            call cleanUpGoogleFilestore as cleanUpDeepVariantGVCFCallerInputsGoogle {
+                                input:
+                                    previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                    current_task_output = runDeepVariantCallerGVCF.genotyped_vcf
+                            }
+                        }
+                        if (!GOOGLE_CLEANUP_MODE) {
+                            call cleanUpUnixFilesystem as cleanUpDeepVariantGVCFCallerInputsUnix {
+                                input:
+                                    previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
+                                    current_task_output = runDeepVariantCallerGVCF.genotyped_vcf
+                            }
+                        }
+                    }
                 }
             }
-            # Run VCF varaint calling using the Dragen module
-            if (DRAGEN_MODE) {
-                call runDragenCaller {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_bam_file=merged_bam_file_output,
-                        in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                        in_udp_data_dir=UDPBINFO_PATH,
-                        in_helix_username=HELIX_USERNAME
-                }
-            }
-            
-            File final_vcf_output = select_first([bgzipGATKCalledVCF.output_merged_vcf, runDragenCaller.dragen_genotyped_vcf])
+            File final_contig_vcf = select_first([runGATKHaplotypeCaller.genotyped_vcf, runDeepVariantCaller.genotyped_vcf, runGATKHaplotypeCallerGVCF.genotyped_vcf, runDeepVariantCallerGVCF.genotyped_vcf])
         }
-        # Run GVCF variant calling procedure
-        if (GVCF_MODE) {
-            # Run GVCF genotypers
-            if (!DRAGEN_MODE) {
-                call runGATKHaplotypeCallerGVCF {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_bam_file=merged_bam_file_output,
-                        in_bam_file_index=merged_bam_file_index_output,
-                        in_pcr_indel_model=PCR_INDEL_MODEL,
-                        in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE,
-                        in_vgcall_cores=VGCALL_CORES,
-                        in_vgcall_disk=VGCALL_DISK,
-                        in_vgcall_mem=VGCALL_MEM
-                }
-            }
-            # Run GVCF varaint calling using the Dragen module
-            if (DRAGEN_MODE) {
-                call runDragenCallerGVCF {
-                    input:
-                        in_sample_name=SAMPLE_NAME,
-                        in_bam_file=merged_bam_file_output,
-                        in_dragen_ref_index_name=DRAGEN_REF_INDEX_NAME,
-                        in_udp_data_dir=UDPBINFO_PATH,
-                        in_helix_username=HELIX_USERNAME
-                }
-            }
-            
-            File final_gvcf_output = select_first([runGATKHaplotypeCallerGVCF.rawLikelihoods_gvcf, runDragenCallerGVCF.dragen_genotyped_gvcf])
+        # Merge linear-based called VCFs
+        Array[File?] final_contig_vcf_output = final_contig_vcf
+        Array[File] final_contig_vcf_output_list = select_all(final_contig_vcf_output)
+        call concatClippedVCFChunks as concatLinearVCFChunks {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_clipped_vcf_chunk_files=final_contig_vcf_output_list,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
+        call bgzipMergedVCF as bgzipLinearCalledVCF { 
+            input: 
+                in_sample_name=SAMPLE_NAME, 
+                in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
+                in_vg_container=VG_CONTAINER, 
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
+        }
+        
+        File final_vcf_output = bgzipLinearCalledVCF.output_merged_vcf
     }
     
     ################################
@@ -449,7 +519,7 @@ workflow vgMultiMapCall {
     }
     
     # Extract either the linear-based or graph-based VCF
-    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, final_vcf_output, final_gvcf_output])
+    File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, final_vcf_output])
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
         call normalizeVCF {
@@ -582,8 +652,10 @@ task runVGMAP {
         File in_gcsa_file
         File in_gcsa_lcp_file
         File? in_gbwt_file
+        File? in_ref_dict
         String in_vg_container
         String in_sample_name
+        Boolean surject_output
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
@@ -610,15 +682,30 @@ task runVGMAP {
         fi
         ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
         ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
-        vg map \
-          -x ~{in_xg_file} \
-          -g input_gcsa_file.gcsa \
-          ${GBWT_OPTION_STRING} \
-          -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+        if [ ~{surject_output} == false ]; then
+            vg map \
+              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+              --sample "~{in_sample_name}" \
+              -x ~{in_xg_file} \
+              -g input_gcsa_file.gcsa \
+              ${GBWT_OPTION_STRING} \
+              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+        else    
+           vg map \
+              --ref-paths ~{in_ref_dict} \
+              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+              --sample "~{in_sample_name}" \
+              --surject-to bam \
+              -x ~{in_xg_file} \
+              -g input_gcsa_file.gcsa \
+              ${GBWT_OPTION_STRING} \
+              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
+        fi
     >>>
     output {
-        File chunk_gam_file = glob("*.gam")[0]
+        File chunk_gam_file = glob("*am")[0]
     }
     runtime {
         time: 300
@@ -638,8 +725,10 @@ task runVGMPMAP {
         File in_gcsa_lcp_file
         File? in_gbwt_file
         File? in_snarls_file
+        File? in_ref_dict
         String in_vg_container
         String in_sample_name
+        Boolean surject_output
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
@@ -669,18 +758,32 @@ task runVGMPMAP {
         fi
         ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
         ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
-        vg mpmap \
-          -S \
-          -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-          -x ~{in_xg_file} \
-          -g input_gcsa_file.gcsa \
-          ${GBWT_OPTION_STRING} \
-          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --sample "~{in_sample_name}" \
-          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+        if [ ~{surject_output} == false ]; then
+            vg mpmap \
+              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+              --sample "~{in_sample_name}" \
+              -S \
+              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+              -x ~{in_xg_file} \
+              -g input_gcsa_file.gcsa \
+              ${GBWT_OPTION_STRING} \
+              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+        else    
+            vg mpmap \
+              --ref-paths ~{in_ref_dict} \
+              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+              --sample "~{in_sample_name}" \
+              --output-fmt BAM \
+              -S \
+              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+              -x ~{in_xg_file} \
+              -g input_gcsa_file.gcsa \
+              ${GBWT_OPTION_STRING} \
+              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
+        fi
     >>>
     output {
-        File chunk_gam_file = glob("*.gam")[0]
+        File chunk_gam_file = glob("*am")[0]
     }
     runtime {
         time: 300
@@ -690,19 +793,25 @@ task runVGMPMAP {
         docker: in_vg_container
     }
 }
-
-task runSurject {
+task runVGGIRAFFE {
     input {
-        File in_gam_chunk_file
+        File in_left_read_pair_chunk_file
+        File in_right_read_pair_chunk_file
         File in_xg_file
+        File in_gbwt_file
+        File in_ggbwt_file
+        File in_dist_file
+        File in_min_file
+        File? in_ref_dict
         String in_vg_container
         String in_sample_name
+        Boolean surject_output
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
     }
     
-    command <<<
+    command <<< 
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -713,19 +822,40 @@ task runSurject {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
-        READ_CHUNK_ID=($(ls ~{in_gam_chunk_file} | awk -F'.' '{print $(NF-1)}'))
-        vg surject \
-          -i \
-          -x ~{in_xg_file} \
-          -t ~{in_map_cores} \
-          -b ~{in_gam_chunk_file} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
+        
+        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
+        if [ ~{surject_output} == false ]; then
+            vg giraffe \
+              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+              -x ~{in_xg_file} \
+              -H ~{in_gbwt_file} \
+              -g ~{in_ggbwt_file} \
+              -d ~{in_dist_file} \
+              -m ~{in_min_file} \
+              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+              --sample "~{in_sample_name}" \
+              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+        else    
+            vg giraffe \
+              --ref-paths ~{in_ref_dict} \
+              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+              --sample "~{in_sample_name}" \
+              --output-format BAM \
+              --ref-paths ~{in_ref_dict} \
+              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+              -x ~{in_xg_file} \
+              -H ~{in_gbwt_file} \
+              -g ~{in_ggbwt_file} \
+              -d ~{in_dist_file} \
+              -m ~{in_min_file} \
+              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
+        fi
     >>>
     output {
-        File chunk_bam_file = glob("*.bam")[0]
+        File chunk_gam_file = glob("*am")[0]
     }
     runtime {
-        time: 180
+        time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
@@ -757,52 +887,17 @@ task sortMDTagBAMFile {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        if [ ~{in_vgmpmap_mode} == false ]; then
-            samtools sort \
-              --threads ~{in_map_cores} \
-              -n \
-              ~{in_bam_chunk_file} \
-              -O BAM \
-            | samtools fixmate \
-              -O BAM \
-              - \
-              - \
-            | samtools sort \
-              --threads ~{in_map_cores} \
-              - \
-              -O BAM \
-            | samtools addreplacerg \
-              -O BAM \
-              -r ID:1 -r LB:lib1 -r SM:~{in_sample_name} -r PL:illumina -r PU:unit1 \
-              - \
-            | samtools view \
-              -@ ~{in_map_cores} \
-              -h -O SAM \
-              - \
-            | samtools view \
-              -@ ~{in_map_cores} \
-              -h -O BAM \
-              - \
-            | samtools calmd \
-              -b \
-              - \
-              ~{in_reference_file} \
-              > ~{in_sample_name}_positionsorted.mdtag.bam \
-            && samtools index \
-              ~{in_sample_name}_positionsorted.mdtag.bam
-        else
-            samtools sort \
-              --threads ~{in_map_cores} \
-              ~{in_bam_chunk_file} \
-              -O BAM \
-            | samtools calmd \
-              -b \
-              - \
-              ~{in_reference_file} \
-              > ~{in_sample_name}_positionsorted.mdtag.bam \
-            && samtools index \
-              ~{in_sample_name}_positionsorted.mdtag.bam
-        fi
+        samtools sort \
+          --threads ~{in_map_cores} \
+          ~{in_bam_chunk_file} \
+          -O BAM \
+        | samtools calmd \
+          -b \
+          - \
+          ~{in_reference_file} \
+          > ~{in_sample_name}_positionsorted.mdtag.bam \
+        && samtools index \
+          ~{in_sample_name}_positionsorted.mdtag.bam
         java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
           PROGRAM_RECORD_ID=null \
           VALIDATION_STRINGENCY=LENIENT \
@@ -810,15 +905,9 @@ task sortMDTagBAMFile {
           O=~{in_sample_name}.mdtag.dupmarked.bam \
           M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
         && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai \
-        && java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar ReorderSam \
-            VALIDATION_STRINGENCY=LENIENT \
-            REFERENCE=~{in_reference_file} \
-            INPUT=~{in_sample_name}.mdtag.dupmarked.bam \
-            OUTPUT=~{in_sample_name}.mdtag.dupmarked.reordered.bam \
-        && rm -f ~{in_sample_name}.mdtag.dupmarked.bam
     >>>
     output {
-        File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.reordered.bam"
+        File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.bam"
     }
     runtime {
         time: 90
@@ -937,10 +1026,11 @@ task runGATKHaplotypeCaller {
         
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-
+        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         gatk HaplotypeCaller \
           --native-pair-hmm-threads ~{in_vgcall_cores} \
           --pcr-indel-model ~{in_pcr_indel_model} \
+          -L ${CONTIG_ID} \
           --reference ~{in_reference_file} \
           --input input_bam_file.bam \
           --output ~{in_sample_name}.vcf \
@@ -985,10 +1075,11 @@ task runGATKHaplotypeCallerGVCF {
         
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-
+        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         gatk HaplotypeCaller \
           --native-pair-hmm-threads ~{in_vgcall_cores} \
           -ERC GVCF \
+          -L ${CONTIG_ID} \
           --pcr-indel-model ~{in_pcr_indel_model} \
           --reference ~{in_reference_file} \
           --input input_bam_file.bam \
@@ -1006,16 +1097,18 @@ task runGATKHaplotypeCallerGVCF {
     }
 }
 
-task runDragenCaller {
+task runDeepVariantVCF {
     input {
         String in_sample_name
         File in_bam_file
-        String in_dragen_ref_index_name
-        String in_udp_data_dir
-        String in_helix_username
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
-     
-    String bam_file_name = basename(in_bam_file)
     
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -1027,49 +1120,44 @@ task runDragenCaller {
         set -u
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
-        #to turn off echo do 'set +o xtrace' 
+        #to turn off echo do 'set +o xtrace'
         
-        UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
-        mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
-        cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
-        DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp"
-        if [[ ${DRAGEN_WORK_DIR_PATH}/ = *[[:space:]]* ]]; then
-            echo "ERROR: DRAGEN_WORK_DIR_PATH variable contains whitespace"
-            exit 1
-        fi
-        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
-            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
-            exit 1
-        fi
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
-        mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
-        mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
-        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
+        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        
+        /opt/deepvariant/bin/run_deepvariant \
+        --num_shards ~{in_vgcall_cores} \
+        --model_type WGS \
+        --regions ${CONTIG_ID} \
+        --ref ~{in_reference_file} \
+        --reads input_bam_file.bam \
+        --output_vcf ~{in_sample_name}.vcf \
+        && bgzip ~{in_sample_name}.vcf
     >>>
     output {
-        File dragen_genotyped_vcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.hard-filtered.vcf.gz"
+        File rawLikelihoods_gvcf = "~{in_sample_name}.vcf.gz"
     }
     runtime {
-        memory: 20 + " GB"
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: "google/deepvariant:1.0.0"
     }
 }
 
-task runDragenCallerGVCF {
+task runDeepVariantGVCF {
     input {
         String in_sample_name
         File in_bam_file
-        String in_dragen_ref_index_name
-        String in_udp_data_dir
-        String in_helix_username
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
-    
-    String bam_file_name = basename(in_bam_file)
     
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -1081,36 +1169,29 @@ task runDragenCallerGVCF {
         set -u
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
-        #to turn off echo do 'set +o xtrace' 
+        #to turn off echo do 'set +o xtrace'
         
-        UDP_DATA_DIR_PATH="~{in_udp_data_dir}/usr/~{in_helix_username}"
-        mkdir -p /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
-        cp ~{in_bam_file} /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ && \
-        DRAGEN_WORK_DIR_PATH="/staging/~{in_helix_username}/~{in_sample_name}" && \
-        TMP_DIR="/staging/~{in_helix_username}/tmp"
-        if [[ ${DRAGEN_WORK_DIR_PATH}/ = *[[:space:]]* ]]; then
-            echo "ERROR: DRAGEN_WORK_DIR_PATH variable contains whitespace"
-            exit 1
-        fi
-        if [[ /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ = *[[:space:]]* ]]; then
-            echo "ERROR: /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/ variable contains whitespace"
-            exit 1
-        fi
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${DRAGEN_WORK_DIR_PATH}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "mkdir -p ${TMP_DIR}" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov \'sbatch --wait --wrap=\"dragen -f -r /staging/~{in_dragen_ref_index_name} -b /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} --verbose --bin_memory=50000000000 --enable-map-align false --enable-variant-caller true --pair-by-name=true --vc-emit-ref-confidence GVCF --vc-sample-name ~{in_sample_name} --intermediate-results-dir ${TMP_DIR} --output-directory ${DRAGEN_WORK_DIR_PATH} --output-file-prefix ~{in_sample_name}_dragen_genotyped\"\' && \
-        mkdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && chmod ug+rw -R /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "cp -R ${DRAGEN_WORK_DIR_PATH}/. /staging/helix/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper" && \
-        ssh ~{in_helix_username}@helix.nih.gov ssh ~{in_helix_username}@udpdragen01.nhgri.nih.gov "rm -fr ${DRAGEN_WORK_DIR_PATH}/" && \
-        mv /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_dragen_genotyper ~{in_sample_name}_dragen_genotyper && \
-        rm -f /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/~{bam_file_name} && \
-        rmdir /data/${UDP_DATA_DIR_PATH}/~{in_sample_name}_surjected_bams/
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
+        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        
+        /opt/deepvariant/bin/run_deepvariant \
+        --num_shards ~{in_vgcall_cores} \
+        --model_type WGS \
+        --regions ${CONTIG_ID} \
+        --ref ~{in_reference_file} \
+        --reads input_bam_file.bam \
+        --output_gvcf ~{in_sample_name}.rawLikelihoods.gvcf \
+        && bgzip ~{in_sample_name}.rawLikelihoods.gvcf
     >>>
     output {
-        File dragen_genotyped_gvcf = "~{in_sample_name}_dragen_genotyper/~{in_sample_name}_dragen_genotyped.hard-filtered.gvcf.gz"
+        File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
-        memory: 20 + " GB"
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: "google/deepvariant:1.0.0"
     }
 }
 
