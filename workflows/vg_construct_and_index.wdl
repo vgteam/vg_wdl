@@ -170,13 +170,15 @@ workflow vg_construct_and_index {
             graph_name = graph_name,
             xg = xg_index.xg,
             trivial_snarls = snarls_merge.merged_snarls,
+            vg_docker = vg_docker,
             construct_cores = 32
         }
         # make Graph GBWT index
         call sampled_gbwt_index { input:
             graph_name = graph_name,
-            merged_gbwt = final_gbwt,
+            gbwt = final_gbwt,
             xg = xg_index.xg,
+            vg_docker = vg_docker,
             construct_cores = 32
         }
         # make Minimizer index
@@ -185,6 +187,7 @@ workflow vg_construct_and_index {
             sampled_gbwt = sampled_gbwt_index.sampled_gbwt,
             sampled_gg = sampled_gbwt_index.sampled_gg,
             dist = dist_index.dist,
+            vg_docker = vg_docker,
             construct_cores = 32
         }
     }
@@ -484,6 +487,7 @@ task dist_index {
         File xg
         File trivial_snarls
         Int construct_cores
+        String vg_docker
     }
     command <<<
         set -exu -o pipefail
@@ -505,9 +509,10 @@ task dist_index {
 task sampled_gbwt_index { 
     input {
         String graph_name
-        File gbwt
+        File? gbwt
         File xg
         Int construct_cores
+        String vg_docker
     }
     command <<<
         set -exu -o pipefail
@@ -534,6 +539,7 @@ task min_index {
         File sampled_gg
         File dist
         Int construct_cores
+        String vg_docker
     }
     command <<<
         set -exu -o pipefail

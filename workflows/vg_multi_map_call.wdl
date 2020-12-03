@@ -177,7 +177,6 @@ workflow vgMultiMapCall {
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM,
-                    in_vgmpmap_mode=VGMPMAP_MODE
             }
             # Cleanup intermediate surject files after use
             if (CLEANUP_FILES) {
@@ -287,7 +286,6 @@ workflow vgMultiMapCall {
                             in_sample_name=SAMPLE_NAME,
                             in_bam_file=gatk_caller_input_files.left,
                             in_bam_file_index=gatk_caller_input_files.right,
-                            in_pcr_indel_model=PCR_INDEL_MODEL,
                             in_reference_file=REF_FILE,
                             in_reference_index_file=REF_INDEX_FILE,
                             in_reference_dict_file=REF_DICT_FILE,
@@ -337,14 +335,14 @@ workflow vgMultiMapCall {
                             call cleanUpGoogleFilestore as cleanUpGATKGVCFCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                                    current_task_output = runGATKHaplotypeCallerGVCF.genotyped_vcf
+                                    current_task_output = runGATKHaplotypeCallerGVCF.genotyped_gvcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
                             call cleanUpUnixFilesystem as cleanUpGATKGVCFCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                                    current_task_output = runGATKHaplotypeCallerGVCF.genotyped_vcf
+                                    current_task_output = runGATKHaplotypeCallerGVCF.genotyped_gvcf
                             }
                         }
                     }
@@ -355,7 +353,6 @@ workflow vgMultiMapCall {
                             in_sample_name=SAMPLE_NAME,
                             in_bam_file=gatk_caller_input_files.left,
                             in_bam_file_index=gatk_caller_input_files.right,
-                            in_pcr_indel_model=PCR_INDEL_MODEL,
                             in_reference_file=REF_FILE,
                             in_reference_index_file=REF_INDEX_FILE,
                             in_reference_dict_file=REF_DICT_FILE,
@@ -369,20 +366,20 @@ workflow vgMultiMapCall {
                             call cleanUpGoogleFilestore as cleanUpDeepVariantGVCFCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                                    current_task_output = runDeepVariantCallerGVCF.genotyped_vcf
+                                    current_task_output = runDeepVariantCallerGVCF.genotyped_gvcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
                             call cleanUpUnixFilesystem as cleanUpDeepVariantGVCFCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
-                                    current_task_output = runDeepVariantCallerGVCF.genotyped_vcf
+                                    current_task_output = runDeepVariantCallerGVCF.genotyped_gvcf
                             }
                         }
                     }
                 }
             }
-            File final_contig_vcf = select_first([runGATKHaplotypeCaller.genotyped_vcf, runDeepVariantCaller.genotyped_vcf, runGATKHaplotypeCallerGVCF.genotyped_vcf, runDeepVariantCallerGVCF.genotyped_vcf])
+            File final_contig_vcf = select_first([runGATKHaplotypeCaller.genotyped_vcf, runDeepVariantCaller.genotyped_vcf, runGATKHaplotypeCallerGVCF.genotyped_gvcf, runDeepVariantCallerGVCF.genotyped_gvcf])
         }
         # Merge linear-based called VCFs
         Array[File?] final_contig_vcf_output = final_contig_vcf
@@ -649,8 +646,8 @@ task runVGMAP {
         File in_left_read_pair_chunk_file
         File in_right_read_pair_chunk_file
         File in_xg_file
-        File in_gcsa_file
-        File in_gcsa_lcp_file
+        File? in_gcsa_file
+        File? in_gcsa_lcp_file
         File? in_gbwt_file
         File? in_ref_dict
         String in_vg_container
@@ -721,8 +718,8 @@ task runVGMPMAP {
         File in_left_read_pair_chunk_file
         File in_right_read_pair_chunk_file
         File in_xg_file
-        File in_gcsa_file
-        File in_gcsa_lcp_file
+        File? in_gcsa_file
+        File? in_gcsa_lcp_file
         File? in_gbwt_file
         File? in_snarls_file
         File? in_ref_dict
@@ -798,10 +795,10 @@ task runVGGIRAFFE {
         File in_left_read_pair_chunk_file
         File in_right_read_pair_chunk_file
         File in_xg_file
-        File in_gbwt_file
-        File in_ggbwt_file
-        File in_dist_file
-        File in_min_file
+        File? in_gbwt_file
+        File? in_ggbwt_file
+        File? in_dist_file
+        File? in_min_file
         File? in_ref_dict
         String in_vg_container
         String in_sample_name
@@ -873,7 +870,6 @@ task sortMDTagBAMFile {
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
-        Boolean in_vgmpmap_mode
     }
 
     command <<<
@@ -1087,7 +1083,7 @@ task runGATKHaplotypeCallerGVCF {
         && bgzip ~{in_sample_name}.rawLikelihoods.gvcf
     >>>
     output {
-        File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
+        File genotyped_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
         memory: in_vgcall_mem + " GB"
@@ -1097,7 +1093,7 @@ task runGATKHaplotypeCallerGVCF {
     }
 }
 
-task runDeepVariantVCF {
+task runDeepVariantCaller {
     input {
         String in_sample_name
         File in_bam_file
@@ -1136,7 +1132,7 @@ task runDeepVariantVCF {
         && bgzip ~{in_sample_name}.vcf
     >>>
     output {
-        File rawLikelihoods_gvcf = "~{in_sample_name}.vcf.gz"
+        File genotyped_vcf = "~{in_sample_name}.vcf.gz"
     }
     runtime {
         memory: in_vgcall_mem + " GB"
@@ -1146,7 +1142,7 @@ task runDeepVariantVCF {
     }
 }
 
-task runDeepVariantGVCF {
+task runDeepVariantCallerGVCF {
     input {
         String in_sample_name
         File in_bam_file
@@ -1185,7 +1181,7 @@ task runDeepVariantGVCF {
         && bgzip ~{in_sample_name}.rawLikelihoods.gvcf
     >>>
     output {
-        File rawLikelihoods_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
+        File genotyped_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
         memory: in_vgcall_mem + " GB"

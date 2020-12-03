@@ -65,7 +65,6 @@ workflow vgTrioPipeline {
         String MAPPER = "GIRAFFE"                       # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
         Boolean DEEPVARIANT_MODE = false                # Set to 'true' to use the DeepVariant variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean GIRAFFE_INDEXES = true                  # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
-        Boolean MAKE_SNARLS = false                     # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean CLEANUP_FILES = true                    # Set to 'false' to turn off intermediate file cleanup.
@@ -218,9 +217,9 @@ workflow vgTrioPipeline {
         }
     }
     if (DEEPVARIANT_MODE) {
-        runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
+        call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
             input:
-                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
+                in_sample_name=SAMPLE_NAME_PROBAND,
                 in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=[probandMapCallWorkflow.output_vcf]
@@ -232,7 +231,7 @@ workflow vgTrioPipeline {
     #####################################
     File output_joint_genotyped_vcf = select_first([bgzipGATKGVCF.output_merged_vcf, deepVarJointGenotyper1st.joint_genotyped_vcf])
     File output_joint_genotyped_vcf_index = select_first([bgzipGATKGVCF.output_merged_vcf_index, deepVarJointGenotyper1st.joint_genotyped_vcf_index])
-    if (USE_HAPLOTYPES) {
+    if (GIRAFFE_INDEXES) {
         call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
             input:
                 in_proband_sample_name=SAMPLE_NAME_PROBAND,
@@ -264,7 +263,7 @@ workflow vgTrioPipeline {
         }
         call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
             input:
-                in_sample_name="${SAMPLE_NAME_PROBAND}_cohort",
+                in_sample_name=SAMPLE_NAME_PROBAND,
                 in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf,
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
@@ -296,8 +295,7 @@ workflow vgTrioPipeline {
             ref_fasta_gz=REF_FASTA_GZ,
             contigs=CONTIGS,
             contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
-            giraffe_indexes=USE_HAPLOTYPES,
-            make_snarls=MAKE_SNARLS,
+            giraffe_indexes=GIRAFFE_INDEXES,
             use_decoys=USE_DECOYS,
             decoy_regex=DECOY_REGEX,
             vg_docker=VG_CONTAINER
@@ -362,7 +360,7 @@ workflow vgTrioPipeline {
     if (!DEEPVARIANT_MODE) {
         call runGATKCombineGenotypeGVCFs as gatkJointGenotyper2nd {
             input:
-                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
+                in_sample_name=SAMPLE_NAME_PROBAND,
                 in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=gvcf_files_siblings,
@@ -372,7 +370,7 @@ workflow vgTrioPipeline {
         }
         call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzip2ndGATKGVCF {
             input:
-                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
+                in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=gatkJointGenotyper2nd.joint_genotyped_vcf,
                 in_vg_container=VG_CONTAINER,
                 in_vgcall_disk=VGCALL_DISK,
@@ -380,9 +378,9 @@ workflow vgTrioPipeline {
         }
     }
     if (DEEPVARIANT_MODE) {
-        runDeepVariantJointGenotyper as deepVarJointGenotyper2nd {
+        call runDeepVariantJointGenotyper as deepVarJointGenotyper2nd {
             input:
-                in_sample_name=SAMPLE_NAME_SIBLING_LIST[0],
+                in_sample_name=SAMPLE_NAME_PROBAND,
                 in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
                 in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
                 in_gvcf_files_siblings=gvcf_files_siblings
@@ -496,28 +494,25 @@ task runGATKCombineGenotypeGVCFs {
         File in_reference_index_file
         File in_reference_dict_file
     }
-
-    command {
+    
+    command <<<
         set -exu -o pipefail
-        
-        gatk IndexFeatureFile \
-            -F ${in_gvcf_file_maternal} \
-        && gatk IndexFeatureFile \
-            -F ${in_gvcf_file_paternal}
-        for sibling_gvcf_file in ${sep=" " in_gvcf_files_siblings} ; do
-            gatk IndexFeatureFile -F "$sibling_gvcf_file"
+        tabix -f -p vcf ~{in_gvcf_file_maternal}
+        tabix -f -p vcf ~{in_gvcf_file_paternal}
+        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
+            tabix -f -p vcf "${sibling_gvcf_file}"
         done
         gatk CombineGVCFs \
-          --reference ${in_reference_file} \
-          -V ${in_gvcf_file_maternal} -V ${in_gvcf_file_paternal} -V ${sep=" -V " in_gvcf_files_siblings} \
-          --output ${in_sample_name}_cohort.combined.gvcf \
+          --reference ~{in_reference_file} \
+          -V ~{in_gvcf_file_maternal} -V ~{in_gvcf_file_paternal} -V ~{sep=" -V " in_gvcf_files_siblings} \
+          --output ~{in_sample_name}_cohort.combined.gvcf \
         && gatk GenotypeGVCFs \
-          --reference ${in_reference_file} \
-          --variant ${in_sample_name}_cohort.combined.gvcf \
-          --output ${in_sample_name}_cohort.jointgenotyped.vcf
-    }
+          --reference ~{in_reference_file} \
+          --variant ~{in_sample_name}_cohort.combined.gvcf \
+          --output ~{in_sample_name}_cohort.jointgenotyped.vcf
+    >>>
     output {
-        File joint_genotyped_vcf = "${in_sample_name}_cohort.jointgenotyped.vcf"
+        File joint_genotyped_vcf = "~{in_sample_name}_cohort.jointgenotyped.vcf"
     }
     runtime {
         memory: 100 + " GB"
@@ -532,31 +527,28 @@ task runDeepVariantJointGenotyper {
         File in_gvcf_file_maternal
         File in_gvcf_file_paternal
         Array[File]+ in_gvcf_files_siblings
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
     }
 
-    command {
+    command <<<
         set -exu -o pipefail
         
-        tabix -f -p vcf ${in_gvcf_file_maternal}
-        tabix -f -p vcf ${in_gvcf_file_paternal}
-        for sibling_gvcf_file in ${sep=" " in_gvcf_files_siblings} ; do
-            tabix -f -p vcf "$sibling_gvcf_file"
+        tabix -f -p vcf ~{in_gvcf_file_maternal}
+        tabix -f -p vcf ~{in_gvcf_file_paternal}
+        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
+            tabix -f -p vcf "${sibling_gvcf_file}"
         done
          
         /usr/local/bin/glnexus_cli \
         --config DeepVariantWGS \
-        ${in_gvcf_file_maternal} \
-        ${in_gvcf_file_paternal} \
-        ${sep=" " in_gvcf_files_siblings} \
-        | bcftools view - | bgzip -c > ${in_sample_name}_cohort.jointgenotyped.vcf.gz \
-        && tabix -f -p vcf ${in_sample_name}_cohort.jointgenotyped.vcf.gz
-    }
+        ~{in_gvcf_file_maternal} \
+        ~{in_gvcf_file_paternal} \
+        ~{sep=" " in_gvcf_files_siblings} \
+        | bcftools view - | bgzip -c > ~{in_sample_name}_cohort.jointgenotyped.vcf.gz \
+        && tabix -f -p vcf ~{in_sample_name}_cohort.jointgenotyped.vcf.gz
+    >>>
     output {
-        File joint_genotyped_vcf = "${in_sample_name}_cohort.jointgenotyped.vcf.gz"
-        File joint_genotyped_vcf_index = "${in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
+        File joint_genotyped_vcf = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz"
+        File joint_genotyped_vcf_index = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
         memory: 100 + " GB"
