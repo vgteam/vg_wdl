@@ -834,7 +834,6 @@ task runVGGIRAFFE {
               -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
         else    
             vg giraffe \
-              --ref-paths ~{in_ref_dict} \
               --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
               --sample "~{in_sample_name}" \
               --output-format BAM \
