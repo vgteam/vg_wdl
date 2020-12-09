@@ -975,7 +975,8 @@ task splitBAMbyPath {
             samtools view \
               -@ ~{in_map_cores} \
               -h -O BAM \
-              input_bam_file.bam ${path_name} > ~{in_sample_name}.${path_name}.bam \
+              input_bam_file.bam ${path_name} \
+              -o ~{in_sample_name}.${path_name}.bam \
             && samtools index \
               ~{in_sample_name}.${path_name}.bam
         done < ~{in_path_list_file}
@@ -1021,7 +1022,7 @@ task runGATKHaplotypeCaller {
         
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         gatk HaplotypeCaller \
           --native-pair-hmm-threads ~{in_vgcall_cores} \
           --pcr-indel-model ~{in_pcr_indel_model} \
@@ -1070,7 +1071,7 @@ task runGATKHaplotypeCallerGVCF {
         
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         gatk HaplotypeCaller \
           --native-pair-hmm-threads ~{in_vgcall_cores} \
           -ERC GVCF \
@@ -1119,7 +1120,7 @@ task runDeepVariantCaller {
         
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         
         /opt/deepvariant/bin/run_deepvariant \
         --num_shards ~{in_vgcall_cores} \
@@ -1168,7 +1169,7 @@ task runDeepVariantCallerGVCF {
         
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        CONTIG_ID = ($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         
         /opt/deepvariant/bin/run_deepvariant \
         --num_shards ~{in_vgcall_cores} \

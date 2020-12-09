@@ -21,7 +21,7 @@ workflow vg_ABOlocus_test {
         File ref_dict_file
         File ref_file_gz
         File ped_file
-        String vg_docker = 'quay.io/vgteam/vg@sha256:9b5a50376033fa228815ffae0a9affc33870e09214612b67d1cf5e710051a006'
+        String vg_docker = 'quay.io/vgteam/vg:v1.28.0'
     }
 
     # build & check the ABOlocus graph
@@ -30,7 +30,7 @@ workflow vg_ABOlocus_test {
         ref_fasta_gz = ABOlocus_fa_gz,
         contigs = ["ABOlocus"],
         contigs_vcf_gz = [ABOlocus_small_vcf_gz],
-        use_haplotypes = true,
+        giraffe_indexes = true,
         vg_docker = vg_docker
     }
 
@@ -56,9 +56,10 @@ workflow vg_ABOlocus_test {
         SAMPLE_NAME_MATERNAL = "HG004",
         SAMPLE_NAME_PATERNAL = "HG003",
         XG_FILE = cons.xg,
-        GCSA_FILE = cons.gcsa,
-        GCSA_LCP_FILE = cons.gcsa_lcp,
         GBWT_FILE = cons.gbwt,
+        GGBWT_FILE = cons.ggbwt,
+        DIST_FILE = cons.dist,
+        MIN_FILE = cons.min,
         GRAPH_NAME = "ABOlocus_parental",
         CONTIGS = ["ABOlocus"],
         REF_FILE = ref_file,
@@ -77,10 +78,7 @@ workflow vg_ABOlocus_test {
         SNPEFF_ANNOTATION = false,
         CLEANUP_FILES = false,
         USE_DECOYS = false,
-        DRAGEN_MODE = false,
-        DRAGEN_REF_INDEX_NAME = "",
-        UDPBINFO_PATH = "",
-        HELIX_USERNAME = "",
+        MAPPER="GIRAFFE",
         VG_CONTAINER = vg_docker 
     }
     
@@ -149,7 +147,7 @@ task check_trio_bams {
         n_mom_reads=$(expr $(zcat ~{mom_fastq_1_gz} | wc -l) / 2)
         n_mom_aligned_reads=$(samtools view ~{mom_bam} | wc -l)
         diff_mom_aligned_source_reads=$(($n_mom_reads - $n_mom_aligned_reads))
-        if [ ${diff_mom_aligned_source_reads#-} -gt 5 ]; then
+        if [ ${diff_mom_aligned_source_reads#-} -gt 10 ]; then
             echo "wrong read count for maternal alignments" >&2
             exit 1
         fi
@@ -160,7 +158,7 @@ task check_trio_bams {
         n_dad_reads=$(expr $(zcat ~{dad_fastq_1_gz} | wc -l) / 2)
         n_dad_aligned_reads=$(samtools view ~{dad_bam} | wc -l)
         diff_dad_aligned_source_reads=$(($n_dad_reads - $n_dad_aligned_reads))
-        if [ ${diff_dad_aligned_source_reads#-} -gt 5 ]; then
+        if [ ${diff_dad_aligned_source_reads#-} -gt 10 ]; then
             echo "wrong read count for paternal alignments" >&2
             exit 1
         fi
@@ -171,7 +169,7 @@ task check_trio_bams {
         n_child_reads=$(expr $(zcat ~{child_fastq_1_gz} | wc -l) / 2)
         n_child_aligned_reads=$(samtools view ~{child_bam} | wc -l)
         diff_child_aligned_source_reads=$(($n_child_reads - $n_child_aligned_reads))
-        if [ ${diff_child_aligned_source_reads#-} -gt 5 ]; then
+        if [ ${diff_child_aligned_source_reads#-} -gt 15 ]; then
             echo "wrong read count for child alignments" >&2
             exit 1
         fi

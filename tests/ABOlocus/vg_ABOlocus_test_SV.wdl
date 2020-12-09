@@ -22,7 +22,7 @@ workflow vg_ABOlocus_test {
         File ABOlocus_fa_gz
         File ABOlocus_SV_vcf_gz
         File reads_bam
-        String vg_docker = "quay.io/vgteam/vg:v1.14.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.28.0"
     }
 
     # build & check the ABOlocus graph
