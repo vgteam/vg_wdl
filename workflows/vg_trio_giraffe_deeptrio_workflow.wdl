@@ -213,7 +213,7 @@ workflow vgTrioPipeline {
         maternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.left
         paternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.right
         
-        call runGATKIndelRealigner as indelRealignProband{
+        call runGATKRealignerTargetCreator as realignTargetCreateProband {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_bam_file=proband_deeptrio_caller_input_files,
@@ -221,6 +221,17 @@ workflow vgTrioPipeline {
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
         }
+        call runAbraRealigner as abraRealignProband {
+            input:
+                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_bam_file=proband_deeptrio_caller_input_files,
+                in_target_bed_file=realignTargetCreateProband.realigner_target_bed,
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_reference_dict_file=REF_DICT_FILE
+        }
+        
+        #TODO
         call runGATKIndelRealigner as indelRealignMaternal{
             input:
                 in_sample_name=SAMPLE_NAME_MATERNAL,
@@ -242,8 +253,9 @@ workflow vgTrioPipeline {
                 in_proband_name=SAMPLE_NAME_PROBAND,
                 in_maternal_name=SAMPLE_NAME_MATERNAL,
                 in_paternal_name=SAMPLE_NAME_PATERNAL,
-                in_proband_bam_file=indelRealignProband.indel_realigned_bam,
-                in_proband_bam_file_index=indelRealignProband.indel_realigned_bam_index,
+                in_proband_bam_file=abraRealignProband.indel_realigned_bam,
+                in_proband_bam_file_index=abraRealignProband.indel_realigned_bam_index,
+        
                 in_maternal_bam_file=indelRealignMaternal.indel_realigned_bam,
                 in_maternal_bam_file_index=indelRealignMaternal.indel_realigned_bam_index,
                 in_paternal_bam_file=indelRealignPaternal.indel_realigned_bam,
@@ -566,7 +578,7 @@ task splitBAMbyPath {
     }
 }
 
-task runGATKIndelRealigner {
+task runGATKRealignerTargetCreator {
     input {
         String in_sample_name
         Pair[File, File] in_bam_file
@@ -589,21 +601,62 @@ task runGATKIndelRealigner {
 
         ln -f -s ~{in_bam_file.left} input_bam_file.bam
         ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
+        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
           -nt "32" \
           -R ~{in_reference_file} \
+          -L ${CONTIG_ID} \
           -I input_bam_file.bam \
-          --out forIndelRealigner.intervals \
-        && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
-          --remove_program_records \
-          --disable_bam_indexing \
-          -R ~{in_reference_file} \
-          --targetIntervals forIndelRealigner.intervals \
-          -I input_bam_file.bam \
-          --out ~{in_sample_name}_merged.fixmate.positionsorted.rg.mdtag.dupmarked.reordered.indel_realigned.bam
+          --out forIndelRealigner.intervals
+        
+        awk -F '[:-]' 'BEGIN { OFS = "\t" } { if( $3 == "") { print $1, $2-1, $2 } else { print $1, $2-1, $3}}' forIndelRealigner.intervals > ~{in_sample_name}.${CONTIG}.intervals.bed
+    >>>
+    output {
+        File realigner_target_bed = glob("*.bed")
+    }
+    runtime {
+        time: 180
+        memory: 20 + " GB"
+        cpu: 32
+        docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
+    }
+}
+
+task runAbraRealigner {
+    input {
+        String in_sample_name
+        Pair[File, File] in_bam_file
+        File in_target_bed_file
+        File in_reference_file
+        File in_reference_index_file
+        File in_reference_dict_file
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        ln -f -s ~{in_bam_file.left} input_bam_file.bam
+        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
+        java -Xmx20G -jar /opt/abra2/abra2.jar \
+          --targets ~{in_target_bed_file} \
+          --in input_bam_file.bam \
+          --out ~{in_sample_name}_merged.indel_realigned.bam \
+          --ref ~{in_reference_file} \
+          --index \
+          --threads 32
     >>>
     output {
         File indel_realigned_bam = "~{in_sample_name}_merged.indel_realigned.bam"
@@ -613,7 +666,7 @@ task runGATKIndelRealigner {
         time: 180
         memory: 20 + " GB"
         cpu: 32
-        docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
+        docker: "dceoy/abra2:latest"
     }
 }
 
