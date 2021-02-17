@@ -230,9 +230,7 @@ workflow vgTrioPipeline {
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
         }
-        
-        #TODO
-        call runGATKIndelRealigner as indelRealignMaternal{
+        call runGATKRealignerTargetCreator as realignTargetCreateMaternal {
             input:
                 in_sample_name=SAMPLE_NAME_MATERNAL,
                 in_bam_file=maternal_deeptrio_caller_input_files,
@@ -240,7 +238,16 @@ workflow vgTrioPipeline {
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
         }
-        call runGATKIndelRealigner as indelRealignPaternal{
+        call runAbraRealigner as abraRealignMaternal {
+            input:
+                in_sample_name=SAMPLE_NAME_MATERNAL,
+                in_bam_file=maternal_deeptrio_caller_input_files,
+                in_target_bed_file=realignTargetCreateMaternal.realigner_target_bed,
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_reference_dict_file=REF_DICT_FILE
+        }
+        call runGATKRealignerTargetCreator as realignTargetCreatePaternal {
             input:
                 in_sample_name=SAMPLE_NAME_PATERNAL,
                 in_bam_file=paternal_deeptrio_caller_input_files,
@@ -248,23 +255,45 @@ workflow vgTrioPipeline {
                 in_reference_index_file=REF_INDEX_FILE,
                 in_reference_dict_file=REF_DICT_FILE
         }
-        call runDeepTrioMakeExamples {
+        call runAbraRealigner as abraRealignPaternal {
+            input:
+                in_sample_name=SAMPLE_NAME_PATERNAL,
+                in_bam_file=paternal_deeptrio_caller_input_files,
+                in_target_bed_file=realignTargetCreatePaternal.realigner_target_bed,
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_reference_dict_file=REF_DICT_FILE
+        }
+        # TODO: define runDeepTrioMakeExamples task
+        call runDeepTrioMakeExamples as firstIterationMakeExamples {
             input:
                 in_proband_name=SAMPLE_NAME_PROBAND,
                 in_maternal_name=SAMPLE_NAME_MATERNAL,
                 in_paternal_name=SAMPLE_NAME_PATERNAL,
                 in_proband_bam_file=abraRealignProband.indel_realigned_bam,
                 in_proband_bam_file_index=abraRealignProband.indel_realigned_bam_index,
-        
-                in_maternal_bam_file=indelRealignMaternal.indel_realigned_bam,
-                in_maternal_bam_file_index=indelRealignMaternal.indel_realigned_bam_index,
-                in_paternal_bam_file=indelRealignPaternal.indel_realigned_bam,
-                in_paternal_bam_file_index=indelRealignPaternal.indel_realigned_bam_index,
+                in_maternal_bam_file=abraRealignMaternal.indel_realigned_bam,
+                in_maternal_bam_file_index=abraRealignMaternal.indel_realigned_bam_index,
+                in_paternal_bam_file=abraRealignPaternal.indel_realigned_bam,
+                in_paternal_bam_file_index=abraRealignPaternal.indel_realigned_bam_index,
                 in_reference_file=REF_FILE,
                 in_reference_index_file=REF_INDEX_FILE,
                 in_vgcall_cores=VGCALL_CORES,
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
+        }
+        # TODO
+        call runDeepTrioCallVariants as callVariantsProband {
+            input:
+                firstIterationMakeExamples.proband_examples_files,
+        }
+        call runDeepTrioCallVariants as callVariantsMaternal {
+            input:
+                firstIterationMakeExamples.maternal_examples_files,
+        }
+        call runDeepTrioCallVariants as callVariantsPaternal {
+            input:
+                firstIterationMakeExamples.paternal_examples_files,
         }
     }
     
@@ -272,9 +301,9 @@ workflow vgTrioPipeline {
     call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
         input:
             in_sample_name=SAMPLE_NAME_PROBAND,
-            in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
-            in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
-            in_gvcf_files_siblings=[probandMapCallWorkflow.output_vcf]
+            in_gvcf_file_maternal=callVariantsMaternal.output_gvcf,
+            in_gvcf_file_paternal=callVariantsPaternal.output_gvcf,
+            in_gvcf_files_siblings=[callVariantsProband.output_gvcf]
     }
     
     #####################################
