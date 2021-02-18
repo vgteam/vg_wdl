@@ -299,7 +299,7 @@ workflow vgTrioPipeline {
         File maternal_indel_realigned_bam_index = select_first([abraRealignMaternal.indel_realigned_bam_index, gatkRealignMaternal.indel_realigned_bam_index])
         File paternal_indel_realigned_bam = select_first([abraRealignPaternal.indel_realigned_bam, gatkRealignPaternal.indel_realigned_bam])
         File paternal_indel_realigned_bam_index = select_first([abraRealignPaternal.indel_realigned_bam_index, gatkRealignPaternal.indel_realigned_bam_index])
-        # TODO: define runDeepTrioMakeExamples task
+        
         call runDeepTrioMakeExamples as firstIterationMakeExamples {
             input:
                 in_proband_name=SAMPLE_NAME_PROBAND,
@@ -317,28 +317,57 @@ workflow vgTrioPipeline {
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
         }
-        # TODO
         call runDeepTrioCallVariants as callVariantsProband {
             input:
-                firstIterationMakeExamples.proband_examples_files,
+                in_sample_name=SAMPLE_NAME_PROBAND,
+                in_sample_type="child",
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_examples_file=firstIterationMakeExamples.proband_examples_file,
+                in_nonvariant_site_tf_file=firstIterationMakeExamples.proband_nonvariant_site_tf_file,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call runDeepTrioCallVariants as callVariantsMaternal {
             input:
-                firstIterationMakeExamples.maternal_examples_files,
+                in_sample_name=SAMPLE_NAME_MATERNAL,
+                in_sample_type="parent1",
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_examples_file=firstIterationMakeExamples.maternal_examples_files,
+                in_nonvariant_site_tf_file=firstIterationMakeExamples.maternal_nonvariant_site_tf_file,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
         call runDeepTrioCallVariants as callVariantsPaternal {
             input:
-                firstIterationMakeExamples.paternal_examples_files,
+                in_sample_name=SAMPLE_NAME_PATERNAL,
+                in_sample_type="parent2",
+                in_reference_file=REF_FILE,
+                in_reference_index_file=REF_INDEX_FILE,
+                in_examples_file=firstIterationMakeExamples.paternal_examples_files,
+                in_nonvariant_site_tf_file=firstIterationMakeExamples.paternal_nonvariant_site_tf_file,
+                in_vgcall_cores=VGCALL_CORES,
+                in_vgcall_disk=VGCALL_DISK,
+                in_vgcall_mem=VGCALL_MEM
         }
     }
     
+    # Collect parental indel-realigned BAM contig lists
+    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = zip(select_all(maternal_indel_realigned_bam), select_all(maternal_indel_realigned_bam_index))
+    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(select_all(paternal_indel_realigned_bam), select_all(paternal_indel_realigned_bam_index))
     
     call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
         input:
             in_sample_name=SAMPLE_NAME_PROBAND,
-            in_gvcf_file_maternal=callVariantsMaternal.output_gvcf,
-            in_gvcf_file_paternal=callVariantsPaternal.output_gvcf,
-            in_gvcf_files_siblings=[callVariantsProband.output_gvcf]
+            in_gvcf_file_maternal=callVariantsMaternal.output_gvcf_file,
+            in_gvcf_file_paternal=callVariantsPaternal.output_gvcf_file,
+            in_gvcf_files_siblings=[callVariantsProband.output_gvcf_file],
+            in_vgcall_cores=VGCALL_CORES,
+            in_vgcall_disk=VGCALL_DISK,
+            in_vgcall_mem=VGCALL_MEM
     }
     
     #####################################
@@ -422,7 +451,7 @@ workflow vgTrioPipeline {
     Array[Pair[File,File]] read_pair_files_list = zip(SIBLING_INPUT_READ_FILE_1_LIST, SIBLING_INPUT_READ_FILE_2_LIST)
     scatter (read_pair_set in zip(read_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] read_pair_files = read_pair_set.left
-        call vgMultiMapCallWorkflow.vgMultiMapCall as secondIterationSiblingMapCall {
+        call vgMultiMapWorkflow.vgMultiMap as secondIterationSiblingMap {
             input:
                 INPUT_READ_FILE_1=read_pair_files.left,
                 INPUT_READ_FILE_2=read_pair_files.right,
@@ -446,22 +475,20 @@ workflow vgTrioPipeline {
                 MAP_CORES=MAP_CORES,
                 MAP_DISK=MAP_DISK,
                 MAP_MEM=MAP_MEM,
-                MERGE_GAM_CORES=MERGE_GAM_CORES,
-                MERGE_GAM_DISK=MERGE_GAM_DISK,
-                MERGE_GAM_MEM=MERGE_GAM_MEM,
-                MERGE_GAM_TIME=MERGE_GAM_TIME,
-                CHUNK_GAM_CORES=CHUNK_GAM_CORES,
-                CHUNK_GAM_DISK=CHUNK_GAM_DISK,
-                CHUNK_GAM_MEM=CHUNK_GAM_MEM,
-                VGCALL_CORES=VGCALL_CORES,
-                VGCALL_DISK=VGCALL_DISK,
-                VGCALL_MEM=VGCALL_MEM,
-                MAPPER=MAPPER,
+                MAPPER="GIRAFFE",
                 CLEANUP_FILES=CLEANUP_FILES,
-                SURJECT_MODE=true,
-                DEEPVARIANT_MODE=DEEPVARIANT_MODE,
-                GVCF_MODE=true,
-                SNPEFF_ANNOTATION=false
+                SURJECT_MODE=true
+        }
+        # Split merged alignment by contigs list
+        call splitBAMbyPath as splitSiblingBAMbyPath {
+            input:
+                in_sample_name=read_pair_set.right,
+                in_merged_bam_file=secondIterationSiblingMap.merged_bam_file_output,
+                in_merged_bam_file_index=secondIterationSiblingMap.merged_bam_file_index_output,
+                in_path_list_file=pipeline_path_list_file,
+                in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
+                in_map_mem=MAP_MEM
         }
     }
     Array[File?] output_sibling_bam_list_maybes = secondIterationSiblingMapCall.output_bam
@@ -471,6 +498,98 @@ workflow vgTrioPipeline {
     Array[File?] gvcf_files_siblings_maybes = secondIterationSiblingMapCall.output_vcf
     Array[File] gvcf_files_siblings = select_all(gvcf_files_siblings_maybes)
     
+    #TODO: IMPLEMENT A DEEPTRIO CALLING PIPELINE THAT ALSO DOES INDEL REALIGNMENT ON THE FLY. APPLY SUBWORKFLOW PER SIBLING
+    
+    Array[Array[Pair[File, File]]] sibling_bams_and_indexes_by_contig = select_all(splitSiblingBAMbyPath.bams_and_indexes_by_contig)
+    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = zip(select_all(maternal_indel_realigned_bam), select_all(maternal_indel_realigned_bam_index))
+    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(select_all(paternal_indel_realigned_bam), select_all(paternal_indel_realigned_bam_index))
+    # Run distributed DeepTRIO linear variant calling for each chromosomal contig
+    scatter (deeptrio_caller_input_files in zip(splitProbandBAMbyPath.bams_and_indexes_by_contig, zip(splitMaternalBAMbyPath.bams_and_indexes_by_contig, splitPaternalBAMbyPath.bams_and_indexes_by_contig))) {
+        proband_deeptrio_caller_input_files = deeptrio_caller_input_files.left
+        maternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.left
+        paternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.right
+        
+        if (ABRA_REALIGN) {
+            call runGATKRealignerTargetCreator as realignTargetCreateProband {
+                input:
+                    in_sample_name=SAMPLE_NAME_PROBAND,
+                    in_bam_file=proband_deeptrio_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runAbraRealigner as abraRealignProband {
+                input:
+                    in_sample_name=SAMPLE_NAME_PROBAND,
+                    in_bam_file=proband_deeptrio_caller_input_files,
+                    in_target_bed_file=realignTargetCreateProband.realigner_target_bed,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runGATKRealignerTargetCreator as realignTargetCreateMaternal {
+                input:
+                    in_sample_name=SAMPLE_NAME_MATERNAL,
+                    in_bam_file=maternal_deeptrio_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runAbraRealigner as abraRealignMaternal {
+                input:
+                    in_sample_name=SAMPLE_NAME_MATERNAL,
+                    in_bam_file=maternal_deeptrio_caller_input_files,
+                    in_target_bed_file=realignTargetCreateMaternal.realigner_target_bed,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runGATKRealignerTargetCreator as realignTargetCreatePaternal {
+                input:
+                    in_sample_name=SAMPLE_NAME_PATERNAL,
+                    in_bam_file=paternal_deeptrio_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runAbraRealigner as abraRealignPaternal {
+                input:
+                    in_sample_name=SAMPLE_NAME_PATERNAL,
+                    in_bam_file=paternal_deeptrio_caller_input_files,
+                    in_target_bed_file=realignTargetCreatePaternal.realigner_target_bed,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+        }
+        if (!ABRA_REALIGN) {
+            call runGATKIndelRealigner as gatkRealignProband {
+                input:
+                    in_sample_name=SAMPLE_NAME_PROBAND,
+                    in_bam_file=proband_deeptrio_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runGATKIndelRealigner as gatkRealignMaternal {
+                input:
+                    in_sample_name=SAMPLE_NAME_MATERNAL,
+                    in_bam_file=maternal_deeptrio_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+            call runGATKIndelRealigner as gatkRealignPaternal {
+                input:
+                    in_sample_name=SAMPLE_NAME_PATERNAL,
+                    in_bam_file=paternal_deeptrio_caller_input_files,
+                    in_reference_file=REF_FILE,
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
+            }
+        }
+        File proband_indel_realigned_bam = select_first([abraRealignProband.indel_realigned_bam, gatkRealignProband.indel_realigned_bam])
+        File proband_indel_realigned_bam_index = select_first([abraRealignProband.indel_realigned_bam_index, gatkRealignProband.indel_realigned_bam_index])
     
     #######################################################
     ## Run 2nd trio joint genotyping on new proband GVCF ##
@@ -939,6 +1058,9 @@ task runGATKCombineGenotypeGVCFs {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
     
     command <<<
@@ -973,6 +1095,9 @@ task runDeepVariantJointGenotyper {
         File in_gvcf_file_maternal
         File in_gvcf_file_paternal
         Array[File]+ in_gvcf_files_siblings
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
     }
 
     command <<<
@@ -983,9 +1108,10 @@ task runDeepVariantJointGenotyper {
         for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
             tabix -f -p vcf "${sibling_gvcf_file}"
         done
-         
+        
         /usr/local/bin/glnexus_cli \
-        --config DeepVariantWGS \
+        --config DeepVariant_unfiltered \
+        --threads ~{in_vgcall_cores} \
         ~{in_gvcf_file_maternal} \
         ~{in_gvcf_file_paternal} \
         ~{sep=" " in_gvcf_files_siblings} \
@@ -997,8 +1123,8 @@ task runDeepVariantJointGenotyper {
         File joint_genotyped_vcf_index = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
-        memory: 100 + " GB"
-        cpu: 32
+        memory: in_vgcall_mem + " GB"
+        cpu: in_vgcall_cores
         docker: "quay.io/mlin/glnexus:v1.2.7"
     }
 }
