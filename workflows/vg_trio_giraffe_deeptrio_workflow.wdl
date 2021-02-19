@@ -6,6 +6,7 @@ version 1.0
 ## Reference: https://github.com/vgteam/vg/wiki
 
 import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+import "./vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
 import "./vg_construct_and_index.wdl" as vgConstructWorkflow
 import "./vg_indel_realign.wdl" as vgIndelRealignmentWorkflow
 
@@ -177,194 +178,38 @@ workflow vgTrioPipeline {
     #########################
     ## Run trio genotyping ##
     #########################
-    # Split merged alignment by contigs list
-    call splitBAMbyPath as splitProbandBAMbyPath {
+    call vgDeepTrioCallWorkflow.vgDeepTrioCall as firstTrioCallWorkflow {
         input:
-            in_sample_name=SAMPLE_NAME_PROBAND,
-            in_merged_bam_file=probandMapWorkflow.merged_bam_file_output,
-            in_merged_bam_file_index=probandMapWorkflow.merged_bam_file_index_output,
-            in_path_list_file=pipeline_path_list_file,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
-    }
-    call splitBAMbyPath as splitMaternalBAMbyPath {
-        input:
-            in_sample_name=SAMPLE_NAME_MATERNAL,
-            in_merged_bam_file=maternalMapWorkflow.merged_bam_file_output,
-            in_merged_bam_file_index=maternalMapWorkflow.merged_bam_file_index_output,
-            in_path_list_file=pipeline_path_list_file,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
-    }
-    call splitBAMbyPath as splitPaternalBAMbyPath {
-        input:
-            in_sample_name=SAMPLE_NAME_PATERNAL,
-            in_merged_bam_file=paternalMapWorkflow.merged_bam_file_output,
-            in_merged_bam_file_index=paternalMapWorkflow.merged_bam_file_index_output,
-            in_path_list_file=pipeline_path_list_file,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
-    }
-    # Run distributed DeepTRIO linear variant calling for each chromosomal contig
-    scatter (deeptrio_caller_input_files in zip(splitProbandBAMbyPath.bams_and_indexes_by_contig, zip(splitMaternalBAMbyPath.bams_and_indexes_by_contig, splitPaternalBAMbyPath.bams_and_indexes_by_contig))) {
-        proband_deeptrio_caller_input_files = deeptrio_caller_input_files.left
-        maternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.left
-        paternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.right
-        
-        if (ABRA_REALIGN) {
-            call runGATKRealignerTargetCreator as realignTargetCreateProband {
-                input:
-                    in_sample_name=SAMPLE_NAME_PROBAND,
-                    in_bam_file=proband_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runAbraRealigner as abraRealignProband {
-                input:
-                    in_sample_name=SAMPLE_NAME_PROBAND,
-                    in_bam_file=proband_deeptrio_caller_input_files,
-                    in_target_bed_file=realignTargetCreateProband.realigner_target_bed,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKRealignerTargetCreator as realignTargetCreateMaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_bam_file=maternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runAbraRealigner as abraRealignMaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_bam_file=maternal_deeptrio_caller_input_files,
-                    in_target_bed_file=realignTargetCreateMaternal.realigner_target_bed,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKRealignerTargetCreator as realignTargetCreatePaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_bam_file=paternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runAbraRealigner as abraRealignPaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_bam_file=paternal_deeptrio_caller_input_files,
-                    in_target_bed_file=realignTargetCreatePaternal.realigner_target_bed,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-        }
-        if (!ABRA_REALIGN) {
-            call runGATKIndelRealigner as gatkRealignProband {
-                input:
-                    in_sample_name=SAMPLE_NAME_PROBAND,
-                    in_bam_file=proband_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKIndelRealigner as gatkRealignMaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_bam_file=maternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKIndelRealigner as gatkRealignPaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_bam_file=paternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-        }
-        File proband_indel_realigned_bam = select_first([abraRealignProband.indel_realigned_bam, gatkRealignProband.indel_realigned_bam])
-        File proband_indel_realigned_bam_index = select_first([abraRealignProband.indel_realigned_bam_index, gatkRealignProband.indel_realigned_bam_index])
-        File maternal_indel_realigned_bam = select_first([abraRealignMaternal.indel_realigned_bam, gatkRealignMaternal.indel_realigned_bam])
-        File maternal_indel_realigned_bam_index = select_first([abraRealignMaternal.indel_realigned_bam_index, gatkRealignMaternal.indel_realigned_bam_index])
-        File paternal_indel_realigned_bam = select_first([abraRealignPaternal.indel_realigned_bam, gatkRealignPaternal.indel_realigned_bam])
-        File paternal_indel_realigned_bam_index = select_first([abraRealignPaternal.indel_realigned_bam_index, gatkRealignPaternal.indel_realigned_bam_index])
-        
-        call runDeepTrioMakeExamples as firstIterationMakeExamples {
-            input:
-                in_proband_name=SAMPLE_NAME_PROBAND,
-                in_maternal_name=SAMPLE_NAME_MATERNAL,
-                in_paternal_name=SAMPLE_NAME_PATERNAL,
-                in_proband_bam_file=proband_indel_realigned_bam,
-                in_proband_bam_file_index=proband_indel_realigned_bam_index,
-                in_maternal_bam_file=maternal_indel_realigned_bam,
-                in_maternal_bam_file_index=maternal_indel_realigned_bam_index,
-                in_paternal_bam_file=paternal_indel_realigned_bam,
-                in_paternal_bam_file_index=paternal_indel_realigned_bam_index,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_vgcall_cores=VGCALL_CORES,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
-        call runDeepTrioCallVariants as callVariantsProband {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_sample_type="child",
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_examples_file=firstIterationMakeExamples.proband_examples_file,
-                in_nonvariant_site_tf_file=firstIterationMakeExamples.proband_nonvariant_site_tf_file,
-                in_vgcall_cores=VGCALL_CORES,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
-        call runDeepTrioCallVariants as callVariantsMaternal {
-            input:
-                in_sample_name=SAMPLE_NAME_MATERNAL,
-                in_sample_type="parent1",
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_examples_file=firstIterationMakeExamples.maternal_examples_files,
-                in_nonvariant_site_tf_file=firstIterationMakeExamples.maternal_nonvariant_site_tf_file,
-                in_vgcall_cores=VGCALL_CORES,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
-        call runDeepTrioCallVariants as callVariantsPaternal {
-            input:
-                in_sample_name=SAMPLE_NAME_PATERNAL,
-                in_sample_type="parent2",
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_examples_file=firstIterationMakeExamples.paternal_examples_files,
-                in_nonvariant_site_tf_file=firstIterationMakeExamples.paternal_nonvariant_site_tf_file,
-                in_vgcall_cores=VGCALL_CORES,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
+            MATERNAL_BAM_FILE=maternalMapWorkflow.merged_bam_file_output,
+            MATERNAL_BAM_FILE_INDEX=maternalMapWorkflow.merged_bam_file_index_output,
+            PATERNAL_BAM_FILE=paternalMapWorkflow.merged_bam_file_output,
+            PATERNAL_BAM_FILE_INDEX=paternalMapWorkflow.merged_bam_file_index_output,
+            CHILD_BAM_FILE=probandMapWorkflow.merged_bam_file_output,
+            CHILD_BAM_FILE_INDEX=probandMapWorkflow.merged_bam_file_index_output,
+            CHILD_SAMPLE_NAME=SAMPLE_NAME_PROBAND,
+            MATERNAL_SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
+            PATERNAL_SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
+            PATH_LIST_FILE=pipeline_path_list_file,
+            REF_FILE=REF_FILE,
+            REF_INDEX_FILE=REF_INDEX_FILE,
+            MAP_CORES=MAP_CORES,
+            MAP_DISK=MAP_DISK,
+            MAP_MEM=MAP_MEM,
+            VGCALL_CORES=VGCALL_CORES,
+            VGCALL_DISK=VGCALL_DISK,
+            VGCALL_MEM=VGCALL_MEM
     }
     
     # Collect parental indel-realigned BAM contig lists
-    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = zip(select_all(maternal_indel_realigned_bam), select_all(maternal_indel_realigned_bam_index))
-    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(select_all(paternal_indel_realigned_bam), select_all(paternal_indel_realigned_bam_index))
+    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_maternal_indelrealigned_bams_and_indexes_by_contig
+    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_paternal_indelrealigned_bams_and_indexes_by_contig
     
     call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
         input:
             in_sample_name=SAMPLE_NAME_PROBAND,
-            in_gvcf_file_maternal=callVariantsMaternal.output_gvcf_file,
-            in_gvcf_file_paternal=callVariantsPaternal.output_gvcf_file,
-            in_gvcf_files_siblings=[callVariantsProband.output_gvcf_file],
+            in_gvcf_file_maternal=firstTrioCallWorkflow.output_maternal_gvcf,
+            in_gvcf_file_paternal=firstTrioCallWorkflow.output_paternal_gvcf,
+            in_gvcf_files_siblings=[firstTrioCallWorkflow.output_child_gvcf],
             in_vgcall_cores=VGCALL_CORES,
             in_vgcall_disk=VGCALL_DISK,
             in_vgcall_mem=VGCALL_MEM
@@ -373,8 +218,8 @@ workflow vgTrioPipeline {
     #####################################
     ## Run parental graph construction ##
     #####################################
-    File output_joint_genotyped_vcf = select_first([bgzipGATKGVCF.output_merged_vcf, deepVarJointGenotyper1st.joint_genotyped_vcf])
-    File output_joint_genotyped_vcf_index = select_first([bgzipGATKGVCF.output_merged_vcf_index, deepVarJointGenotyper1st.joint_genotyped_vcf_index])
+    File output_joint_genotyped_vcf = deepVarJointGenotyper1st.joint_genotyped_vcf
+    File output_joint_genotyped_vcf_index = deepVarJointGenotyper1st.joint_genotyped_vcf_index
     if (GIRAFFE_INDEXES) {
         call runSplitJointGenotypedVCF as splitJointGenotypedVCF {
             input:
@@ -479,17 +324,27 @@ workflow vgTrioPipeline {
                 CLEANUP_FILES=CLEANUP_FILES,
                 SURJECT_MODE=true
         }
-        # Split merged alignment by contigs list
-        call splitBAMbyPath as splitSiblingBAMbyPath {
+        
+        call vgDeepTrioCallWorkflow.vgDeepTrioCall as firstTrioCallWorkflow {
             input:
-                in_sample_name=read_pair_set.right,
-                in_merged_bam_file=secondIterationSiblingMap.merged_bam_file_output,
-                in_merged_bam_file_index=secondIterationSiblingMap.merged_bam_file_index_output,
-                in_path_list_file=pipeline_path_list_file,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                MATERNAL_BAM_INDEX_CONTIG_LIST=maternal_bams_and_indexes_by_contig,
+                PATERNAL_BAM_INDEX_CONTIG_LIST=paternal_bams_and_indexes_by_contig,
+                CHILD_BAM_FILE=secondIterationSiblingMap.merged_bam_file_output,
+                CHILD_BAM_FILE_INDEX=secondIterationSiblingMap.merged_bam_file_index_output,
+                CHILD_SAMPLE_NAME=read_pair_set.right,
+                MATERNAL_SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
+                PATERNAL_SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
+                PATH_LIST_FILE=pipeline_path_list_file,
+                REF_FILE=REF_FILE,
+                REF_INDEX_FILE=REF_INDEX_FILE,
+                MAP_CORES=MAP_CORES,
+                MAP_DISK=MAP_DISK,
+                MAP_MEM=MAP_MEM,
+                VGCALL_CORES=VGCALL_CORES,
+                VGCALL_DISK=VGCALL_DISK,
+                VGCALL_MEM=VGCALL_MEM
         }
+        
     }
     Array[File?] output_sibling_bam_list_maybes = secondIterationSiblingMapCall.output_bam
     Array[File?] output_sibling_bam_index_list_maybes = secondIterationSiblingMapCall.output_bam_index
@@ -498,98 +353,21 @@ workflow vgTrioPipeline {
     Array[File?] gvcf_files_siblings_maybes = secondIterationSiblingMapCall.output_vcf
     Array[File] gvcf_files_siblings = select_all(gvcf_files_siblings_maybes)
     
-    #TODO: IMPLEMENT A DEEPTRIO CALLING PIPELINE THAT ALSO DOES INDEL REALIGNMENT ON THE FLY. APPLY SUBWORKFLOW PER SIBLING
+    # Collect parental indel-realigned BAM contig lists
+    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_maternal_indelrealigned_bams_and_indexes_by_contig
+    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_paternal_indelrealigned_bams_and_indexes_by_contig
     
-    Array[Array[Pair[File, File]]] sibling_bams_and_indexes_by_contig = select_all(splitSiblingBAMbyPath.bams_and_indexes_by_contig)
-    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = zip(select_all(maternal_indel_realigned_bam), select_all(maternal_indel_realigned_bam_index))
-    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(select_all(paternal_indel_realigned_bam), select_all(paternal_indel_realigned_bam_index))
-    # Run distributed DeepTRIO linear variant calling for each chromosomal contig
-    scatter (deeptrio_caller_input_files in zip(splitProbandBAMbyPath.bams_and_indexes_by_contig, zip(splitMaternalBAMbyPath.bams_and_indexes_by_contig, splitPaternalBAMbyPath.bams_and_indexes_by_contig))) {
-        proband_deeptrio_caller_input_files = deeptrio_caller_input_files.left
-        maternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.left
-        paternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.right
-        
-        if (ABRA_REALIGN) {
-            call runGATKRealignerTargetCreator as realignTargetCreateProband {
-                input:
-                    in_sample_name=SAMPLE_NAME_PROBAND,
-                    in_bam_file=proband_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runAbraRealigner as abraRealignProband {
-                input:
-                    in_sample_name=SAMPLE_NAME_PROBAND,
-                    in_bam_file=proband_deeptrio_caller_input_files,
-                    in_target_bed_file=realignTargetCreateProband.realigner_target_bed,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKRealignerTargetCreator as realignTargetCreateMaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_bam_file=maternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runAbraRealigner as abraRealignMaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_bam_file=maternal_deeptrio_caller_input_files,
-                    in_target_bed_file=realignTargetCreateMaternal.realigner_target_bed,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKRealignerTargetCreator as realignTargetCreatePaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_bam_file=paternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runAbraRealigner as abraRealignPaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_bam_file=paternal_deeptrio_caller_input_files,
-                    in_target_bed_file=realignTargetCreatePaternal.realigner_target_bed,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-        }
-        if (!ABRA_REALIGN) {
-            call runGATKIndelRealigner as gatkRealignProband {
-                input:
-                    in_sample_name=SAMPLE_NAME_PROBAND,
-                    in_bam_file=proband_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKIndelRealigner as gatkRealignMaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_bam_file=maternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-            call runGATKIndelRealigner as gatkRealignPaternal {
-                input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_bam_file=paternal_deeptrio_caller_input_files,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
-            }
-        }
-        File proband_indel_realigned_bam = select_first([abraRealignProband.indel_realigned_bam, gatkRealignProband.indel_realigned_bam])
-        File proband_indel_realigned_bam_index = select_first([abraRealignProband.indel_realigned_bam_index, gatkRealignProband.indel_realigned_bam_index])
+    call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
+        input:
+            in_sample_name=SAMPLE_NAME_PROBAND,
+            in_gvcf_file_maternal=firstTrioCallWorkflow.output_maternal_gvcf,
+            in_gvcf_file_paternal=firstTrioCallWorkflow.output_paternal_gvcf,
+            in_gvcf_files_siblings=[firstTrioCallWorkflow.output_child_gvcf],
+            in_vgcall_cores=VGCALL_CORES,
+            in_vgcall_disk=VGCALL_DISK,
+            in_vgcall_mem=VGCALL_MEM
+    }
+    # TODO RUN BAM MERGING ON ALL SAMPLES
     
     #######################################################
     ## Run 2nd trio joint genotyping on new proband GVCF ##
@@ -648,62 +426,6 @@ workflow vgTrioPipeline {
     if (!SNPEFF_ANNOTATION) {
         File final_vcf_output = output_2nd_joint_genotyped_vcf
     }
-    
-    ######################################################
-    ## Run indel realignment workflows on pedigree bams ##
-    ######################################################
-    call vgIndelRealignmentWorkflow.vgMultiMapCall as maternalIndelRealignmentWorkflow {
-        input:
-            INPUT_BAM_FILE=maternalMapCallWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=maternalMapCallWorkflow.output_bam_index,
-            SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
-            VG_CONTAINER=VG_CONTAINER,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM
-    }
-    call vgIndelRealignmentWorkflow.vgMultiMapCall as paternalIndelRealignmentWorkflow {
-        input:
-            INPUT_BAM_FILE=paternalMapCallWorkflow.output_bam,
-            INPUT_BAM_FILE_INDEX=paternalMapCallWorkflow.output_bam_index,
-            SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
-            VG_CONTAINER=VG_CONTAINER,
-            PATH_LIST_FILE=PATH_LIST_FILE,
-            XG_FILE=XG_FILE,
-            REF_FILE=REF_FILE,
-            REF_INDEX_FILE=REF_INDEX_FILE,
-            REF_DICT_FILE=REF_DICT_FILE,
-            MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM
-    }
-
-    Array[Pair[File,File]] bam_pair_files_list = zip(output_sibling_bam_list, output_sibling_bam_index_list)
-    scatter (bam_pair_set in zip(bam_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
-        Pair[File,File] bam_pair_files = bam_pair_set.left
-        call vgIndelRealignmentWorkflow.vgMultiMapCall as siblingIndelRealignmentWorkflow {
-            input:
-                INPUT_BAM_FILE=bam_pair_files.left,
-                INPUT_BAM_FILE_INDEX=bam_pair_files.right,
-                SAMPLE_NAME=bam_pair_set.right,
-                VG_CONTAINER=VG_CONTAINER,
-                PATH_LIST_FILE=PATH_LIST_FILE,
-                XG_FILE=XG_FILE,
-                REF_FILE=REF_FILE,
-                REF_INDEX_FILE=REF_INDEX_FILE,
-                REF_DICT_FILE=REF_DICT_FILE,
-                MAP_CORES=MAP_CORES,
-                MAP_DISK=MAP_DISK,
-                MAP_MEM=MAP_MEM
-        }
-    }
-    Array[File?] output_sibling_indel_bam_list_maybes = siblingIndelRealignmentWorkflow.output_bam
-    Array[File?] output_sibling_indel_bam_index_list_maybes = siblingIndelRealignmentWorkflow.output_bam_index
     
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
