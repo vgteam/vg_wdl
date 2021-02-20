@@ -35,7 +35,7 @@ workflow vg_construct_and_index {
         Boolean use_svs = false
         
         # regex to use in grep for extracting decoy contig names from reference FASTA
-        String decoy_regex = ">GL\|>NC_007605\|>hs37d5"
+        String decoy_regex = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_"
         
         # vg docker image tag
         String vg_docker = "quay.io/vgteam/vg:v1.28.0"
@@ -322,7 +322,7 @@ task combine_graphs {
         while read -r contig_vg; do
             nm=$(basename "$contig_vg")
             cp "$contig_vg" "vg/$nm"
-            if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* ]]; then
+            if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* || $nm == *"KI"* || $nm == *"chrEBV"* || $nm == *"chrUn"* || $nm == *"hs38d1_decoys"* ]]; then
                 echo "vg/$nm" >> decoy_contigs_uid_vg
             else
                 echo "vg/$nm" >> contigs_uid_vg
