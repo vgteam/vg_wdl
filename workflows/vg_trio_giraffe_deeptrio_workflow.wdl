@@ -201,8 +201,21 @@ workflow vgTrioPipeline {
     }
     
     # Collect parental indel-realigned BAM contig lists
-    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_maternal_indelrealigned_bams_and_indexes_by_contig
-    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_paternal_indelrealigned_bams_and_indexes_by_contig
+    Array[File] maternal_bams_by_contig = firstTrioCallWorkflow.maternal_indelrealigned_bams_by_contig
+    Array[File] maternal_bam_indexes_by_contig = firstTrioCallWorkflow.maternal_indelrealigned_bam_indexes_by_contig
+    Array[File] paternal_bams_by_contig = firstTrioCallWorkflow.paternal_indelrealigned_bams_by_contig
+    Array[File] paternal_bam_indexes_by_contig = firstTrioCallWorkflow.paternal_indelrealigned_bam_indexes_by_contig
+    
+    call mergeIndelRealignedBAMs as mergeMaternalIndelRealignedBams{
+        input:  
+            in_sample_name=SAMPLE_NAME_MATERNAL,
+            in_alignment_bam_chunk_files=maternal_bams_by_contig
+    }
+    call mergeIndelRealignedBAMs as mergePaternalIndelRealignedBams{
+        input:  
+            in_sample_name=SAMPLE_NAME_PATERNAL,
+            in_alignment_bam_chunk_files=paternal_bams_by_contig
+    }
     
     call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
         input:
@@ -325,10 +338,12 @@ workflow vgTrioPipeline {
                 SURJECT_MODE=true
         }
         
-        call vgDeepTrioCallWorkflow.vgDeepTrioCall as firstTrioCallWorkflow {
+        call vgDeepTrioCallWorkflow.vgDeepTrioCall as secondTrioCallWorkflow {
             input:
-                MATERNAL_BAM_INDEX_CONTIG_LIST=maternal_bams_and_indexes_by_contig,
-                PATERNAL_BAM_INDEX_CONTIG_LIST=paternal_bams_and_indexes_by_contig,
+                MATERNAL_BAM_CONTIG_LIST=maternal_bams_by_contig,
+                MATERNAL_BAM_INDEX_CONTIG_LIST=maternal_bam_indexes_by_contig,
+                PATERNAL_BAM_CONTIG_LIST=paternal_bams_by_contig,
+                PATERNAL_BAM_INDEX_CONTIG_LIST=paternal_bam_indexes_by_contig,
                 CHILD_BAM_FILE=secondIterationSiblingMap.merged_bam_file_output,
                 CHILD_BAM_FILE_INDEX=secondIterationSiblingMap.merged_bam_file_index_output,
                 CHILD_SAMPLE_NAME=read_pair_set.right,
@@ -344,65 +359,33 @@ workflow vgTrioPipeline {
                 VGCALL_DISK=VGCALL_DISK,
                 VGCALL_MEM=VGCALL_MEM
         }
+        call mergeIndelRealignedBAMs as mergeSiblingIndelRealignedBams{
+            input:
+                in_sample_name=read_pair_set.right,
+                in_alignment_bam_chunk_files=secondTrioCallWorkflow.output_child_indelrealigned_bams
+        }
         
     }
-    Array[File?] output_sibling_bam_list_maybes = secondIterationSiblingMapCall.output_bam
-    Array[File?] output_sibling_bam_index_list_maybes = secondIterationSiblingMapCall.output_bam_index
-    Array[File] output_sibling_bam_list = select_all(output_sibling_bam_list_maybes)
-    Array[File] output_sibling_bam_index_list = select_all(output_sibling_bam_index_list_maybes)
-    Array[File?] gvcf_files_siblings_maybes = secondIterationSiblingMapCall.output_vcf
-    Array[File] gvcf_files_siblings = select_all(gvcf_files_siblings_maybes)
+    #######################################################
+    ## Run 2nd trio joint genotyping on new proband GVCF ##
+    #######################################################
+    Array[File] output_sibling_bam_list = select_all(mergeSiblingIndelRealignedBams.merged_indel_realigned_bam_file)
+    Array[File] output_sibling_bam_index_list = select_all(mergeSiblingIndelRealignedBams.merged_indel_realigned_bam_file_index)
+    Array[File] gvcf_files_siblings = select_all(secondTrioCallWorkflow.output_child_gvcf)
     
-    # Collect parental indel-realigned BAM contig lists
-    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_maternal_indelrealigned_bams_and_indexes_by_contig
-    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = firstTrioCallWorkflow.output_paternal_indelrealigned_bams_and_indexes_by_contig
-    
-    call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
+    call runDeepVariantJointGenotyper as deepVarJointGenotyper2nd {
         input:
             in_sample_name=SAMPLE_NAME_PROBAND,
             in_gvcf_file_maternal=firstTrioCallWorkflow.output_maternal_gvcf,
             in_gvcf_file_paternal=firstTrioCallWorkflow.output_paternal_gvcf,
-            in_gvcf_files_siblings=[firstTrioCallWorkflow.output_child_gvcf],
+            in_gvcf_files_siblings=gvcf_files_siblings,
             in_vgcall_cores=VGCALL_CORES,
             in_vgcall_disk=VGCALL_DISK,
             in_vgcall_mem=VGCALL_MEM
     }
-    # TODO RUN BAM MERGING ON ALL SAMPLES
     
-    #######################################################
-    ## Run 2nd trio joint genotyping on new proband GVCF ##
-    #######################################################
-    if (!DEEPVARIANT_MODE) {
-        call runGATKCombineGenotypeGVCFs as gatkJointGenotyper2nd {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
-                in_gvcf_files_siblings=gvcf_files_siblings,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_reference_dict_file=REF_DICT_FILE
-        }
-        call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzip2ndGATKGVCF {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_merged_vcf_file=gatkJointGenotyper2nd.joint_genotyped_vcf,
-                in_vg_container=VG_CONTAINER,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
-    }
-    if (DEEPVARIANT_MODE) {
-        call runDeepVariantJointGenotyper as deepVarJointGenotyper2nd {
-            input:
-                in_sample_name=SAMPLE_NAME_PROBAND,
-                in_gvcf_file_maternal=maternalMapCallWorkflow.output_vcf,
-                in_gvcf_file_paternal=paternalMapCallWorkflow.output_vcf,
-                in_gvcf_files_siblings=gvcf_files_siblings
-        }
-    }
-    File output_2nd_joint_genotyped_vcf = select_first([bgzip2ndGATKGVCF.output_merged_vcf, deepVarJointGenotyper2nd.joint_genotyped_vcf])
-    File output_2nd_joint_genotyped_vcf_index = select_first([bgzip2ndGATKGVCF.output_merged_vcf_index, deepVarJointGenotyper2nd.joint_genotyped_vcf_index])
+    File output_2nd_joint_genotyped_vcf = deepVarJointGenotyper2nd.joint_genotyped_vcf
+    File output_2nd_joint_genotyped_vcf_index = deepVarJointGenotyper2nd.joint_genotyped_vcf_index
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
         call vgMultiMapCallWorkflow.normalizeVCF as normalizeCohortVCF {
@@ -429,13 +412,13 @@ workflow vgTrioPipeline {
     
     output {
         File output_cohort_vcf = select_first([snpEffAnnotateCohortVCF.output_snpeff_annotated_vcf, final_vcf_output])
-        File? output_maternal_bam = maternalIndelRealignmentWorkflow.output_bam
-        File? output_maternal_bam_index = maternalIndelRealignmentWorkflow.output_bam_index
-        File? output_paternal_bam = paternalIndelRealignmentWorkflow.output_bam
-        File? output_paternal_bam_index = paternalIndelRealignmentWorkflow.output_bam_index
+        File output_maternal_bam = mergeMaternalIndelRealignedBams.merged_indel_realigned_bam_file
+        File output_maternal_bam_index = mergeMaternalIndelRealignedBams.merged_indel_realigned_bam_file_index
+        File output_paternal_bam = mergePaternalIndelRealignedBams.merged_indel_realigned_bam_file
+        File output_paternal_bam_index = mergePaternalIndelRealignedBams.merged_indel_realigned_bam_file_index
         Array[File] output_gvcf_files_siblings = gvcf_files_siblings
-        Array[File] final_output_sibling_bam_list = select_all(output_sibling_indel_bam_list_maybes)
-        Array[File] final_output_sibling_bam_index_list = select_all(output_sibling_indel_bam_index_list_maybes)
+        Array[File] output_sibling_bam_list = output_sibling_bam_list
+        Array[File] output_sibling_bam_index_list = output_sibling_bam_index_list
     }
 }
 
@@ -891,6 +874,42 @@ task runSplitJointGenotypedVCF {
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+    }
+}
+
+task mergeIndelRealignedBAMs {
+    input {
+        String in_sample_name
+        Array[File] in_alignment_bam_chunk_files
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+        samtools merge \
+          -f -p -c --threads "$(nproc --all)" \
+          ~{in_sample_name}_merged.indel_realigned.bam \
+          ~{sep=" " in_alignment_bam_chunk_files} \
+        && samtools index \
+          ~{in_sample_name}_merged.indel_realigned.bam
+    >>>
+    output {
+        File merged_indel_realigned_bam_file = "~{in_sample_name}_merged.indel_realigned.bam"
+        File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
+    }
+    runtime {
+        memory: 100 + " GB"
+        cpu: 32
+        disks: "local-disk 100 SSD"
+        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
 
