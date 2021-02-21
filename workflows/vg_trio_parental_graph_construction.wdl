@@ -39,7 +39,7 @@ workflow vgTrioPipeline {
         Boolean USE_HAPLOTYPES = true                       # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
         Boolean MAKE_SNARLS = false                         # Set to 'true' to construct the SNARLS index which incorporates indexes of "bubble" structures in the graph.
         Boolean USE_DECOYS = true                           # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
-        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5"     # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true' to use this option.
+        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_"     # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true' to use this option.
     }
     
     

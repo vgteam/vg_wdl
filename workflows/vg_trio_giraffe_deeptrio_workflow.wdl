@@ -66,7 +66,7 @@ workflow vgTrioPipeline {
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean CLEANUP_FILES = true                    # Set to 'false' to turn off intermediate file cleanup.
         Boolean ABRA_REALIGN = false                    # Set to 'true' to use GATK IndelRealigner instead of ABRA2 for indel realignment
-        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
+        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
     File PROBAND_INPUT_READ_FILE_1 = SIBLING_INPUT_READ_FILE_1_LIST[0]  # Input proband 1st read pair fastq.gz
@@ -466,334 +466,6 @@ task splitBAMbyPath {
     }
 }
 
-task runGATKRealignerTargetCreator {
-    input {
-        String in_sample_name
-        Pair[File, File] in_bam_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -f -s ~{in_bam_file.left} input_bam_file.bam
-        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
-        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
-        
-        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
-          --remove_program_records \
-          -drf DuplicateRead \
-          --disable_bam_indexing \
-          -nt "32" \
-          -R ~{in_reference_file} \
-          -L ${CONTIG_ID} \
-          -I input_bam_file.bam \
-          --out forIndelRealigner.intervals
-        
-        awk -F '[:-]' 'BEGIN { OFS = "\t" } { if( $3 == "") { print $1, $2-1, $2 } else { print $1, $2-1, $3}}' forIndelRealigner.intervals > ~{in_sample_name}.${CONTIG}.intervals.bed
-    >>>
-    output {
-        File realigner_target_bed = glob("*.bed")
-    }
-    runtime {
-        time: 180
-        memory: 20 + " GB"
-        cpu: 32
-        docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
-    }
-}
-
-task runAbraRealigner {
-    input {
-        String in_sample_name
-        Pair[File, File] in_bam_file
-        File in_target_bed_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -f -s ~{in_bam_file.left} input_bam_file.bam
-        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
-        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
-        java -Xmx20G -jar /opt/abra2/abra2.jar \
-          --targets ~{in_target_bed_file} \
-          --in input_bam_file.bam \
-          --out ~{in_sample_name}.${CONTIG_ID}.indel_realigned.bam \
-          --ref ~{in_reference_file} \
-          --index \
-          --threads 32
-    >>>
-    output {
-        File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")
-        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bam.bai")
-    }
-    runtime {
-        time: 180
-        memory: 20 + " GB"
-        cpu: 32
-        docker: "dceoy/abra2:latest"
-    }
-}
-
-task runGATKIndelRealigner {
-    input {
-        String in_sample_name
-        Pair[File, File] in_bam_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -f -s ~{in_bam_file.left} input_bam_file.bam
-        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
-        CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
-        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
-          --remove_program_records \
-          -drf DuplicateRead \
-          --disable_bam_indexing \
-          -nt "$(nproc --all)" \
-          -R ~{in_reference_file} \
-          -I input_bam_file.bam \
-          -L ${CONTIG_ID} \
-          --out forIndelRealigner.intervals \
-        && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
-          --remove_program_records \
-          -R ~{in_reference_file} \
-          --targetIntervals forIndelRealigner.intervals \
-          -I input_bam_file.bam \
-          --out ~{in_sample_name}.${CONTIG_ID}.indel_realigned.bam
-    >>>
-    output {
-        File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")
-        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bam.bai")
-    }
-    runtime {
-        time: 180
-        memory: 20 + " GB"
-        cpu: 32
-        docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
-    }
-}
-
-task runDeepTrioMakeExamples {
-    input {
-        String in_proband_name
-        String in_maternal_name
-        String in_paternal_name
-        File in_proband_bam_file
-        File in_proband_bam_file_index
-        File in_maternal_bam_file
-        File in_maternal_bam_file_index
-        File in_paternal_bam_file
-        File in_paternal_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -s ~{in_proband_bam_file} input_bam_file.proband.bam
-        ln -s ~{in_proband_bam_file_index} input_bam_file.proband.bam.bai
-        ln -s ~{in_maternal_bam_file} input_bam_file.maternal.bam
-        ln -s ~{in_maternal_bam_file_index} input_bam_file.maternal.bam.bai
-        ln -s ~{in_paternal_bam_file} input_bam_file.paternal.bam
-        ln -s ~{in_paternal_bam_file_index} input_bam_file.paternal.bam.bai
-        CONTIG_ID=($(ls ~{in_proband_bam_file} | awk -F'.' '{print $(NF-1)}'))
-        
-        seq 0 ~{in_vgcall_cores} | \
-        parallel -q halt 2 --line-buffer /opt/deepvariant/bin/deeptrio/make_examples \
-        --mode calling \
-        --ref ~{in_reference_file} \
-        --reads_parent1 input_bam_file.paternal.bam \
-        --reads_parent2 input_bam_file.maternal.bam \
-        --reads input_bam_file.proband.bam \
-        --examples ./make_examples.tfrecord@~{in_vgcall_cores}.gz \
-        --sample_name in_proband_name \
-        --sample_name_parent1 in_paternal_name \
-        --sample_name_parent2 in_maternal_name \
-        --gvcf ./gvcf.tfrecord@~{in_vgcall_cores}.gz \
-        --min_mapping_quality 1 \
-        --pileup_image_height_child 60 \
-        --pileup_image_height_parent 40 \
-        --regions ${CONTIG_ID} \
-        --task {}
-
-        ls | grep 'make_examples_child.tfrecord' | tar -czf 'make_examples_child.tfrecord.tar.gz' -T -
-        ls | grep 'make_examples_parent1.tfrecord' | tar -czf 'make_examples_parent1.tfrecord.tar.gz' -T -
-        ls | grep 'make_examples_parent2.tfrecord' | tar -czf 'make_examples_parent2.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf_child.tfrecord' | tar -czf 'gvcf_child.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf_parent1.tfrecord' | tar -czf 'gvcf_parent1.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf_parent2.tfrecord' | tar -czf 'gvcf_parent2.tfrecord.tar.gz' -T -
-    >>>
-    output {
-        File proband_examples_file = "make_examples_child.tfrecord.tar.gz"
-        File paternal_examples_file = "make_examples_parent1.tfrecord.tar.gz"
-        File maternal_examples_file = "make_examples_parent2.tfrecord.tar.gz"
-        File proband_nonvariant_site_tf_file = "gvcf_child.tfrecord.tar.gz"
-        File paternal_nonvariant_site_tf_file = "gvcf_parent1.tfrecord.tar.gz"
-        File maternal_nonvariant_site_tf_file = "gvcf_parent2.tfrecord.tar.gz"
-    }
-    runtime {
-        memory: in_vgcall_mem + " GB"
-        cpu: in_vgcall_cores
-        disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.1.0"
-    }
-}
-
-task runDeepTrioCallVariants {
-    input {
-        String in_sample_name
-        String in_sample_type
-        File in_reference_file
-        File in_reference_index_file
-        File in_examples_file
-        File in_nonvariant_site_tf_file
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
-    }
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        tar -xzf ~{in_examples_file}
-        tar -xzf ~{in_nonvariant_site_tf_file}
-        if [ ~{in_sample_type} == "child" ]; then
-            EXAMPLES_FILE="make_examples_child.tfrecord~{in_vgcall_cores}.gz"
-            OUTPUT_FILE="call_variants_output_child.tfrecord.gz"
-            NONVARIANT_SITE_FILE="gvcf_child.tfrecord~{in_vgcall_cores}.gz"
-            DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/child/model.ckpt"
-        elif [ ~{in_sample_type} == "parent1" ]; then
-            EXAMPLES_FILE="make_examples_parent1.tfrecord~{in_vgcall_cores}.gz"
-            OUTPUT_FILE="call_variants_output_parent1.tfrecord.gz"
-            NONVARIANT_SITE_FILE="gvcf_parent1.tfrecord~{in_vgcall_cores}.gz"
-            DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/parent/model.ckpt"
-        elif [ ~{in_sample_type} == "parent2" ]; then
-            EXAMPLES_FILE="make_examples_parent2.tfrecord~{in_vgcall_cores}.gz"
-            OUTPUT_FILE="call_variants_output_parent2.tfrecord.gz"
-            NONVARIANT_SITE_FILE="gvcf_parent2.tfrecord~{in_vgcall_cores}.gz"
-            DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/parent/model.ckpt"
-        fi
-        /opt/deepvariant/bin/call_variants \
-        --outfile ${OUTPUT_FILE} \
-        --examples ${EXAMPLES_FILE} \
-        --checkpoint ${DEEPTRIO_MODEL} && \
-        /opt/deepvariant/bin/postprocess_variants \
-        --ref ~{in_reference_file} \
-        --infile ${OUTPUT_FILE} \
-        --nonvariant_site_tfrecord_path ${NONVARIANT_SITE_FILE} \
-        --outfile "~{in_sample_name}_deeptrio.vcf.gz" \
-        --gvcf_outfile "~{in_sample_name}_deeptrio.g.vcf.gz"
-    >>>
-    output {
-        File output_vcf_file = "~{in_sample_name}_deeptrio.vcf.gz"
-        File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
-    }
-    runtime {
-        memory: in_vgcall_mem + " GB"
-        cpu: in_vgcall_cores
-        disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.1.0"
-    } 
-}
-
-task runGATKCombineGenotypeGVCFs {
-    input {
-        String in_sample_name
-        File in_gvcf_file_maternal
-        File in_gvcf_file_paternal
-        Array[File]+ in_gvcf_files_siblings
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
-    }
-    
-    command <<<
-        set -exu -o pipefail
-        tabix -f -p vcf ~{in_gvcf_file_maternal}
-        tabix -f -p vcf ~{in_gvcf_file_paternal}
-        for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
-            tabix -f -p vcf "${sibling_gvcf_file}"
-        done
-        gatk CombineGVCFs \
-          --reference ~{in_reference_file} \
-          -V ~{in_gvcf_file_maternal} -V ~{in_gvcf_file_paternal} -V ~{sep=" -V " in_gvcf_files_siblings} \
-          --output ~{in_sample_name}_cohort.combined.gvcf \
-        && gatk GenotypeGVCFs \
-          --reference ~{in_reference_file} \
-          --variant ~{in_sample_name}_cohort.combined.gvcf \
-          --output ~{in_sample_name}_cohort.jointgenotyped.vcf
-    >>>
-    output {
-        File joint_genotyped_vcf = "~{in_sample_name}_cohort.jointgenotyped.vcf"
-    }
-    runtime {
-        memory: 100 + " GB"
-        cpu: 32
-        docker: "broadinstitute/gatk@sha256:cc8981d0527e716775645b04a7f59e96a52ad59a7ae9788ddc47902384bf35aa"
-    }
-}
-
 task runDeepVariantJointGenotyper {
     input {
         String in_sample_name
@@ -857,9 +529,9 @@ task runSplitJointGenotypedVCF {
         ln -s ~{joint_genotyped_vcf} input_vcf_file.vcf.gz
         ln -s ~{joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
         while read -r contig; do
-            if [[ ~{filter_parents} == true && ${contig} == "MT" ]]; then
+            if [[ ~{filter_parents} == true && (${contig} == "MT" || ${contig} == chr"M") ]]; then
                 bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
-            elif [[ ~{filter_parents} == true && ${contig} == "Y" ]]; then
+            elif [[ ~{filter_parents} == true && (${contig} == "Y" || ${contig} == chr"Y") ]]; then
                 bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             else
                 bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
@@ -936,15 +608,16 @@ task runWhatsHapPhasing {
     command <<<
         set -exu -o pipefail
         
+        GENMAP_OPTION_STRING=""
         if [ ~{genetic_map_available} == true ]; then
             tar -xvf ~{in_genetic_map}
-        fi
-        if [[ ~{in_contig} == "Y" || ~{in_contig} == "MT" || ~{in_contig} == "ABOlocus" ]]; then
-            GENMAP_OPTION_STRING=""
-        elif [ ~{in_contig} == "X" ]; then
-            GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chrX_nonPAR_combined_b37.txt --chromosome X"
-        else
-            GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chr~{in_contig}_combined_b37.txt --chromosome ~{in_contig}"
+            if [[ ~{in_contig} == "Y" || ~{in_contig} == "MT" || ~{in_contig} == "ABOlocus" ]]; then
+                GENMAP_OPTION_STRING=""
+            elif [ ~{in_contig} == "X" ]; then
+                GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chrX_nonPAR_combined_b37.txt --chromosome X"
+            else
+                GENMAP_OPTION_STRING="--genmap genetic_map_GRCh37/genetic_map_chr~{in_contig}_combined_b37.txt --chromosome ~{in_contig}"
+            fi
         fi
         whatshap phase \
             --reference ~{in_reference_file} \
