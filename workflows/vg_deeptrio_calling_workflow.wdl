@@ -17,8 +17,8 @@ workflow vgDeepTrioCall {
         File? PATERNAL_BAM_FILE_INDEX                               # Input paternal .bai index of surjected .bam file.
         Array[File]? PATERNAL_BAM_CONTIG_LIST                       # Input paternal bam per contig in a list of files.
         Array[File]? PATERNAL_BAM_INDEX_CONTIG_LIST                 # Input paternal bam index per contig in a list of files following the same contig order as PATERNAL_BAM_CONTIG_LIST.
-        File CHILD_BAM_FILE                                         # Input child surjected .bam file
-        File CHILD_BAM_FILE_INDEX                                   # Input child .bai index of surjected .bam file.
+        File? CHILD_BAM_FILE                                         # Input child surjected .bam file
+        File? CHILD_BAM_FILE_INDEX                                   # Input child .bai index of surjected .bam file.
         String SAMPLE_NAME_CHILD                                    # The child sample name
         String SAMPLE_NAME_MATERNAL                                 # The maternal sample name
         String SAMPLE_NAME_PATERNAL                                 # The paternal sample name
@@ -225,12 +225,11 @@ workflow vgDeepTrioCall {
             }
         }
     }
-    Array[File] child_contig_gvcf_output_list = select_all(callVariantsChild.output_gvcf_file)
     # Merge distributed variant called VCFs
     call concatClippedVCFChunks as concatVCFChunksChild {
         input:
             in_sample_name=SAMPLE_NAME_CHILD,
-            in_clipped_vcf_chunk_files=child_contig_gvcf_output_list,
+            in_clipped_vcf_chunk_files=callVariantsChild.output_gvcf_file,
             in_vgcall_disk=VGCALL_DISK,
             in_vgcall_mem=VGCALL_MEM
     }
@@ -286,13 +285,14 @@ workflow vgDeepTrioCall {
     
     # Collect parental indel-realigned BAM contig lists
     if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
-        Array[File] maternal_indelrealigned_bams_by_contig = select_all(maternal_indel_realigned_bam)
-        Array[File] maternal_indelrealigned_bam_indexes_by_contig = select_all(maternal_indel_realigned_bam_index)
+        Array[File] maternal_indelrealigned_bams_by_contig = maternal_indel_realigned_bam
+        Array[File] maternal_indelrealigned_bam_indexes_by_contig = maternal_indel_realigned_bam_index
     }
     if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
-        Array[File] paternal_indelrealigned_bams_by_contig = select_all(paternal_indel_realigned_bam)
-        Array[File] paternal_indelrealigned_bam_indexes_by_contig = select_all(paternal_indel_realigned_bam_index)
+        Array[File] paternal_indelrealigned_bams_by_contig = paternal_indel_realigned_bam
+        Array[File] paternal_indelrealigned_bam_indexes_by_contig = paternal_indel_realigned_bam_index
     }
+    
     output {
         File output_child_gvcf = bgzipVGCalledChildVCF.output_merged_vcf
         File output_child_gvcf_index = bgzipVGCalledChildVCF.output_merged_vcf_index
@@ -300,8 +300,8 @@ workflow vgDeepTrioCall {
         File? output_maternal_gvcf_index = bgzipVGCalledMaternalVCF.output_merged_vcf_index
         File? output_paternal_gvcf = bgzipVGCalledPaternalVCF.output_merged_vcf
         File? output_paternal_gvcf_index = bgzipVGCalledPaternalVCF.output_merged_vcf_index
-        Array[File] output_child_indelrealigned_bams = select_all(child_indel_realigned_bam)
-        Array[File] output_child_indelrealigned_bam_indexes = select_all(child_indel_realigned_bam_index)
+        Array[File] output_child_indelrealigned_bams = child_indel_realigned_bam
+        Array[File] output_child_indelrealigned_bam_indexes = child_indel_realigned_bam_index
         Array[File]? output_maternal_indelrealigned_bams = maternal_indelrealigned_bams_by_contig
         Array[File]? output_maternal_indelrealigned_bam_indexes = maternal_indelrealigned_bam_indexes_by_contig
         Array[File]? output_paternal_indelrealigned_bams = paternal_indelrealigned_bams_by_contig

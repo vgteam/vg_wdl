@@ -36,7 +36,6 @@ workflow vgTrioPipeline {
         File GGBWT_FILE                                     # Path to .gg index file
         File DIST_FILE                                      # Path to .dist index file
         File MIN_FILE                                       # Path to .min index file
-        File SNARLS_FILE                                    # Path to .snarls index file
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
@@ -95,13 +94,10 @@ workflow vgTrioPipeline {
             READS_PER_CHUNK=READS_PER_CHUNK,
             PATH_LIST_FILE=PATH_LIST_FILE,
             XG_FILE=XG_FILE,
-            GCSA_FILE=GCSA_FILE,
-            GCSA_LCP_FILE=GCSA_LCP_FILE,
             GBWT_FILE=GBWT_FILE,
             GGBWT_FILE=GGBWT_FILE,
             DIST_FILE=DIST_FILE,
             MIN_FILE=MIN_FILE,
-            SNARLS_FILE=SNARLS_FILE,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
@@ -127,13 +123,10 @@ workflow vgTrioPipeline {
             READS_PER_CHUNK=READS_PER_CHUNK,
             PATH_LIST_FILE=PATH_LIST_FILE,
             XG_FILE=XG_FILE,
-            GCSA_FILE=GCSA_FILE,
-            GCSA_LCP_FILE=GCSA_LCP_FILE,
             GBWT_FILE=GBWT_FILE,
             GGBWT_FILE=GGBWT_FILE,
             DIST_FILE=DIST_FILE,
             MIN_FILE=MIN_FILE,
-            SNARLS_FILE=SNARLS_FILE,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
@@ -155,13 +148,10 @@ workflow vgTrioPipeline {
             READS_PER_CHUNK=READS_PER_CHUNK,
             PATH_LIST_FILE=PATH_LIST_FILE,
             XG_FILE=XG_FILE,
-            GCSA_FILE=GCSA_FILE,
-            GCSA_LCP_FILE=GCSA_LCP_FILE,
             GBWT_FILE=GBWT_FILE,
             GGBWT_FILE=GGBWT_FILE,
             DIST_FILE=DIST_FILE,
             MIN_FILE=MIN_FILE,
-            SNARLS_FILE=SNARLS_FILE,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
@@ -180,15 +170,15 @@ workflow vgTrioPipeline {
     #########################
     call vgDeepTrioCallWorkflow.vgDeepTrioCall as firstTrioCallWorkflow {
         input:
-            MATERNAL_BAM_FILE=maternalMapWorkflow.merged_bam_file_output,
-            MATERNAL_BAM_FILE_INDEX=maternalMapWorkflow.merged_bam_file_index_output,
-            PATERNAL_BAM_FILE=paternalMapWorkflow.merged_bam_file_output,
-            PATERNAL_BAM_FILE_INDEX=paternalMapWorkflow.merged_bam_file_index_output,
-            CHILD_BAM_FILE=probandMapWorkflow.merged_bam_file_output,
-            CHILD_BAM_FILE_INDEX=probandMapWorkflow.merged_bam_file_index_output,
-            CHILD_SAMPLE_NAME=SAMPLE_NAME_PROBAND,
-            MATERNAL_SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
-            PATERNAL_SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
+            MATERNAL_BAM_FILE=maternalMapWorkflow.output_bam,
+            MATERNAL_BAM_FILE_INDEX=maternalMapWorkflow.output_bam_index,
+            PATERNAL_BAM_FILE=paternalMapWorkflow.output_bam,
+            PATERNAL_BAM_FILE_INDEX=paternalMapWorkflow.output_bam_index,
+            CHILD_BAM_FILE=probandMapWorkflow.output_bam,
+            CHILD_BAM_FILE_INDEX=probandMapWorkflow.output_bam_index,
+            SAMPLE_NAME_CHILD=SAMPLE_NAME_PROBAND,
+            SAMPLE_NAME_MATERNAL=SAMPLE_NAME_MATERNAL,
+            SAMPLE_NAME_PATERNAL=SAMPLE_NAME_PATERNAL,
             PATH_LIST_FILE=pipeline_path_list_file,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
@@ -201,10 +191,12 @@ workflow vgTrioPipeline {
     }
     
     # Collect parental indel-realigned BAM contig lists
-    Array[File] maternal_bams_by_contig = firstTrioCallWorkflow.maternal_indelrealigned_bams_by_contig
-    Array[File] maternal_bam_indexes_by_contig = firstTrioCallWorkflow.maternal_indelrealigned_bam_indexes_by_contig
-    Array[File] paternal_bams_by_contig = firstTrioCallWorkflow.paternal_indelrealigned_bams_by_contig
-    Array[File] paternal_bam_indexes_by_contig = firstTrioCallWorkflow.paternal_indelrealigned_bam_indexes_by_contig
+    Array[File] maternal_bams_by_contig = select_first([firstTrioCallWorkflow.output_maternal_indelrealigned_bams])
+    Array[File] maternal_bam_indexes_by_contig = select_first([firstTrioCallWorkflow.output_maternal_indelrealigned_bam_indexes])
+    Array[File] paternal_bams_by_contig = select_first([firstTrioCallWorkflow.output_paternal_indelrealigned_bams])
+    Array[File] paternal_bam_indexes_by_contig = select_first([firstTrioCallWorkflow.output_paternal_indelrealigned_bam_indexes])
+    Array[File] child_bams_by_contig = firstTrioCallWorkflow.output_child_indelrealigned_bams
+    Array[File] child_bam_indexes_by_contig = firstTrioCallWorkflow.output_child_indelrealigned_bam_indexes
     
     call mergeIndelRealignedBAMs as mergeMaternalIndelRealignedBams{
         input:  
@@ -244,17 +236,21 @@ workflow vgTrioPipeline {
                 contigs=CONTIGS,
                 filter_parents=false
         }
-        scatter (contig_pair in zip(CONTIGS, splitJointGenotypedVCF.contig_vcfs)) {
+        Array[Pair[File,File]] maternal_bam_index_by_contigs_pair = zip(maternal_bams_by_contig, maternal_bam_indexes_by_contig)
+        Array[Pair[File,File]] paternal_bam_index_by_contigs_pair = zip(paternal_bams_by_contig, paternal_bam_indexes_by_contig)
+        Array[Pair[File,File]] child_bam_index_by_contigs_pair = zip(child_bams_by_contig, child_bam_indexes_by_contig)
+        Array[Pair[Pair[File,File],Pair[Pair[File,File],Pair[File,File]]]] trio_bam_index_by_contigs_pair = zip(child_bam_index_by_contigs_pair,zip(maternal_bam_index_by_contigs_pair,paternal_bam_index_by_contigs_pair))
+        scatter (contig_pair in zip(CONTIGS, zip(splitJointGenotypedVCF.contig_vcfs, trio_bam_index_by_contigs_pair))) {
             call runWhatsHapPhasing {
                 input:
                     in_cohort_sample_name=SAMPLE_NAME_PROBAND,
-                    joint_genotyped_vcf=contig_pair.right,
-                    in_maternal_bam=maternalMapCallWorkflow.output_bam,
-                    in_maternal_bam_index=maternalMapCallWorkflow.output_bam_index,
-                    in_paternal_bam=paternalMapCallWorkflow.output_bam,
-                    in_paternal_bam_index=paternalMapCallWorkflow.output_bam_index,
-                    in_proband_bam=probandMapCallWorkflow.output_bam,
-                    in_proband_bam_index=probandMapCallWorkflow.output_bam_index,
+                    joint_genotyped_vcf=contig_pair.right.left,
+                    in_maternal_bam=contig_pair.right.right.right.left.left,
+                    in_maternal_bam_index=contig_pair.right.right.right.left.right,
+                    in_paternal_bam=contig_pair.right.right.right.right.left,
+                    in_paternal_bam_index=contig_pair.right.right.right.right.right,
+                    in_proband_bam=contig_pair.right.right.left.left,
+                    in_proband_bam_index=contig_pair.right.right.left.right,
                     in_ped_file=PED_FILE,
                     in_genetic_map=GEN_MAP_FILES,
                     in_contig=contig_pair.left,
@@ -263,14 +259,14 @@ workflow vgTrioPipeline {
                     in_reference_dict_file=REF_DICT_FILE
             }
         }
-        call vgMultiMapCallWorkflow.concatClippedVCFChunks as concatCohortPhasedVCFs {
+        call concatClippedVCFChunks as concatCohortPhasedVCFs {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_clipped_vcf_chunk_files=runWhatsHapPhasing.phased_cohort_vcf,
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
         }
-        call vgMultiMapCallWorkflow.bgzipMergedVCF as bgzipCohortPhasedVCF {
+        call bgzipMergedVCF as bgzipCohortPhasedVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_merged_vcf_file=concatCohortPhasedVCFs.output_merged_vcf,
@@ -318,13 +314,10 @@ workflow vgTrioPipeline {
                 READS_PER_CHUNK=READS_PER_CHUNK,
                 PATH_LIST_FILE=PATH_LIST_FILE,
                 XG_FILE=constructGraphIndexWorkflow.xg,
-                GCSA_FILE=constructGraphIndexWorkflow.gcsa,
-                GCSA_LCP_FILE=constructGraphIndexWorkflow.gcsa_lcp,
                 GBWT_FILE=constructGraphIndexWorkflow.gbwt,
                 GGBWT_FILE=constructGraphIndexWorkflow.ggbwt,
                 DIST_FILE=constructGraphIndexWorkflow.dist,
                 MIN_FILE=constructGraphIndexWorkflow.min,
-                SNARLS_FILE=constructGraphIndexWorkflow.snarls,
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
                 REF_DICT_FILE=REF_DICT_FILE,
@@ -344,11 +337,11 @@ workflow vgTrioPipeline {
                 MATERNAL_BAM_INDEX_CONTIG_LIST=maternal_bam_indexes_by_contig,
                 PATERNAL_BAM_CONTIG_LIST=paternal_bams_by_contig,
                 PATERNAL_BAM_INDEX_CONTIG_LIST=paternal_bam_indexes_by_contig,
-                CHILD_BAM_FILE=secondIterationSiblingMap.merged_bam_file_output,
-                CHILD_BAM_FILE_INDEX=secondIterationSiblingMap.merged_bam_file_index_output,
-                CHILD_SAMPLE_NAME=read_pair_set.right,
-                MATERNAL_SAMPLE_NAME=SAMPLE_NAME_MATERNAL,
-                PATERNAL_SAMPLE_NAME=SAMPLE_NAME_PATERNAL,
+                CHILD_BAM_FILE=secondIterationSiblingMap.output_bam,
+                CHILD_BAM_FILE_INDEX=secondIterationSiblingMap.output_bam_index,
+                SAMPLE_NAME_CHILD=read_pair_set.right,
+                SAMPLE_NAME_MATERNAL=SAMPLE_NAME_MATERNAL,
+                SAMPLE_NAME_PATERNAL=SAMPLE_NAME_PATERNAL,
                 PATH_LIST_FILE=pipeline_path_list_file,
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
@@ -369,9 +362,9 @@ workflow vgTrioPipeline {
     #######################################################
     ## Run 2nd trio joint genotyping on new proband GVCF ##
     #######################################################
-    Array[File] output_sibling_bam_list = select_all(mergeSiblingIndelRealignedBams.merged_indel_realigned_bam_file)
-    Array[File] output_sibling_bam_index_list = select_all(mergeSiblingIndelRealignedBams.merged_indel_realigned_bam_file_index)
-    Array[File] gvcf_files_siblings = select_all(secondTrioCallWorkflow.output_child_gvcf)
+    Array[File] sibling_bam_list = mergeSiblingIndelRealignedBams.merged_indel_realigned_bam_file
+    Array[File] sibling_bam_index_list = mergeSiblingIndelRealignedBams.merged_indel_realigned_bam_file_index
+    Array[File] gvcf_files_siblings = secondTrioCallWorkflow.output_child_gvcf
     
     call runDeepVariantJointGenotyper as deepVarJointGenotyper2nd {
         input:
@@ -388,7 +381,7 @@ workflow vgTrioPipeline {
     File output_2nd_joint_genotyped_vcf_index = deepVarJointGenotyper2nd.joint_genotyped_vcf_index
     # Run snpEff annotation on final VCF as desired
     if (SNPEFF_ANNOTATION && defined(SNPEFF_DATABASE)) {
-        call vgMultiMapCallWorkflow.normalizeVCF as normalizeCohortVCF {
+        call normalizeVCF as normalizeCohortVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_bgzip_vcf_file=output_2nd_joint_genotyped_vcf,
@@ -396,7 +389,7 @@ workflow vgTrioPipeline {
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
         }
-        call vgMultiMapCallWorkflow.snpEffAnnotateVCF as snpEffAnnotateCohortVCF {
+        call snpEffAnnotateVCF as snpEffAnnotateCohortVCF {
             input:
                 in_sample_name=SAMPLE_NAME_PROBAND,
                 in_normalized_vcf_file=normalizeCohortVCF.output_normalized_vcf,
@@ -417,14 +410,37 @@ workflow vgTrioPipeline {
         File output_paternal_bam = mergePaternalIndelRealignedBams.merged_indel_realigned_bam_file
         File output_paternal_bam_index = mergePaternalIndelRealignedBams.merged_indel_realigned_bam_file_index
         Array[File] output_gvcf_files_siblings = gvcf_files_siblings
-        Array[File] output_sibling_bam_list = output_sibling_bam_list
-        Array[File] output_sibling_bam_index_list = output_sibling_bam_index_list
+        Array[File] output_sibling_bam_list = sibling_bam_list
+        Array[File] output_sibling_bam_index_list = sibling_bam_index_list
     }
 }
 
 ########################
 ### TASK DEFINITIONS ###
 ########################
+task extractPathNames {
+    input {
+        File in_xg_file
+        String in_vg_container
+    }
+
+    command {
+        set -eux -o pipefail
+
+        vg paths \
+            --list \
+            --xg ${in_xg_file} > path_list.txt
+    }
+    output {
+        File output_path_list = "path_list.txt"
+    }
+    runtime {
+        memory: "50 GB"
+        disks: "local-disk 50 SSD"
+        docker: in_vg_container
+    }
+}
+
 task splitBAMbyPath {
     input {
         String in_sample_name
@@ -469,8 +485,8 @@ task splitBAMbyPath {
 task runDeepVariantJointGenotyper {
     input {
         String in_sample_name
-        File in_gvcf_file_maternal
-        File in_gvcf_file_paternal
+        File? in_gvcf_file_maternal
+        File? in_gvcf_file_paternal
         Array[File]+ in_gvcf_files_siblings
         Int in_vgcall_cores
         Int in_vgcall_disk
@@ -552,7 +568,7 @@ task runSplitJointGenotypedVCF {
 task mergeIndelRealignedBAMs {
     input {
         String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
+        Array[File]? in_alignment_bam_chunk_files
     }
 
     command <<<
@@ -638,4 +654,149 @@ task runWhatsHapPhasing {
         docker: "quay.io/biocontainers/whatshap@sha256:cf82de1173a35a0cb063469a602eff2e8999b4cfc0f0ee9cef0dbaedafa5ab6c"
     }
 }
+
+task concatClippedVCFChunks {
+    input {
+        String in_sample_name
+        Array[File] in_clipped_vcf_chunk_files
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+    }
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        for vcf_file in ${sep=" " in_clipped_vcf_chunk_files} ; do
+            bcftools index "$vcf_file"
+        done
+        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort - > ${in_sample_name}_merged.vcf
+    }
+    output {
+        File output_merged_vcf = "${in_sample_name}_merged.vcf"
+    }
+    runtime {
+        time: 60
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+    }
+}
+
+task bgzipMergedVCF {
+    input {
+        String in_sample_name
+        File in_merged_vcf_file
+        String in_vg_container
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+    }
+
+    # TODO:
+    #   If GVCF in in_merged_vcf_file then output_vcf_extension="gvcf" else output_vcf_extension="vcf"
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        bgzip -c ${in_merged_vcf_file} > ${in_sample_name}_merged.vcf.gz && \
+        tabix -f -p vcf ${in_sample_name}_merged.vcf.gz
+    }
+    output {
+        File output_merged_vcf = "${in_sample_name}_merged.vcf.gz"
+        File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
+    }
+    runtime {
+        time: 30
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: in_vg_container
+    }
+}
+
+task normalizeVCF {
+    input {
+        String in_sample_name
+        File in_bgzip_vcf_file
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        bcftools norm -m-both --threads ~{in_vgcall_cores} -o ~{in_sample_name}.unrolled.vcf ~{in_bgzip_vcf_file}
+    >>>
+    output {
+        File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"
+    }
+    runtime {
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+    }
+}
+
+task snpEffAnnotateVCF {
+    input {
+        String in_sample_name
+        File in_normalized_vcf_file
+        File? in_snpeff_database
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        unzip ~{in_snpeff_database}
+        snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${PWD}/data GRCh37.75 ~{in_normalized_vcf_file} > ~{in_sample_name}.snpeff.unrolled.vcf
+    >>>
+    output {
+        File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
+    }
+    runtime {
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
+    }
+}
+
 
