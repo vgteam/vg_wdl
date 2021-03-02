@@ -182,6 +182,7 @@ workflow vgTrioPipeline {
             PATH_LIST_FILE=pipeline_path_list_file,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
+            REF_DICT_FILE=REF_DICT_FILE,
             MAP_CORES=MAP_CORES,
             MAP_DISK=MAP_DISK,
             MAP_MEM=MAP_MEM,
@@ -345,6 +346,7 @@ workflow vgTrioPipeline {
                 PATH_LIST_FILE=pipeline_path_list_file,
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
+                REF_DICT_FILE=REF_DICT_FILE,
                 MAP_CORES=MAP_CORES,
                 MAP_DISK=MAP_DISK,
                 MAP_MEM=MAP_MEM,
@@ -621,8 +623,15 @@ task runWhatsHapPhasing {
     
     Boolean genetic_map_available = defined(in_genetic_map)
     
+    
     command <<<
         set -exu -o pipefail
+        ln -s ~{in_maternal_bam} input_m_bam_file.bam
+        ln -s ~{in_maternal_bam_index} input_m_bam_file.bam.bai
+        ln -s ~{in_paternal_bam} input_p_bam_file.bam
+        ln -s ~{in_paternal_bam_index} input_p_bam_file.bam.bai
+        ln -s ~{in_proband_bam} input_c_bam_file.bam
+        ln -s ~{in_proband_bam_index} input_c_bam_file.bam.bai
         
         GENMAP_OPTION_STRING=""
         if [ ~{genetic_map_available} == true ]; then
@@ -641,7 +650,7 @@ task runWhatsHapPhasing {
             --ped ~{in_ped_file} \
             ${GENMAP_OPTION_STRING} \
             -o ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf \
-            ~{joint_genotyped_vcf} ~{in_proband_bam} ~{in_maternal_bam} ~{in_paternal_bam} \
+            ~{joint_genotyped_vcf} input_c_bam_file.bam input_m_bam_file.bam input_p_bam_file.bam \
         && bgzip ~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf
     >>>
 

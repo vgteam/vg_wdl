@@ -32,7 +32,7 @@ workflow vgMultiMap {
         Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 32
         Int MAP_DISK = 10
-        Int MAP_MEM = 60
+        Int MAP_MEM = 100
         Int MERGE_GAM_CORES = 56
         Int MERGE_GAM_DISK = 100
         Int MERGE_GAM_MEM = 40

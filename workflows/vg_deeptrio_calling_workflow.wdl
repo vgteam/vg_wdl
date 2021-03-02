@@ -25,6 +25,7 @@ workflow vgDeepTrioCall {
         File PATH_LIST_FILE                                         # Text file where each line is a path name in the XG index used in 
         File REF_FILE                                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                         # Path to .fai index of the REF_FILE fasta reference
+        File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int MAP_CORES = 32
         Int MAP_DISK = 100
@@ -76,22 +77,23 @@ workflow vgDeepTrioCall {
     Array[File] paternal_bam_indexes_by_contig = select_first([PATERNAL_BAM_INDEX_CONTIG_LIST, splitPaternalBAMbyPath.bam_contig_files_index])
     Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(paternal_bams_by_contig, paternal_bam_indexes_by_contig)
     Array[Pair[File, File]] child_bams_and_indexes_by_contig = zip(splitChildBAMbyPath.bam_contig_files, splitChildBAMbyPath.bam_contig_files_index)
+    
     scatter (deeptrio_caller_input_files in zip(child_bams_and_indexes_by_contig, zip(maternal_bams_and_indexes_by_contig, paternal_bams_and_indexes_by_contig))) {
-        Pair[File,File] child_deeptrio_caller_input_files = deeptrio_caller_input_files.left
-        Pair[File,File] maternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.left
-        Pair[File,File] paternal_deeptrio_caller_input_files = deeptrio_caller_input_files.right.right
         if (ABRA_REALIGN) {
             call runGATKRealignerTargetCreator as realignTargetCreateChild {
                 input:
                     in_sample_name=SAMPLE_NAME_CHILD,
-                    in_bam_file=child_deeptrio_caller_input_files,
+                    in_bam_file=deeptrio_caller_input_files.left.left,
+                    in_bam_index_file=deeptrio_caller_input_files.left.right,
                     in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
             }
             call runAbraRealigner as abraRealignChild {
                 input:
                     in_sample_name=SAMPLE_NAME_CHILD,
-                    in_bam_file=child_deeptrio_caller_input_files,
+                    in_bam_file=deeptrio_caller_input_files.left.left,
+                    in_bam_index_file=deeptrio_caller_input_files.left.right,
                     in_target_bed_file=realignTargetCreateChild.realigner_target_bed,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE
@@ -101,14 +103,17 @@ workflow vgDeepTrioCall {
                 call runGATKRealignerTargetCreator as realignTargetCreateMaternal {
                     input:
                         in_sample_name=SAMPLE_NAME_MATERNAL,
-                        in_bam_file=maternal_deeptrio_caller_input_files,
+                        in_bam_file=deeptrio_caller_input_files.right.left.left,
+                        in_bam_index_file=deeptrio_caller_input_files.right.left.right,
                         in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_reference_dict_file=REF_DICT_FILE
                 }
                 call runAbraRealigner as abraRealignMaternal {
                     input:
                         in_sample_name=SAMPLE_NAME_MATERNAL,
-                        in_bam_file=maternal_deeptrio_caller_input_files,
+                        in_bam_file=deeptrio_caller_input_files.right.left.left,
+                        in_bam_index_file=deeptrio_caller_input_files.right.left.right,
                         in_target_bed_file=realignTargetCreateMaternal.realigner_target_bed,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE
@@ -118,14 +123,17 @@ workflow vgDeepTrioCall {
                 call runGATKRealignerTargetCreator as realignTargetCreatePaternal {
                     input:
                         in_sample_name=SAMPLE_NAME_PATERNAL,
-                        in_bam_file=paternal_deeptrio_caller_input_files,
+                        in_bam_file=deeptrio_caller_input_files.right.right.left,
+                        in_bam_index_file=deeptrio_caller_input_files.right.right.right,
                         in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_reference_dict_file=REF_DICT_FILE
                 }
                 call runAbraRealigner as abraRealignPaternal {
                     input:
                         in_sample_name=SAMPLE_NAME_PATERNAL,
-                        in_bam_file=paternal_deeptrio_caller_input_files,
+                        in_bam_file=deeptrio_caller_input_files.right.right.left,
+                        in_bam_index_file=deeptrio_caller_input_files.right.right.right,
                         in_target_bed_file=realignTargetCreatePaternal.realigner_target_bed,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE
@@ -136,36 +144,42 @@ workflow vgDeepTrioCall {
             call runGATKIndelRealigner as gatkRealignChild {
                 input:
                     in_sample_name=SAMPLE_NAME_CHILD,
-                    in_bam_file=child_deeptrio_caller_input_files,
+                    in_bam_file=deeptrio_caller_input_files.left.left,
+                    in_bam_index_file=deeptrio_caller_input_files.left.right,
                     in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_reference_dict_file=REF_DICT_FILE
             }
             # Only do indel realignment of parents if there isn't already a supplied indel realigned bam set
             if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
                 call runGATKIndelRealigner as gatkRealignMaternal {
                     input:
                         in_sample_name=SAMPLE_NAME_MATERNAL,
-                        in_bam_file=maternal_deeptrio_caller_input_files,
+                        in_bam_file=deeptrio_caller_input_files.right.left.left,
+                        in_bam_index_file=deeptrio_caller_input_files.right.left.right,
                         in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_reference_dict_file=REF_DICT_FILE
                 }
             }
             if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
                 call runGATKIndelRealigner as gatkRealignPaternal {
                     input:
                         in_sample_name=SAMPLE_NAME_PATERNAL,
-                        in_bam_file=paternal_deeptrio_caller_input_files,
+                        in_bam_file=deeptrio_caller_input_files.right.right.left,
+                        in_bam_index_file=deeptrio_caller_input_files.right.right.right,
                         in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_reference_dict_file=REF_DICT_FILE
                 }
             }
         }
         File child_indel_realigned_bam = select_first([abraRealignChild.indel_realigned_bam, gatkRealignChild.indel_realigned_bam])
         File child_indel_realigned_bam_index = select_first([abraRealignChild.indel_realigned_bam_index, gatkRealignChild.indel_realigned_bam_index])
-        File maternal_indel_realigned_bam = select_first([abraRealignMaternal.indel_realigned_bam, gatkRealignMaternal.indel_realigned_bam, maternal_deeptrio_caller_input_files.left])
-        File maternal_indel_realigned_bam_index = select_first([abraRealignMaternal.indel_realigned_bam_index, gatkRealignMaternal.indel_realigned_bam_index, maternal_deeptrio_caller_input_files.right])
-        File paternal_indel_realigned_bam = select_first([abraRealignPaternal.indel_realigned_bam, gatkRealignPaternal.indel_realigned_bam, paternal_deeptrio_caller_input_files.left])
-        File paternal_indel_realigned_bam_index = select_first([abraRealignPaternal.indel_realigned_bam_index, gatkRealignPaternal.indel_realigned_bam_index, paternal_deeptrio_caller_input_files.right])
+        File maternal_indel_realigned_bam = select_first([abraRealignMaternal.indel_realigned_bam, gatkRealignMaternal.indel_realigned_bam, deeptrio_caller_input_files.right.left.left])
+        File maternal_indel_realigned_bam_index = select_first([abraRealignMaternal.indel_realigned_bam_index, gatkRealignMaternal.indel_realigned_bam_index, deeptrio_caller_input_files.right.left.right])
+        File paternal_indel_realigned_bam = select_first([abraRealignPaternal.indel_realigned_bam, gatkRealignPaternal.indel_realigned_bam, deeptrio_caller_input_files.right.right.left])
+        File paternal_indel_realigned_bam_index = select_first([abraRealignPaternal.indel_realigned_bam_index, gatkRealignPaternal.indel_realigned_bam_index, deeptrio_caller_input_files.right.right.right])
 
         call runDeepTrioMakeExamples {
             input:
@@ -200,7 +214,7 @@ workflow vgDeepTrioCall {
             call runDeepTrioCallVariants as callVariantsMaternal {
                 input:
                     in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_sample_type="parent1",
+                    in_sample_type="parent2",
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_examples_file=runDeepTrioMakeExamples.maternal_examples_file,
@@ -214,7 +228,7 @@ workflow vgDeepTrioCall {
             call runDeepTrioCallVariants as callVariantsPaternal {
                 input:
                     in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_sample_type="parent2",
+                    in_sample_type="parent1",
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_examples_file=runDeepTrioMakeExamples.paternal_examples_file,
@@ -354,9 +368,11 @@ task splitBAMbyPath {
 task runGATKRealignerTargetCreator { 
     input { 
         String in_sample_name 
-        Pair[File, File] in_bam_file 
+        File in_bam_file 
+        File in_bam_index_file
         File in_reference_file 
-        File in_reference_index_file 
+        File in_reference_index_file
+        File in_reference_dict_file
     } 
  
     command <<< 
@@ -371,8 +387,8 @@ task runGATKRealignerTargetCreator {
         set -o xtrace 
         #to turn off echo do 'set +o xtrace' 
  
-        ln -f -s ~{in_bam_file.left} input_bam_file.bam 
-        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai 
+        ln -f -s ~{in_bam_file} input_bam_file.bam 
+        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai 
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}')) 
          
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \ 
@@ -401,7 +417,8 @@ task runGATKRealignerTargetCreator {
 task runAbraRealigner {
     input {
         String in_sample_name
-        Pair[File, File] in_bam_file
+        File in_bam_file 
+        File in_bam_index_file
         File in_target_bed_file
         File in_reference_file
         File in_reference_index_file
@@ -419,8 +436,8 @@ task runAbraRealigner {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        ln -f -s ~{in_bam_file.left} input_bam_file.bam
-        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
+        ln -f -s ~{in_bam_file} input_bam_file.bam 
+        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai 
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         java -Xmx20G -jar /opt/abra2/abra2.jar \
           --targets ~{in_target_bed_file} \
@@ -432,7 +449,7 @@ task runAbraRealigner {
     >>>
     output {
         File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")[0]
-        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bam.bai")[0]
+        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
         time: 180
@@ -445,9 +462,11 @@ task runAbraRealigner {
 task runGATKIndelRealigner {
     input {
         String in_sample_name
-        Pair[File, File] in_bam_file
+        File in_bam_file 
+        File in_bam_index_file
         File in_reference_file
         File in_reference_index_file
+        File in_reference_dict_file
     }
 
     command <<<
@@ -462,14 +481,14 @@ task runGATKIndelRealigner {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        ln -f -s ~{in_bam_file.left} input_bam_file.bam
-        ln -f -s ~{in_bam_file.right} input_bam_file.bam.bai
+        ln -f -s ~{in_bam_file} input_bam_file.bam 
+        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai 
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
-          -nt "$(nproc --all)" \
+          -nt "32" \
           -R ~{in_reference_file} \
           -I input_bam_file.bam \
           -L ${CONTIG_ID} \
@@ -483,7 +502,7 @@ task runGATKIndelRealigner {
     >>>
     output {
         File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")[0]
-        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bam.bai")[0]
+        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
         time: 180
@@ -529,19 +548,19 @@ task runDeepTrioMakeExamples {
         ln -s ~{in_maternal_bam_file_index} input_bam_file.maternal.bam.bai
         ln -s ~{in_paternal_bam_file} input_bam_file.paternal.bam
         ln -s ~{in_paternal_bam_file_index} input_bam_file.paternal.bam.bai
-        CONTIG_ID=($(ls ~{in_child_bam_file} | awk -F'.' '{print $(NF-1)}'))
+        CONTIG_ID=($(ls ~{in_child_bam_file} | awk -F'.' '{print $(NF-2)}'))
         
-        seq 0 ~{in_vgcall_cores} | \
-        parallel -q halt 2 --line-buffer /opt/deepvariant/bin/deeptrio/make_examples \
+        seq 0 $((~{in_vgcall_cores}-1)) | \
+        parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/deeptrio/make_examples \
         --mode calling \
         --ref ~{in_reference_file} \
         --reads_parent1 input_bam_file.paternal.bam \
         --reads_parent2 input_bam_file.maternal.bam \
         --reads input_bam_file.child.bam \
         --examples ./make_examples.tfrecord@~{in_vgcall_cores}.gz \
-        --sample_name in_child_name \
-        --sample_name_parent1 in_paternal_name \
-        --sample_name_parent2 in_maternal_name \
+        --sample_name ~{in_child_name} \
+        --sample_name_parent1 ~{in_paternal_name} \
+        --sample_name_parent2 ~{in_maternal_name} \
         --gvcf ./gvcf.tfrecord@~{in_vgcall_cores}.gz \
         --min_mapping_quality 1 \
         --pileup_image_height_child 60 \
@@ -598,19 +617,19 @@ task runDeepTrioCallVariants {
         tar -xzf ~{in_examples_file}
         tar -xzf ~{in_nonvariant_site_tf_file}
         if [ ~{in_sample_type} == "child" ]; then
-            EXAMPLES_FILE="make_examples_child.tfrecord~{in_vgcall_cores}.gz"
+            EXAMPLES_FILE="make_examples_child.tfrecord@~{in_vgcall_cores}.gz"
             OUTPUT_FILE="call_variants_output_child.tfrecord.gz"
-            NONVARIANT_SITE_FILE="gvcf_child.tfrecord~{in_vgcall_cores}.gz"
+            NONVARIANT_SITE_FILE="gvcf_child.tfrecord@~{in_vgcall_cores}.gz"
             DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/child/model.ckpt"
         elif [ ~{in_sample_type} == "parent1" ]; then
-            EXAMPLES_FILE="make_examples_parent1.tfrecord~{in_vgcall_cores}.gz"
+            EXAMPLES_FILE="make_examples_parent1.tfrecord@~{in_vgcall_cores}.gz"
             OUTPUT_FILE="call_variants_output_parent1.tfrecord.gz"
-            NONVARIANT_SITE_FILE="gvcf_parent1.tfrecord~{in_vgcall_cores}.gz"
+            NONVARIANT_SITE_FILE="gvcf_parent1.tfrecord@~{in_vgcall_cores}.gz"
             DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/parent/model.ckpt"
         elif [ ~{in_sample_type} == "parent2" ]; then
-            EXAMPLES_FILE="make_examples_parent2.tfrecord~{in_vgcall_cores}.gz"
+            EXAMPLES_FILE="make_examples_parent2.tfrecord@~{in_vgcall_cores}.gz"
             OUTPUT_FILE="call_variants_output_parent2.tfrecord.gz"
-            NONVARIANT_SITE_FILE="gvcf_parent2.tfrecord~{in_vgcall_cores}.gz"
+            NONVARIANT_SITE_FILE="gvcf_parent2.tfrecord@~{in_vgcall_cores}.gz"
             DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/parent/model.ckpt"
         fi
         /opt/deepvariant/bin/call_variants \
