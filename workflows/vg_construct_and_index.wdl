@@ -232,7 +232,7 @@ task extract_decoys {
     }
     runtime {
         time: 10
-        memory: 5
+        memory: 5 + " GB"
         docker: vg_docker
     }
 }

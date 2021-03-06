@@ -649,9 +649,12 @@ task runDeepTrioCallVariants {
     }
     runtime {
         memory: in_vgcall_mem + " GB"
-        cpu: in_vgcall_cores
+        cpu: 8
+        gpuType: "nvidia-tesla-p100"
+        gpuCount: 1
+        nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.1.0"
+        docker: "google/deepvariant:deeptrio-1.1.0-gpu"
     }
 }
 
