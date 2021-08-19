@@ -1,4 +1,4 @@
-version 1.0
+version 1.1
 
 ### vg_trio_giraffe_deeptrio_workflow.wdl ###
 ## Author: Charles Markello
@@ -8,7 +8,6 @@ version 1.0
 import "./vg_multi_map.wdl" as vgMultiMapWorkflow
 import "./vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
 import "./vg_construct_and_index.wdl" as vgConstructWorkflow
-import "./vg_indel_realign.wdl" as vgIndelRealignmentWorkflow
 
 workflow vgTrioPipeline {
     meta {
@@ -26,7 +25,7 @@ workflow vgTrioPipeline {
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Sample name for siblings where the proband file is listed first followed by the siblings
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.28.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.31.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int READS_PER_CHUNK = 10000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
@@ -55,7 +54,7 @@ workflow vgTrioPipeline {
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
-        Array[String]+ CONTIGS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "MT"]
+        Array[String]+ CONTIGS = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY", "chrM"]
         File REF_FASTA_GZ
         File PED_FILE
         File? GEN_MAP_FILES
@@ -237,15 +236,31 @@ workflow vgTrioPipeline {
                 contigs=CONTIGS,
                 filter_parents=false
         }
+        call runPrepPhasing {
+            input:
+                in_eagle_data=EAGLE_DATA,
+                in_contigs=CONTIGS
+        }
         Array[Pair[File,File]] maternal_bam_index_by_contigs_pair = zip(maternal_bams_by_contig, maternal_bam_indexes_by_contig)
         Array[Pair[File,File]] paternal_bam_index_by_contigs_pair = zip(paternal_bams_by_contig, paternal_bam_indexes_by_contig)
         Array[Pair[File,File]] child_bam_index_by_contigs_pair = zip(child_bams_by_contig, child_bam_indexes_by_contig)
         Array[Pair[Pair[File,File],Pair[Pair[File,File],Pair[File,File]]]] trio_bam_index_by_contigs_pair = zip(child_bam_index_by_contigs_pair,zip(maternal_bam_index_by_contigs_pair,paternal_bam_index_by_contigs_pair))
         scatter (contig_pair in zip(CONTIGS, zip(splitJointGenotypedVCF.contig_vcfs, trio_bam_index_by_contigs_pair))) {
+            if (defined(runPrepPhasing.eagle_data[contig_pair.left])) {
+                call runEaglePhasing {
+                    input:
+                        in_cohort_sample_name=SAMPLE_NAME_PROBAND,
+                        joint_genotyped_vcf=contig_pair.right.left,
+                        in_eagle_bcf=runPrepPhasing.eagle_data[contig_pair.left][0],
+                        in_eagle_bcf_index=runPrepPhasing.eagle_data[contig_pair.left][1],
+                        in_contig=contig_pair.left
+                }
+            }
+            File pre_whatshap_vcf_file = select_first([runEaglePhasing.phased_cohort_vcf, contig_pair.right.left])
             call runWhatsHapPhasing {
                 input:
                     in_cohort_sample_name=SAMPLE_NAME_PROBAND,
-                    joint_genotyped_vcf=contig_pair.right.left,
+                    joint_genotyped_vcf=pre_whatshap_vcf_file,
                     in_maternal_bam=contig_pair.right.right.right.left.left,
                     in_maternal_bam_index=contig_pair.right.right.right.left.right,
                     in_paternal_bam=contig_pair.right.right.right.right.left,
@@ -600,6 +615,86 @@ task mergeIndelRealignedBAMs {
         cpu: 32
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+    }
+}
+
+task runPrepPhasing {
+    input {
+        File in_eagle_data
+        Array[String]+ in_contigs
+    }
+    
+    Boolean grch38_coord = in_contigs[0] == "chr1"
+    
+    command <<<
+        set -exu -o pipefail
+        tar -xf ~{in_eagle_data}
+        for contig in ~{sep=" " in_contigs} ; do 
+            if [ ~{grch38_coord} == true ]; then
+                if [ ${contig} == "chrX" ]; then
+                    echo '{"${contig}":"["eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf", "eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf.csi"]"}'
+                elif [[ ! ${contig} =~ ^(chrY|chrM)$ ]]; then
+                    echo '{"${contig}":"["eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf", "eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf.csi"]"}'
+                fi
+            else
+                if [[ ! ${contig} =~ ^(Y|MT|ABOlocus)$ ]]; then
+                    echo '{"${contig}":"["eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf", "eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf.csi"]"}'
+                fi
+            fi
+        done
+    >>>
+    
+    output {
+        Map[String, Array[File]] eagle_data = read_json(stdout())
+    }
+    
+    runtime {
+        memory: "10 GB"
+        disks: "local-disk 70 SSD"
+        docker: in_vg_container
+    }
+}
+
+#TODO
+task runEaglePhasing {
+    input {
+        String in_cohort_sample_name
+        File joint_genotyped_vcf
+        File in_eagle_bcf
+        File in_eagle_bcf_index
+        String in_contig
+        Int in_vgcall_cores
+        Int in_vgcall_disk
+        Int in_vgcall_mem
+    }
+    
+    command <<<
+        set -exu -o pipefail
+        ln -s ~{in_eagle_bcf} input_eagle.bcf
+        ln -s ~{in_eagle_bcf_index} input_eagle.bcf.csi
+        gen_map_file = "/usr/src/app/genetic_map_hg38_withX.txt.gz"
+        if [[ ~{in_contig} != *"chr"* ]]; then
+            gen_map_file = "/usr/src/app/genetic_map_hg19_withX.txt.gz"
+        fi
+        /usr/src/app/eagle \
+        --outputUnphased \
+        --geneticMapFile ${gen_map_file} \
+        --outPrefix "~{in_cohort_sample_name}_cohort_~{in_contig}.eagle_phased" \
+        --numThreads ~{in_vgcall_cores} \
+        --vcfRef input_eagle.bcf \
+        --vcfTarget ~{joint_genotyped_vcf} \
+        --chrom ~{in_contig}
+    >>>
+    
+    output {
+        File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_{in_contig}.eagle_phased.vcf.gz"
+    }
+    
+    runtime {
+        cpu: in_vgcall_cores
+        memory: in_vgcall_mem + " GB"
+        disks: "local-disk " + in_vgcall_disk + " SSD"
+        docker: "quay.io/cmarkello/eagle"
     }
 }
 
