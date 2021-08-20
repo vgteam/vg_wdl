@@ -26,6 +26,9 @@ workflow vgDeepTrioCall {
         File REF_INDEX_FILE                                         # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.31.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        File? DEEPTRIO_CHILD_MODEL
+        File? DEEPTRIO_PARENT_MODEL
+        File? DEEPVAR_MODEL
         Int MAP_CORES = 32
         Int MAP_DISK = 100
         Int MAP_MEM = 100
@@ -205,82 +208,119 @@ workflow vgDeepTrioCall {
         
         #TODO
         if ((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT")) {
-            call runDeepVariant {
+            call runDeepVariant as callDeepVariantChild {
                 input:
-                    in_sample_name=SAMPLE_NAME,
+                    in_sample_name=SAMPLE_NAME_CHILD,
                     in_bam_file=child_indel_realigned_bam,
                     in_bam_file_index=child_indel_realigned_bam_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_contig=contig_name,
-                    in_call_cores=CALL_CORES,
-                    in_call_disk=CALL_DISK,
-                    in_call_mem=CALL_MEM
+                    in_model=DEEPVAR_MODEL,
+                    in_call_cores=VGCALL_CORES,
+                    in_call_disk=VGCALL_DISK,
+                    in_call_mem=VGCALL_MEM
             } 
+            if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
+                call runDeepVariant as callDeepVariantMaternal {
+                    input:
+                        in_sample_name=SAMPLE_NAME_MATERNAL,
+                        in_bam_file=maternal_indel_realigned_bam,
+                        in_bam_file_index=maternal_indel_realigned_bam_index,
+                        in_reference_file=REF_FILE,
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_contig=contig_name,
+                        in_model=DEEPVAR_MODEL,
+                        in_call_cores=VGCALL_CORES,
+                        in_call_disk=VGCALL_DISK,
+                        in_call_mem=VGCALL_MEM
+                }
+            }
+            if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
+                call runDeepVariant as callDeepVariantPaternal {
+                    input:
+                        in_sample_name=SAMPLE_NAME_PATERNAL,
+                        in_bam_file=paternal_indel_realigned_bam,
+                        in_bam_file_index=paternal_indel_realigned_bam_index,
+                        in_reference_file=REF_FILE,
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_contig=contig_name,
+                        in_model=DEEPVAR_MODEL,
+                        in_call_cores=VGCALL_CORES,
+                        in_call_disk=VGCALL_DISK,
+                        in_call_mem=VGCALL_MEM
+                }
+            }
         }
-        call runDeepTrioMakeExamples {
-            input:
-                in_child_name=SAMPLE_NAME_CHILD,
-                in_maternal_name=SAMPLE_NAME_MATERNAL,
-                in_paternal_name=SAMPLE_NAME_PATERNAL,
-                in_child_bam_file=child_indel_realigned_bam,
-                in_child_bam_file_index=child_indel_realigned_bam_index,
-                in_maternal_bam_file=maternal_indel_realigned_bam,
-                in_maternal_bam_file_index=maternal_indel_realigned_bam_index,
-                in_paternal_bam_file=paternal_indel_realigned_bam,
-                in_paternal_bam_file_index=paternal_indel_realigned_bam_index,
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_vgcall_cores=VGCALL_CORES,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
-        call runDeepTrioCallVariants as callVariantsChild {
-            input:
-                in_sample_name=SAMPLE_NAME_CHILD,
-                in_sample_type="child",
-                in_reference_file=REF_FILE,
-                in_reference_index_file=REF_INDEX_FILE,
-                in_examples_file=runDeepTrioMakeExamples.child_examples_file,
-                in_nonvariant_site_tf_file=runDeepTrioMakeExamples.child_nonvariant_site_tf_file,
-                in_vgcall_cores=VGCALL_CORES,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
-        }
-        if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
-            call runDeepTrioCallVariants as callVariantsMaternal {
+        if (!((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT"))) {
+            call runDeepTrioMakeExamples {
                 input:
-                    in_sample_name=SAMPLE_NAME_MATERNAL,
-                    in_sample_type="parent2",
+                    in_child_name=SAMPLE_NAME_CHILD,
+                    in_maternal_name=SAMPLE_NAME_MATERNAL,
+                    in_paternal_name=SAMPLE_NAME_PATERNAL,
+                    in_child_bam_file=child_indel_realigned_bam,
+                    in_child_bam_file_index=child_indel_realigned_bam_index,
+                    in_maternal_bam_file=maternal_indel_realigned_bam,
+                    in_maternal_bam_file_index=maternal_indel_realigned_bam_index,
+                    in_paternal_bam_file=paternal_indel_realigned_bam,
+                    in_paternal_bam_file_index=paternal_indel_realigned_bam_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_examples_file=runDeepTrioMakeExamples.maternal_examples_file,
-                    in_nonvariant_site_tf_file=runDeepTrioMakeExamples.maternal_nonvariant_site_tf_file,
                     in_vgcall_cores=VGCALL_CORES,
                     in_vgcall_disk=VGCALL_DISK,
                     in_vgcall_mem=VGCALL_MEM
             }
-        }
-        if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
-            call runDeepTrioCallVariants as callVariantsPaternal {
+            call runDeepTrioCallVariants as callVariantsChild {
                 input:
-                    in_sample_name=SAMPLE_NAME_PATERNAL,
-                    in_sample_type="parent1",
+                    in_sample_name=SAMPLE_NAME_CHILD,
+                    in_sample_type="child",
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_examples_file=runDeepTrioMakeExamples.paternal_examples_file,
-                    in_nonvariant_site_tf_file=runDeepTrioMakeExamples.paternal_nonvariant_site_tf_file,
+                    in_examples_file=runDeepTrioMakeExamples.child_examples_file,
+                    in_nonvariant_site_tf_file=runDeepTrioMakeExamples.child_nonvariant_site_tf_file,
+                    in_model=DEEPTRIO_CHILD_MODEL,
                     in_vgcall_cores=VGCALL_CORES,
                     in_vgcall_disk=VGCALL_DISK,
                     in_vgcall_mem=VGCALL_MEM
+            }
+            if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
+                call runDeepTrioCallVariants as callVariantsMaternal {
+                    input:
+                        in_sample_name=SAMPLE_NAME_MATERNAL,
+                        in_sample_type="parent2",
+                        in_reference_file=REF_FILE,
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_examples_file=runDeepTrioMakeExamples.maternal_examples_file,
+                        in_nonvariant_site_tf_file=runDeepTrioMakeExamples.maternal_nonvariant_site_tf_file,
+                        in_model=DEEPTRIO_PARENT_MODEL,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
+                }
+            }
+            if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
+                call runDeepTrioCallVariants as callVariantsPaternal {
+                    input:
+                        in_sample_name=SAMPLE_NAME_PATERNAL,
+                        in_sample_type="parent1",
+                        in_reference_file=REF_FILE,
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_examples_file=runDeepTrioMakeExamples.paternal_examples_file,
+                        in_nonvariant_site_tf_file=runDeepTrioMakeExamples.paternal_nonvariant_site_tf_file,
+                        in_model=DEEPTRIO_PARENT_MODEL,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
+                }
             }
         }
     }
+    Array[File] child_contig_gvcf_output_list = select_all(flatten([callVariantsChild.output_gvcf_file, callDeepVariantChild.output_gvcf_file]))
     # Merge distributed variant called VCFs
     call concatClippedVCFChunks as concatVCFChunksChild {
         input:
             in_sample_name=SAMPLE_NAME_CHILD,
-            in_clipped_vcf_chunk_files=callVariantsChild.output_gvcf_file,
+            in_clipped_vcf_chunk_files=child_contig_gvcf_output_list,
             in_vgcall_disk=VGCALL_DISK,
             in_vgcall_mem=VGCALL_MEM
     }
@@ -294,7 +334,7 @@ workflow vgDeepTrioCall {
             in_vgcall_mem=VGCALL_MEM
     }
     if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
-        Array[File] maternal_contig_gvcf_output_list = select_all(callVariantsMaternal.output_gvcf_file)
+        Array[File] maternal_contig_gvcf_output_list = select_all(flatten([callVariantsMaternal.output_gvcf_file, callDeepVariantMaternal.output_gvcf_file]))
         # Merge distributed variant called VCFs
         call concatClippedVCFChunks as concatVCFChunksMaternal {
             input:
@@ -314,7 +354,7 @@ workflow vgDeepTrioCall {
         }
     }
     if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
-        Array[File] paternal_contig_gvcf_output_list = select_all(callVariantsPaternal.output_gvcf_file)
+        Array[File] paternal_contig_gvcf_output_list = select_all(flatten([callVariantsPaternal.output_gvcf_file, callDeepVariantPaternal.output_gvcf_file]))
         # Merge distributed variant called VCFs
         call concatClippedVCFChunks as concatVCFChunksPaternal {
             input:
@@ -548,6 +588,75 @@ task runGATKIndelRealigner {
     }
 }
 
+task runDeepVariant {
+    input {
+        String in_sample_name
+        File in_bam_file
+        File in_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        String in_contig
+        File? in_model
+        Int in_call_cores
+        Int in_call_disk
+        Int in_call_mem
+    }
+    
+    Boolean custom_model = defined(in_model)
+    
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        ln -s ~{in_bam_file} input_bam_file.child.bam
+        ln -s ~{in_bam_file_index} input_bam_file.child.bam.bai
+        
+        DEEPVAR_MODEL="/opt/models/wgs/model.ckpt"
+        if [ ~{custom_model} == true ]; then
+            tar -xzf ~{in_model}
+            model_basename=$(basename ~{in_model})
+            stripped_basename=${model_basename%%.*}
+            core_filename=$(ls $stripped_basename | head -n 1)
+            common_filename=${core_filename%.*}
+            DEEPVAR_MODEL="${PWD}/${stripped_basename}/${common_filename}"
+        fi
+
+        /opt/deepvariant/bin/run_deepvariant \
+        --make_examples_extra_args 'min_mapping_quality=1' \
+        --model_type WGS \
+        --customized_model ${DEEPVAR_MODEL} \
+        --regions ~{in_contig} \
+        --ref ~{in_reference_file} \
+        --reads ~{in_bam_file} \
+        --output_vcf "~{in_sample_name}_deeptrio.vcf.gz" \
+        --output_gvcf "~{in_sample_name}_deeptrio.g.vcf.gz" \
+        --intermediate_results_dir tmp_deepvariant \
+        --num_shards=16
+    >>>
+    output {
+        File output_vcf_file = "~{in_sample_name}_deeptrio.vcf.gz"
+        File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
+    }
+    runtime {
+        memory: in_call_mem + " GB"
+        cpu: 8
+        gpuType: "nvidia-tesla-t4"
+        gpuCount: 1
+        preemptible: 1
+        nvidiaDriverVersion: "418.87.00"
+        disks: "local-disk " + in_call_disk + " SSD"
+        docker: "google/deepvariant:deeptrio-1.1.0-gpu"
+    }
+}
+
 task runDeepTrioMakeExamples {
     input {
         String in_child_name
@@ -627,58 +736,6 @@ task runDeepTrioMakeExamples {
     }
 }
 
-task runDeepVariant {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        Int in_call_cores
-        Int in_call_disk
-        Int in_call_mem
-    }
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -s ~{in_bam_file} input_bam_file.child.bam
-        ln -s ~{in_bam_file_index} input_bam_file.child.bam.bai
-
-        /opt/deepvariant/bin/run_deepvariant \
-        --make_examples_extra_args 'min_mapping_quality=0' \
-        --model_type=WGS \
-        --regions ${CONTIG_ID} \
-        --ref=~{in_reference_file} \
-        --reads=~{in_bam_file} \
-        --output_vcf="~{in_sample_name}_deeptrio.vcf.gz" \
-        --output_gvcf="~{in_sample_name}_deeptrio.g.vcf.gz" \
-        --intermediate_results_dir=tmp_deepvariant \
-        --num_shards=16
-    >>>
-    output {
-        File output_vcf_file = "~{in_sample_name}_deeptrio.vcf.gz"
-        File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
-    }
-    runtime {
-        memory: in_call_mem + " GB"
-        cpu: 8
-        gpuType: "nvidia-tesla-t4"
-        gpuCount: 1
-        preemptible: 1
-        nvidiaDriverVersion: "418.87.00"
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.1.0-gpu"
-    }
-}
 
 task runDeepTrioCallVariants {
     input {
@@ -688,10 +745,14 @@ task runDeepTrioCallVariants {
         File in_reference_index_file
         File in_examples_file
         File in_nonvariant_site_tf_file
+        File? in_model
         Int in_vgcall_cores
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
+    
+    Boolean custom_model = defined(in_model)
+    
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -720,6 +781,14 @@ task runDeepTrioCallVariants {
             OUTPUT_FILE="call_variants_output_parent2.tfrecord.gz"
             NONVARIANT_SITE_FILE="gvcf_parent2.tfrecord@~{in_vgcall_cores}.gz"
             DEEPTRIO_MODEL="/opt/models/deeptrio/wgs/parent/model.ckpt"
+        fi
+        if [ ~{custom_model} == true ]; then
+            tar -xzf ~{in_model}
+            model_basename=$(basename ~{in_model})
+            stripped_basename=${model_basename%%.*}
+            core_filename=$(ls $stripped_basename | head -n 1)
+            common_filename=${core_filename%.*}
+            DEEPTRIO_MODEL="${PWD}/${stripped_basename}/${common_filename}"
         fi
         /opt/deepvariant/bin/call_variants \
         --outfile ${OUTPUT_FILE} \

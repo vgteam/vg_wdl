@@ -1,4 +1,4 @@
-version 1.1
+version 1.0
 
 ### vg_trio_giraffe_deeptrio_workflow.wdl ###
 ## Author: Charles Markello
@@ -57,7 +57,11 @@ workflow vgTrioPipeline {
         Array[String]+ CONTIGS = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY", "chrM"]
         File REF_FASTA_GZ
         File PED_FILE
+        File EAGLE_DATA
         File? GEN_MAP_FILES
+        File? DEEPTRIO_CHILD_MODEL
+        File? DEEPTRIO_PARENT_MODEL
+        File? DEEPVAR_MODEL
         String GRAPH_NAME
         Boolean GIRAFFE_INDEXES = true                  # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
@@ -178,10 +182,13 @@ workflow vgTrioPipeline {
             SAMPLE_NAME_CHILD=SAMPLE_NAME_PROBAND,
             SAMPLE_NAME_MATERNAL=SAMPLE_NAME_MATERNAL,
             SAMPLE_NAME_PATERNAL=SAMPLE_NAME_PATERNAL,
-            PATH_LIST_FILE=pipeline_path_list_file,
+            CONTIGS=CONTIGS,
             REF_FILE=REF_FILE,
             REF_INDEX_FILE=REF_INDEX_FILE,
             REF_DICT_FILE=REF_DICT_FILE,
+            DEEPTRIO_CHILD_MODEL=DEEPTRIO_CHILD_MODEL,
+            DEEPTRIO_PARENT_MODEL=DEEPTRIO_PARENT_MODEL,
+            DEEPVAR_MODEL=DEEPVAR_MODEL,
             MAP_CORES=MAP_CORES,
             MAP_DISK=MAP_DISK,
             MAP_MEM=MAP_MEM,
@@ -253,7 +260,10 @@ workflow vgTrioPipeline {
                         joint_genotyped_vcf=contig_pair.right.left,
                         in_eagle_bcf=runPrepPhasing.eagle_data[contig_pair.left][0],
                         in_eagle_bcf_index=runPrepPhasing.eagle_data[contig_pair.left][1],
-                        in_contig=contig_pair.left
+                        in_contig=contig_pair.left,
+                        in_vgcall_cores=VGCALL_CORES,
+                        in_vgcall_disk=VGCALL_DISK,
+                        in_vgcall_mem=VGCALL_MEM
                 }
             }
             File pre_whatshap_vcf_file = select_first([runEaglePhasing.phased_cohort_vcf, contig_pair.right.left])
@@ -358,10 +368,13 @@ workflow vgTrioPipeline {
                 SAMPLE_NAME_CHILD=read_pair_set.right,
                 SAMPLE_NAME_MATERNAL=SAMPLE_NAME_MATERNAL,
                 SAMPLE_NAME_PATERNAL=SAMPLE_NAME_PATERNAL,
-                PATH_LIST_FILE=pipeline_path_list_file,
+                CONTIGS=CONTIGS,
                 REF_FILE=REF_FILE,
                 REF_INDEX_FILE=REF_INDEX_FILE,
                 REF_DICT_FILE=REF_DICT_FILE,
+                DEEPTRIO_CHILD_MODEL=DEEPTRIO_CHILD_MODEL,
+                DEEPTRIO_PARENT_MODEL=DEEPTRIO_PARENT_MODEL,
+                DEEPVAR_MODEL=DEEPVAR_MODEL,
                 MAP_CORES=MAP_CORES,
                 MAP_DISK=MAP_DISK,
                 MAP_MEM=MAP_MEM,
@@ -651,11 +664,10 @@ task runPrepPhasing {
     runtime {
         memory: "10 GB"
         disks: "local-disk 70 SSD"
-        docker: in_vg_container
+        docker: "ubuntu:latest"
     }
 }
 
-#TODO
 task runEaglePhasing {
     input {
         String in_cohort_sample_name
