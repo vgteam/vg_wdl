@@ -637,24 +637,26 @@ task runPrepPhasing {
         Array[String]+ in_contigs
     }
     
-    Boolean grch38_coord = in_contigs[0] == "chr1"
-    
     command <<<
         set -exu -o pipefail
         tar -xf ~{in_eagle_data}
-        for contig in ~{sep=" " in_contigs} ; do 
-            if [ ~{grch38_coord} == true ]; then
+        json_string=""
+        while read -r contig; do
+            if [[ ~{in_contigs[0]} == *"chr"* ]]; then
                 if [ ${contig} == "chrX" ]; then
-                    echo '{"${contig}":"["eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf", "eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf.csi"]"}'
+                    json_string="${json_string}\"${contig}\":[\"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf\", \"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf.csi\"],"
                 elif [[ ! ${contig} =~ ^(chrY|chrM)$ ]]; then
-                    echo '{"${contig}":"["eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf", "eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf.csi"]"}'
+                    json_string="${json_string}\"${contig}\":[\"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf\", \"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf.csi\"],"
                 fi
             else
                 if [[ ! ${contig} =~ ^(Y|MT|ABOlocus)$ ]]; then
-                    echo '{"${contig}":"["eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf", "eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf.csi"]"}'
+                    json_string="${json_string}\"${contig}\":[\"eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf\", \"eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf.csi\"],"
                 fi
             fi
-        done
+        done < "~{write_lines(in_contigs)}"
+        json_string_output="${json_string%?}"
+        json_string_output="{${json_string_output}}"
+        echo "${json_string_output}"
     >>>
     
     output {
@@ -684,9 +686,10 @@ task runEaglePhasing {
         set -exu -o pipefail
         ln -s ~{in_eagle_bcf} input_eagle.bcf
         ln -s ~{in_eagle_bcf_index} input_eagle.bcf.csi
-        gen_map_file = "/usr/src/app/genetic_map_hg38_withX.txt.gz"
+        tabix -p vcf ~{joint_genotyped_vcf}
+        gen_map_file="/usr/src/app/genetic_map_hg38_withX.txt.gz"
         if [[ ~{in_contig} != *"chr"* ]]; then
-            gen_map_file = "/usr/src/app/genetic_map_hg19_withX.txt.gz"
+            gen_map_file="/usr/src/app/genetic_map_hg19_withX.txt.gz"
         fi
         /usr/src/app/eagle \
         --outputUnphased \

@@ -315,7 +315,9 @@ workflow vgDeepTrioCall {
             }
         }
     }
-    Array[File] child_contig_gvcf_output_list = select_all(flatten([callVariantsChild.output_gvcf_file, callDeepVariantChild.output_gvcf_file]))
+    Array[File] childDeepVarGVCF = select_all(callDeepVariantChild.output_gvcf_file)
+    Array[File] childDeepTrioGVCF = select_all(callVariantsChild.output_gvcf_file)
+    Array[File] child_contig_gvcf_output_list = select_all(flatten([childDeepTrioGVCF, childDeepVarGVCF]))
     # Merge distributed variant called VCFs
     call concatClippedVCFChunks as concatVCFChunksChild {
         input:
@@ -334,7 +336,9 @@ workflow vgDeepTrioCall {
             in_vgcall_mem=VGCALL_MEM
     }
     if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
-        Array[File] maternal_contig_gvcf_output_list = select_all(flatten([callVariantsMaternal.output_gvcf_file, callDeepVariantMaternal.output_gvcf_file]))
+        Array[File] maDeepVarGVCF = select_all(callDeepVariantMaternal.output_gvcf_file)
+        Array[File] maDeepTrioGVCF = select_all(callVariantsMaternal.output_gvcf_file)
+        Array[File] maternal_contig_gvcf_output_list = select_all(flatten([maDeepTrioGVCF, maDeepVarGVCF]))
         # Merge distributed variant called VCFs
         call concatClippedVCFChunks as concatVCFChunksMaternal {
             input:
@@ -354,7 +358,9 @@ workflow vgDeepTrioCall {
         }
     }
     if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
-        Array[File] paternal_contig_gvcf_output_list = select_all(flatten([callVariantsPaternal.output_gvcf_file, callDeepVariantPaternal.output_gvcf_file]))
+        Array[File] paDeepVarGVCF = select_all(callDeepVariantPaternal.output_gvcf_file)
+        Array[File] paDeepTrioGVCF = select_all(callVariantsPaternal.output_gvcf_file)
+        Array[File] paternal_contig_gvcf_output_list = select_all(flatten([paDeepTrioGVCF, paDeepVarGVCF]))
         # Merge distributed variant called VCFs
         call concatClippedVCFChunks as concatVCFChunksPaternal {
             input:
@@ -616,8 +622,8 @@ task runDeepVariant {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        ln -s ~{in_bam_file} input_bam_file.child.bam
-        ln -s ~{in_bam_file_index} input_bam_file.child.bam.bai
+        ln -s ~{in_bam_file} input_bam_file.bam
+        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
         
         DEEPVAR_MODEL="/opt/models/wgs/model.ckpt"
         if [ ~{custom_model} == true ]; then
@@ -635,7 +641,7 @@ task runDeepVariant {
         --customized_model ${DEEPVAR_MODEL} \
         --regions ~{in_contig} \
         --ref ~{in_reference_file} \
-        --reads ~{in_bam_file} \
+        --reads input_bam_file.bam \
         --output_vcf "~{in_sample_name}_deeptrio.vcf.gz" \
         --output_gvcf "~{in_sample_name}_deeptrio.g.vcf.gz" \
         --intermediate_results_dir tmp_deepvariant \
@@ -653,7 +659,7 @@ task runDeepVariant {
         preemptible: 1
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.1.0-gpu"
+        docker: "google/deepvariant:1.1.0-gpu"
     }
 }
 
