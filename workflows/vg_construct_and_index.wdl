@@ -38,7 +38,7 @@ workflow vg_construct_and_index {
         String decoy_regex = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_"
         
         # vg docker image tag
-        String vg_docker = "quay.io/vgteam/vg:v1.28.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.31.0"
     }
 
     # construct graph for each reference contig
@@ -516,7 +516,7 @@ task sampled_gbwt_index {
     }
     command <<<
         set -exu -o pipefail
-        vg gbwt -l -n 16 --threads ~{construct_cores} ~{gbwt} -x ~{xg} -o "~{graph_name}.sampled.gbwt" -g "~{graph_name}.sampled.gg"
+        vg gbwt -l -n 16 --num-threads ~{construct_cores} ~{gbwt} -x ~{xg} -o "~{graph_name}.sampled.gbwt" -g "~{graph_name}.sampled.gg"
     >>>
     output {
         File sampled_gbwt = "~{graph_name}.sampled.gbwt"

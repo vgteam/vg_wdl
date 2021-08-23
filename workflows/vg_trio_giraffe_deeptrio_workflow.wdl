@@ -702,7 +702,7 @@ task runEaglePhasing {
     >>>
     
     output {
-        File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_{in_contig}.eagle_phased.vcf.gz"
+        File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.eagle_phased.vcf.gz"
     }
     
     runtime {
