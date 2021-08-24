@@ -634,7 +634,7 @@ task mergeAlignmentBAMChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads ~{in_map_cores} \
+          -f -p -c --threads 24 \
           ~{in_sample_name}_merged.positionsorted.bam \
           ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \

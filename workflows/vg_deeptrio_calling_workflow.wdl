@@ -42,10 +42,7 @@ workflow vgDeepTrioCall {
             in_sample_name=SAMPLE_NAME_CHILD,
             in_merged_bam_file=CHILD_BAM_FILE,
             in_merged_bam_file_index=CHILD_BAM_FILE_INDEX,
-            contigs=CONTIGS,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
+            contigs=CONTIGS
     }
     if (!defined(MATERNAL_BAM_CONTIG_LIST)) {
         call splitBAMbyPath as splitMaternalBAMbyPath {
@@ -53,10 +50,7 @@ workflow vgDeepTrioCall {
                 in_sample_name=SAMPLE_NAME_MATERNAL,
                 in_merged_bam_file=MATERNAL_BAM_FILE,
                 in_merged_bam_file_index=MATERNAL_BAM_FILE_INDEX,
-                contigs=CONTIGS,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                contigs=CONTIGS
         }
     }
     if (!defined(PATERNAL_BAM_CONTIG_LIST)) {
@@ -65,10 +59,7 @@ workflow vgDeepTrioCall {
                 in_sample_name=SAMPLE_NAME_PATERNAL,
                 in_merged_bam_file=PATERNAL_BAM_FILE,
                 in_merged_bam_file_index=PATERNAL_BAM_FILE_INDEX,
-                contigs=CONTIGS,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                contigs=CONTIGS
         }
     }
     # Run distributed DeepTRIO linear variant calling for each chromosomal contig
@@ -424,7 +415,7 @@ task splitBAMbyPath {
         
         while read -r contig; do
             samtools view \
-              -@ ~{in_map_cores} \
+              -@ 32 \
               -h -O BAM \
               input_bam_file.bam ${contig} \
               -o ~{in_sample_name}.${contig}.bam \
