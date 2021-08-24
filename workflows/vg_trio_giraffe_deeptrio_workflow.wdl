@@ -25,7 +25,7 @@ workflow vgTrioPipeline {
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Sample name for siblings where the proband file is listed first followed by the siblings
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.31.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int READS_PER_CHUNK = 10000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
         Int CHUNK_BASES = 50000000                          # Number of bases to chunk .gam alignment files for variant calling
         Int OVERLAP = 2000                                  # Number of overlapping bases between each .gam chunk
@@ -505,7 +505,7 @@ task splitBAMbyPath {
         Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
     }
     runtime {
-        memory: in_map_mem + " GB"
+        memory: "40 GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
@@ -613,7 +613,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads "$(nproc --all)" \
+          -f -p -c --threads 32 \
           ~{in_sample_name}_merged.indel_realigned.bam \
           ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
@@ -624,7 +624,7 @@ task mergeIndelRealignedBAMs {
         File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
-        memory: 100 + " GB"
+        memory: 50 + " GB"
         cpu: 32
         disks: "local-disk 100 SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
@@ -905,7 +905,11 @@ task snpEffAnnotateVCF {
         #to turn off echo do 'set +o xtrace'
 
         unzip ~{in_snpeff_database}
-        snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${PWD}/data GRCh37.75 ~{in_normalized_vcf_file} > ~{in_sample_name}.snpeff.unrolled.vcf
+        database_ref="GRCH38.99"
+        if [[ "~{in_snpeff_database}" != *"GRCh38"* ]]; then
+            database_ref="GRCh37.75"
+        fi
+        snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${PWD}/data ${database_ref} ~{in_normalized_vcf_file} > ~{in_sample_name}.snpeff.unrolled.vcf
     >>>
     output {
         File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
@@ -914,7 +918,7 @@ task snpEffAnnotateVCF {
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
+        docker: "quay.io/biocontainers/snpeff:5.0--hdfd78af_1"
     }
 }
 

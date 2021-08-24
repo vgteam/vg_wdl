@@ -25,7 +25,7 @@ workflow vgDeepTrioCall {
         File REF_FILE                                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                         # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.31.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         File? DEEPTRIO_CHILD_MODEL
         File? DEEPTRIO_PARENT_MODEL
         File? DEEPVAR_MODEL
@@ -414,9 +414,6 @@ task splitBAMbyPath {
         File? in_merged_bam_file
         File? in_merged_bam_file_index
         Array[String]+ contigs
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
     }
 
     command <<<
@@ -440,9 +437,9 @@ task splitBAMbyPath {
         Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai")
     }
     runtime {
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
+        memory: "40 GB"
+        cpu: 32
+        disks: "local-disk 10 SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
@@ -489,8 +486,7 @@ task runGATKRealignerTargetCreator {
         File realigner_target_bed = glob("*.bed")[0] 
     } 
     runtime { 
-        time: 180 
-        memory: 20 + " GB" 
+        memory: 50 + " GB" 
         cpu: 32 
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b" 
     } 
@@ -534,8 +530,7 @@ task runAbraRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        time: 180
-        memory: 20 + " GB"
+        memory: 50 + " GB"
         cpu: 32
         docker: "dceoy/abra2:latest"
     }
@@ -587,8 +582,7 @@ task runGATKIndelRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        time: 180
-        memory: 20 + " GB"
+        memory: 50 + " GB"
         cpu: 32
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
     }
@@ -645,7 +639,7 @@ task runDeepVariant {
         --output_vcf "~{in_sample_name}_deeptrio.vcf.gz" \
         --output_gvcf "~{in_sample_name}_deeptrio.g.vcf.gz" \
         --intermediate_results_dir tmp_deepvariant \
-        --num_shards=16
+        --num_shards=~{in_call_cores}
     >>>
     output {
         File output_vcf_file = "~{in_sample_name}_deeptrio.vcf.gz"
@@ -852,8 +846,8 @@ task concatClippedVCFChunks {
     }
     runtime {
         time: 60
-        memory: in_vgcall_mem + " GB"
-        disks: "local-disk " + in_vgcall_disk + " SSD"
+        memory: "1 GB"
+        disks: "local-disk 10 SSD"
         docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
@@ -890,8 +884,8 @@ task bgzipMergedVCF {
     }
     runtime {
         time: 30
-        memory: in_vgcall_mem + " GB"
-        disks: "local-disk " + in_vgcall_disk + " SSD"
+        memory: "10 GB"
+        disks: "local-disk 10 SSD"
         docker: in_vg_container
     }
 }

@@ -14,7 +14,7 @@ workflow vgMultiMap {
         File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                              # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.28.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                                    # Path to .xg index file
@@ -189,10 +189,7 @@ workflow vgMultiMap {
         call mergeAlignmentBAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
         File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
@@ -623,9 +620,6 @@ task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
     }
 
     command <<<
@@ -653,8 +647,8 @@ task mergeAlignmentBAMChunks {
     runtime {
         time: 240
         memory: 5 + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
+        cpu: 12
+        disks: "local-disk 10 SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
