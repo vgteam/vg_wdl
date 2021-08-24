@@ -1,0 +1,20 @@
+#1607543776
+vg giraffe --help
+#1607543861
+gcc
+#1607544188
+exit
+#1607544950
+ls
+#1607544955
+echo base > /stage.txt
+#1607544998
+pwd
+#1607545002
+echo build > ~/stage.txt
+#1607545005
+less stage.txt 
+#1607545009
+cat stage.txt 
+#1607545011
+exit

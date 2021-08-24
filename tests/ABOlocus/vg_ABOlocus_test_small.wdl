@@ -11,7 +11,7 @@ workflow vg_ABOlocus_test {
         File ABOlocus_fa_gz
         File ABOlocus_small_vcf_gz
         File reads_bam
-        String vg_docker = "quay.io/vgteam/vg:v1.14.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.28.0"
     }
 
     # build & check the ABOlocus graph
@@ -20,7 +20,7 @@ workflow vg_ABOlocus_test {
         ref_fasta_gz = ABOlocus_fa_gz,
         contigs = ["ABOlocus"],
         contigs_vcf_gz = [ABOlocus_small_vcf_gz],
-        use_haplotypes = true,
+        giraffe_indexes = false,
         vg_docker = vg_docker
     }
 
@@ -36,7 +36,6 @@ workflow vg_ABOlocus_test {
         xg = cons.xg,
         gcsa = cons.gcsa,
         gcsa_lcp = cons.gcsa_lcp,
-        gbwt = cons.gbwt,
         vg_docker = vg_docker
     }
 
@@ -85,8 +84,8 @@ task vg_mpmap {
         File fastq_1
         File fastq_2
         File xg
-        File gcsa
-        File gcsa_lcp
+        File? gcsa
+        File? gcsa_lcp
         File? gbwt
         String vg_mpmap_options = ""
         String vg_docker
