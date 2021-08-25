@@ -55,7 +55,6 @@ workflow vgTrioPipeline {
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
         Array[String]+ CONTIGS = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY", "chrM"]
-        File REF_FASTA_GZ
         File PED_FILE
         File EAGLE_DATA
         File? GEN_MAP_FILES
@@ -316,7 +315,7 @@ workflow vgTrioPipeline {
     call vgConstructWorkflow.vg_construct_and_index as constructGraphIndexWorkflow {
         input:
             graph_name=GRAPH_NAME,
-            ref_fasta_gz=REF_FASTA_GZ,
+            ref_fasta_gz=REF_FILE,
             contigs=CONTIGS,
             contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
             giraffe_indexes=GIRAFFE_INDEXES,
