@@ -9,8 +9,8 @@ workflow vgMultiMap {
     input {
         String MAPPER = "GIRAFFE"                       # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
         Boolean SURJECT_MODE = true                     # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
-        Boolean CLEANUP_FILES = true                    # Set to 'false' to turn off intermediate file cleanup.
-        Boolean GOOGLE_CLEANUP_MODE = false             # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        Boolean CLEANUP_FILES = false                   # Set to 'false' to turn off intermediate file cleanup.
+        Boolean GOOGLE_CLEANUP_MODE = true              # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                              # The sample name
@@ -31,7 +31,7 @@ workflow vgMultiMap {
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 32
-        Int MAP_DISK = 10
+        Int MAP_DISK = 100
         Int MAP_MEM = 100
         Int MERGE_GAM_CORES = 56
         Int MERGE_GAM_DISK = 100
@@ -157,7 +157,6 @@ workflow vgMultiMap {
                     in_bam_chunk_file=vg_map_algorithm_chunk_gam_output,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM,
@@ -568,7 +567,6 @@ task sortMDTagBAMFile {
         File in_bam_chunk_file
         File in_reference_file
         File in_reference_index_file
-        File in_reference_dict_file
         Int in_map_cores
         Int in_map_disk
         String in_map_mem
@@ -585,6 +583,8 @@ task sortMDTagBAMFile {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
         samtools sort \
           --threads ~{in_map_cores} \
           ~{in_bam_chunk_file} \
@@ -592,7 +592,7 @@ task sortMDTagBAMFile {
         | samtools calmd \
           -b \
           - \
-          ~{in_reference_file} \
+          ref.fna \
           > ~{in_sample_name}_positionsorted.mdtag.bam \
         && samtools index \
           ~{in_sample_name}_positionsorted.mdtag.bam
