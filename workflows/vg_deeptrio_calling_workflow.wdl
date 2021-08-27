@@ -444,8 +444,9 @@ task runGATKRealignerTargetCreator {
         File in_reference_index_file
         File in_reference_dict_file
         String in_contig
-    } 
- 
+    }
+    
+    
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command 
         # to exit with a non-zero status, or zero if all commands of the pipeline exit 
@@ -460,13 +461,15 @@ task runGATKRealignerTargetCreator {
  
         ln -f -s ~{in_bam_file} input_bam_file.bam 
         ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai 
-         
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
+        ln -f -s ~{in_reference_dict_file} ref.dict
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \ 
           --remove_program_records \ 
           -drf DuplicateRead \ 
           --disable_bam_indexing \ 
           -nt "32" \ 
-          -R ~{in_reference_file} \ 
+          -R ref.fna \ 
           -L ~{in_contig} \ 
           -I input_bam_file.bam \ 
           --out forIndelRealigner.intervals 
@@ -508,11 +511,13 @@ task runAbraRealigner {
 
         ln -f -s ~{in_bam_file} input_bam_file.bam 
         ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai 
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
         java -Xmx20G -jar /opt/abra2/abra2.jar \
           --targets ~{in_target_bed_file} \
           --in input_bam_file.bam \
           --out ~{in_sample_name}.~{in_contig}.indel_realigned.bam \
-          --ref ~{in_reference_file} \
+          --ref ref.fna \
           --index \
           --threads 32
     >>>
@@ -537,7 +542,7 @@ task runGATKIndelRealigner {
         File in_reference_dict_file
         String in_contig
     }
-
+    
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -552,18 +557,21 @@ task runGATKIndelRealigner {
 
         ln -f -s ~{in_bam_file} input_bam_file.bam 
         ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai 
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
+        ln -f -s ~{in_reference_dict_file} ref.dict
         java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
           -nt "32" \
-          -R ~{in_reference_file} \
+          -R ref.fna \
           -I input_bam_file.bam \
           -L ~{in_contig} \
           --out forIndelRealigner.intervals \
         && java -jar /usr/GenomeAnalysisTK.jar -T IndelRealigner \
           --remove_program_records \
-          -R ~{in_reference_file} \
+          -R ref.fna \
           --targetIntervals forIndelRealigner.intervals \
           -I input_bam_file.bam \
           --out ~{in_sample_name}.~{in_contig}.indel_realigned.bam
@@ -609,7 +617,8 @@ task runDeepVariant {
 
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
         DEEPVAR_MODEL="/opt/models/wgs/model.ckpt"
         if [ ~{custom_model} == true ]; then
             tar -xzf ~{in_model}
@@ -625,7 +634,7 @@ task runDeepVariant {
         --model_type WGS \
         --customized_model ${DEEPVAR_MODEL} \
         --regions ~{in_contig} \
-        --ref ~{in_reference_file} \
+        --ref ref.fna \
         --reads input_bam_file.bam \
         --output_vcf "~{in_sample_name}_deeptrio.vcf.gz" \
         --output_gvcf "~{in_sample_name}_deeptrio.g.vcf.gz" \
@@ -684,12 +693,14 @@ task runDeepTrioMakeExamples {
         ln -s ~{in_maternal_bam_file_index} input_bam_file.maternal.bam.bai
         ln -s ~{in_paternal_bam_file} input_bam_file.paternal.bam
         ln -s ~{in_paternal_bam_file_index} input_bam_file.paternal.bam.bai
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
         CONTIG_ID=($(ls ~{in_child_bam_file} | awk -F'.' '{print $(NF-2)}'))
         
         seq 0 $((~{in_vgcall_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/deeptrio/make_examples \
         --mode calling \
-        --ref ~{in_reference_file} \
+        --ref ref.fna \
         --reads_parent1 input_bam_file.paternal.bam \
         --reads_parent2 input_bam_file.maternal.bam \
         --reads input_bam_file.child.bam \
@@ -757,6 +768,8 @@ task runDeepTrioCallVariants {
         #to turn off echo do 'set +o xtrace'
         tar -xzf ~{in_examples_file}
         tar -xzf ~{in_nonvariant_site_tf_file}
+        gzip -dc ~{in_reference_file} > ref.fna
+        ln -f -s ~{in_reference_index_file} ref.fna.fai
         if [ ~{in_sample_type} == "child" ]; then
             EXAMPLES_FILE="make_examples_child.tfrecord@~{in_vgcall_cores}.gz"
             OUTPUT_FILE="call_variants_output_child.tfrecord.gz"
@@ -786,7 +799,7 @@ task runDeepTrioCallVariants {
         --examples ${EXAMPLES_FILE} \
         --checkpoint ${DEEPTRIO_MODEL} && \
         /opt/deepvariant/bin/postprocess_variants \
-        --ref ~{in_reference_file} \
+        --ref ref.fna \
         --infile ${OUTPUT_FILE} \
         --nonvariant_site_tfrecord_path ${NONVARIANT_SITE_FILE} \
         --outfile "~{in_sample_name}_deeptrio.vcf.gz" \
