@@ -26,7 +26,7 @@
   "vgTrioPipeline.SPLIT_READ_CORES": 2,
   "vgTrioPipeline.SPLIT_READ_DISK": 10,
   "vgTrioPipeline.MAP_CORES": 4,
-  "vgTrioPipeline.MAP_DISK": 10,
+  "vgTrioPipeline.MAP_DISK": 80,
   "vgTrioPipeline.MAP_MEM": 10,
   "vgTrioPipeline.PED_FILE": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/test_input_reads/HG002.ped",
   "vgTrioPipeline.EAGLE_DATA": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/grch38_inputs/eagle_data_grch38.tar.gz",
