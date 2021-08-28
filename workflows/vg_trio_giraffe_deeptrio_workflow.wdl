@@ -704,6 +704,7 @@ task runEaglePhasing {
     }
     
     runtime {
+        time: 300
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -766,6 +767,7 @@ task runWhatsHapPhasing {
         File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf.gz"
     }
     runtime {
+        time: 300
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
         docker: "quay.io/biocontainers/whatshap@sha256:cf82de1173a35a0cb063469a602eff2e8999b4cfc0f0ee9cef0dbaedafa5ab6c"
