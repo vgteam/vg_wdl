@@ -562,27 +562,27 @@ task runSplitJointGenotypedVCF {
         Boolean filter_parents
     }
 
-    command <<<
+    command {
         set -exu -o pipefail
 
-        if [ ~{filter_parents} == true ]; then
-          SAMPLE_FILTER_STRING="-s ~{in_maternal_sample_name},~{in_paternal_sample_name}"
+        if [ ${filter_parents} == true ]; then
+          SAMPLE_FILTER_STRING="-s ${in_maternal_sample_name},${in_paternal_sample_name}"
         else
           SAMPLE_FILTER_STRING=""
         fi
-        ln -s ~{joint_genotyped_vcf} input_vcf_file.vcf.gz
-        ln -s ~{joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
+        ln -s ${joint_genotyped_vcf} input_vcf_file.vcf.gz
+        ln -s ${joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
         while read -r contig; do
-            if [[ ~{filter_parents} == true && (${contig} == "MT" || ${contig} == chr"M") ]]; then
-                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
-            elif [[ ~{filter_parents} == true && (${contig} == "Y" || ${contig} == chr"Y") ]]; then
-                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
+            if [[ ${filter_parents} == true && ($contig == "MT" || $contig == chr"M") ]]; then
+                bcftools view -O z -r "$contig" -s ${in_maternal_sample_name} input_vcf_file.vcf.gz > "$contig.vcf.gz"
+            elif [[ ${filter_parents} == true && ($contig == "Y" || $contig == chr"Y") ]]; then
+                bcftools view -O z -r "$contig" -s ${in_paternal_sample_name} input_vcf_file.vcf.gz > "$contig.vcf.gz"
             else
-                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
+                bcftools view -O z -r "$contig" $SAMPLE_FILTER_STRING input_vcf_file.vcf.gz > "$contig.vcf.gz"
             fi
-            echo "${contig}.vcf.gz" >> contig_vcf_list.txt
+            echo "$contig.vcf.gz" >> contig_vcf_list.txt
         done < "~{write_lines(contigs)}"
-    >>>
+    }
     output {
         Array[File]+ contig_vcfs = read_lines("contig_vcf_list.txt")
     }
