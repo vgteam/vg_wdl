@@ -244,14 +244,13 @@ workflow vgTrioPipeline {
         }
         call runPrepPhasing {
             input:
-                in_eagle_data=EAGLE_DATA,
-                in_contigs=CONTIGS
+                in_eagle_data=EAGLE_DATA
         }
         Array[Pair[File,File]] maternal_bam_index_by_contigs_pair = zip(maternal_bams_by_contig, maternal_bam_indexes_by_contig)
         Array[Pair[File,File]] paternal_bam_index_by_contigs_pair = zip(paternal_bams_by_contig, paternal_bam_indexes_by_contig)
         Array[Pair[File,File]] child_bam_index_by_contigs_pair = zip(child_bams_by_contig, child_bam_indexes_by_contig)
         Array[Pair[Pair[File,File],Pair[Pair[File,File],Pair[File,File]]]] trio_bam_index_by_contigs_pair = zip(child_bam_index_by_contigs_pair,zip(maternal_bam_index_by_contigs_pair,paternal_bam_index_by_contigs_pair))
-        scatter (contig_pair in zip(CONTIGS, zip(splitJointGenotypedVCF.contig_vcfs, trio_bam_index_by_contigs_pair))) {
+        scatter (contig_pair in zip(splitJointGenotypedVCF.contig_vcfs_contig_list, zip(splitJointGenotypedVCF.contig_vcfs, trio_bam_index_by_contigs_pair))) {
             if (defined(runPrepPhasing.eagle_data[contig_pair.left])) {
                 call runEaglePhasing {
                     input:
@@ -315,7 +314,7 @@ workflow vgTrioPipeline {
         input:
             graph_name=GRAPH_NAME,
             ref_fasta_gz=REF_FILE,
-            contigs=CONTIGS,
+            contigs=splitPhasedVCF.contig_vcfs_contig_list,
             contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
             giraffe_indexes=GIRAFFE_INDEXES,
             use_decoys=USE_DECOYS,
@@ -580,11 +579,13 @@ task runSplitJointGenotypedVCF {
             else
                 bcftools view -O z -r "$contig" $SAMPLE_FILTER_STRING input_vcf_file.vcf.gz > "$contig.vcf.gz"
             fi
-            echo "$contig.vcf.gz" >> contig_vcf_list.txt
         done < "~{write_lines(contigs)}"
+        rm input_vcf_file.vcf.gz input_vcf_file.vcf.gz.tbi
+        echo *.vcf.gz | rev | cut -f1 -d'/' | rev | sed s/.vcf.gz//g
     }
     output {
-        Array[File]+ contig_vcfs = read_lines("contig_vcf_list.txt")
+        Array[File]+ contig_vcfs = glob("*.vcf.gz")
+        Array[String]+ contig_vcfs_contig_list = read_string(stdout())
     }
     runtime {
         memory: 50 + " GB"
@@ -632,33 +633,28 @@ task mergeIndelRealignedBAMs {
 task runPrepPhasing {
     input {
         File in_eagle_data
-        Array[String]+ in_contigs
     }
     
     command <<<
         set -exu -o pipefail
         tar -xf ~{in_eagle_data}
-        json_string=""
-        while read -r contig; do
-            if [[ ~{in_contigs[0]} == *"chr"* ]]; then
-                if [ ${contig} == "chrX" ]; then
-                    json_string="${json_string}\"${contig}\":[\"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf\", \"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.eagle2-phased.bcf.csi\"],"
-                elif [[ ! ${contig} =~ ^(chrY|chrM)$ ]]; then
-                    json_string="${json_string}\"${contig}\":[\"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf\", \"eagle_data_grch38/CCDG_14151_B01_GRM_WGS_2020-08-05_${contig}.filtered.shapeit2-duohmm-phased.bcf.csi\"],"
-                fi
-            else
-                if [[ ! ${contig} =~ ^(Y|MT|ABOlocus)$ ]]; then
-                    json_string="${json_string}\"${contig}\":[\"eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf\", \"eagle_data/ALL.chr${contig}.phase3_integrated.20130502.genotypes.bcf.csi\"],"
-                fi
-            fi
-        done < "~{write_lines(in_contigs)}"
-        json_string_output="${json_string%?}"
-        json_string_output="{${json_string_output}}"
-        echo "${json_string_output}"
+        OUTPUT_DIR="eagle_data_grch38"
+        if [[ ~{in_eagle_data} == *"grch38"* ]]; then
+            for FILENAME in eagle_data_grch38/*.bcf; do
+                echo $FILENAME | rev | cut -f1 -d'/' | rev | sed s/CCDG_14151_B01_GRM_WGS_2020-08-05_//g | sed s/.filtered.shapeit2-duohmm-phased.bcf$//g | sed s/.filtered.eagle2-phased.bcf$//g
+            done
+        else
+            OUTPUT_DIR="eagle_data"
+            for FILENAME in eagle_data/*.bcf; do
+                echo $FILENAME | rev | cut -f1 -d'/' | rev | sed s/ALL.chr//g | sed s/.phase3_integrated.20130502.genotypes.bcf$//g
+            done
+        fi
     >>>
     
     output {
-        Map[String, Array[File]] eagle_data = read_json(stdout())
+        Array[File]+ eagle_data = glob("${OUTPUT_DIR}/*.bcf")
+        Array[File]+ eagle_data_index = glob("${OUTPUT_DIR}/*.bcf.csi")
+        Array[String]+ eagle_contigs = read_string(stdout())
     }
     
     runtime {

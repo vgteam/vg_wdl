@@ -315,7 +315,7 @@ task splitReads {
         cpu: in_split_read_cores
         memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/glennhickey/pigz:2.3.1"
     }
 }
 
