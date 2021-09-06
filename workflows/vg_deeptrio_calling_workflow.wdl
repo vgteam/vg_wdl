@@ -188,6 +188,7 @@ workflow vgDeepTrioCall {
         File paternal_indel_realigned_bam_index = select_first([abraRealignPaternal.indel_realigned_bam_index, gatkRealignPaternal.indel_realigned_bam_index, paternal_bam_file_index])
         
         #TODO
+        String contig_name = sub(sub(sub(child_indel_realigned_bam, ".indel_realigned.bam", ""), SAMPLE_NAME_CHILD, ""), ".", "")
         if ((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT")) {
             call runDeepVariant as callDeepVariantChild {
                 input:
@@ -682,7 +683,7 @@ task runDeepTrioMakeExamples {
         ln -s ~{in_paternal_bam_file_index} input_bam_file.paternal.bam.bai
         gzip -dc ~{in_reference_file} > ref.fna
         ln -f -s ~{in_reference_index_file} ref.fna.fai
-        CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.indel_realigned.bam$//g))
+        CONTIG_ID=($(ls ~{in_child_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_child_name}.//g | sed s/.indel_realigned.bam$//g))
         
         seq 0 $((~{in_vgcall_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/deeptrio/make_examples \

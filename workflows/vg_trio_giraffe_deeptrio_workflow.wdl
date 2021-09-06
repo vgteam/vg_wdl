@@ -66,8 +66,8 @@ workflow vgTrioPipeline {
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean CLEANUP_FILES = false                   # Set to 'true' to turn on intermediate file cleanup.
-        Boolean ABRA_REALIGN = false                    # Set to 'true' to use GATK IndelRealigner instead of ABRA2 for indel realignment
-        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
+        Boolean ABRA_REALIGN = false                    # Set to 'true' to use GATK IndelRealigner instead of ABRA2 for indel realignment.
+        String DECOY_REGEX = ">GL\\|>NC_007605\\|>hs37d5\\|>hs38d1_decoys\\|>chrEBV\\|>chrUn\\|>chr\\([1-2][1-9]\\|[1-9]\\|Y\\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
     File PROBAND_INPUT_READ_FILE_1 = SIBLING_INPUT_READ_FILE_1_LIST[0]  # Input proband 1st read pair fastq.gz
@@ -246,18 +246,31 @@ workflow vgTrioPipeline {
             input:
                 in_eagle_data=EAGLE_DATA
         }
+        Array[Pair[File,File]] eagle_vcf_and_index_pairs = zip(runPrepPhasing.eagle_data, runPrepPhasing.eagle_data_index)
+        
+        #TODO
+        #  1) map eagle contigs with eagle vcf/index pair array index
+        #  2) use output for eagle_vcf_contig_map index
+        #  3) if( defined(eagle_vcf_contig_map[contig_pair.left] )
+        #  4) in_eagle_bcf = eagle_vcf_and_index_pairs[eagle_vcf_contig_map[contig_pair.left]].left
+        #  5) in_eagle_bcf_index = eagle_vcf_and_index_pairs[eagle_vcf_contig_map[contig_pair.left]].right
+        call runMakeContigMAP {
+            input:
+                in_eagle_contigs=runPrepPhasing.eagle_contigs
+        }
         Array[Pair[File,File]] maternal_bam_index_by_contigs_pair = zip(maternal_bams_by_contig, maternal_bam_indexes_by_contig)
         Array[Pair[File,File]] paternal_bam_index_by_contigs_pair = zip(paternal_bams_by_contig, paternal_bam_indexes_by_contig)
         Array[Pair[File,File]] child_bam_index_by_contigs_pair = zip(child_bams_by_contig, child_bam_indexes_by_contig)
         Array[Pair[Pair[File,File],Pair[Pair[File,File],Pair[File,File]]]] trio_bam_index_by_contigs_pair = zip(child_bam_index_by_contigs_pair,zip(maternal_bam_index_by_contigs_pair,paternal_bam_index_by_contigs_pair))
         scatter (contig_pair in zip(splitJointGenotypedVCF.contig_vcfs_contig_list, zip(splitJointGenotypedVCF.contig_vcfs, trio_bam_index_by_contigs_pair))) {
-            if (defined(runPrepPhasing.eagle_data[contig_pair.left])) {
+            if (defined(runMakeContigMAP.eagle_vcf_contig_map[contig_pair.left])) {
+                Int eagle_vcf_contig_index = runMakeContigMAP.eagle_vcf_contig_map[contig_pair.left]
                 call runEaglePhasing {
                     input:
                         in_cohort_sample_name=SAMPLE_NAME_PROBAND,
                         joint_genotyped_vcf=contig_pair.right.left,
-                        in_eagle_bcf=runPrepPhasing.eagle_data[contig_pair.left][0],
-                        in_eagle_bcf_index=runPrepPhasing.eagle_data[contig_pair.left][1],
+                        in_eagle_bcf=eagle_vcf_and_index_pairs[eagle_vcf_contig_index].left,
+                        in_eagle_bcf_index=eagle_vcf_and_index_pairs[eagle_vcf_contig_index].right,
                         in_contig=contig_pair.left,
                         in_vgcall_cores=VGCALL_CORES,
                         in_vgcall_disk=VGCALL_DISK,
@@ -561,7 +574,7 @@ task runSplitJointGenotypedVCF {
         Boolean filter_parents
     }
 
-    command {
+    command <<<
         set -exu -o pipefail
 
         if [ ${filter_parents} == true ]; then
@@ -579,10 +592,10 @@ task runSplitJointGenotypedVCF {
             else
                 bcftools view -O z -r "$contig" $SAMPLE_FILTER_STRING input_vcf_file.vcf.gz > "$contig.vcf.gz"
             fi
-        done < "~{write_lines(contigs)}"
+        done < ~{write_lines(contigs)}
         rm input_vcf_file.vcf.gz input_vcf_file.vcf.gz.tbi
-        echo *.vcf.gz | rev | cut -f1 -d'/' | rev | sed s/.vcf.gz//g
-    }
+        echo "*.vcf.gz" | rev | cut -f1 -d'/' | rev | sed s/.vcf.gz//g
+    >>>
     output {
         Array[File]+ contig_vcfs = glob("*.vcf.gz")
         Array[String]+ contig_vcfs_contig_list = read_string(stdout())
@@ -637,14 +650,13 @@ task runPrepPhasing {
     
     command <<<
         set -exu -o pipefail
-        tar -xf ~{in_eagle_data}
-        OUTPUT_DIR="eagle_data_grch38"
+        mkdir eagle_data
+        tar -xzf ~{in_eagle_data} -C eagle_data
         if [[ ~{in_eagle_data} == *"grch38"* ]]; then
             for FILENAME in eagle_data_grch38/*.bcf; do
                 echo $FILENAME | rev | cut -f1 -d'/' | rev | sed s/CCDG_14151_B01_GRM_WGS_2020-08-05_//g | sed s/.filtered.shapeit2-duohmm-phased.bcf$//g | sed s/.filtered.eagle2-phased.bcf$//g
             done
         else
-            OUTPUT_DIR="eagle_data"
             for FILENAME in eagle_data/*.bcf; do
                 echo $FILENAME | rev | cut -f1 -d'/' | rev | sed s/ALL.chr//g | sed s/.phase3_integrated.20130502.genotypes.bcf$//g
             done
@@ -652,14 +664,33 @@ task runPrepPhasing {
     >>>
     
     output {
-        Array[File]+ eagle_data = glob("${OUTPUT_DIR}/*.bcf")
-        Array[File]+ eagle_data_index = glob("${OUTPUT_DIR}/*.bcf.csi")
+        Array[File]+ eagle_data = glob("eagle_data/*.bcf")
+        Array[File]+ eagle_data_index = glob("eagle_data/*.bcf.csi")
         Array[String]+ eagle_contigs = read_string(stdout())
     }
     
     runtime {
         memory: "10 GB"
         disks: "local-disk 150 SSD"
+        docker: "ubuntu:latest"
+    }
+}
+
+task runMakeContigMAP {
+    input {
+        Array[String]+ in_eagle_contigs
+    }
+    Int in_eagle_contigs_length = length(in_eagle_contigs)
+    command <<<
+        python <<CODE
+        for i in xrange(~{in_eagle_contigs_length}):
+            print("~{in_eagle_contigs}[{idx}]\t{idx}".format(idx=i))
+        CODE
+    >>>
+    output {
+        Map[String, Int] eagle_vcf_contig_map = read_map(stdout())
+    }
+    runtime {
         docker: "ubuntu:latest"
     }
 }
