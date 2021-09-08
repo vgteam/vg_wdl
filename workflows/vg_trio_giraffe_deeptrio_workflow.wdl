@@ -67,7 +67,7 @@ workflow vgTrioPipeline {
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean CLEANUP_FILES = false                   # Set to 'true' to turn on intermediate file cleanup.
         Boolean ABRA_REALIGN = false                    # Set to 'true' to use GATK IndelRealigner instead of ABRA2 for indel realignment.
-        String DECOY_REGEX = ">GL\\|>NC_007605\\|>hs37d5\\|>hs38d1_decoys\\|>chrEBV\\|>chrUn\\|>chr\\([1-2][1-9]\\|[1-9]\\|Y\\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
+        String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
     }
     
     File PROBAND_INPUT_READ_FILE_1 = SIBLING_INPUT_READ_FILE_1_LIST[0]  # Input proband 1st read pair fastq.gz
@@ -577,28 +577,28 @@ task runSplitJointGenotypedVCF {
     command <<<
         set -exu -o pipefail
 
-        if [ ${filter_parents} == true ]; then
-          SAMPLE_FILTER_STRING="-s ${in_maternal_sample_name},${in_paternal_sample_name}"
+        if [ ~{filter_parents} == true ]; then
+          SAMPLE_FILTER_STRING="-s ~{in_maternal_sample_name},~{in_paternal_sample_name}"
         else
           SAMPLE_FILTER_STRING=""
         fi
-        ln -s ${joint_genotyped_vcf} input_vcf_file.vcf.gz
-        ln -s ${joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
+        ln -s ~{joint_genotyped_vcf} input_vcf_file.vcf.gz
+        ln -s ~{joint_genotyped_vcf_index} input_vcf_file.vcf.gz.tbi
         while read -r contig; do
-            if [[ ${filter_parents} == true && ($contig == "MT" || $contig == chr"M") ]]; then
-                bcftools view -O z -r "$contig" -s ${in_maternal_sample_name} input_vcf_file.vcf.gz > "$contig.vcf.gz"
-            elif [[ ${filter_parents} == true && ($contig == "Y" || $contig == chr"Y") ]]; then
-                bcftools view -O z -r "$contig" -s ${in_paternal_sample_name} input_vcf_file.vcf.gz > "$contig.vcf.gz"
+            if [[ ~{filter_parents} == true && (${contig} == "MT" || ${contig} == chr"M") ]]; then
+                bcftools view -O z -r "${contig}" -s ~{in_maternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
+            elif [[ ~{filter_parents} == true && (${contig} == "Y" || ${contig} == chr"Y") ]]; then
+                bcftools view -O z -r "${contig}" -s ~{in_paternal_sample_name} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             else
-                bcftools view -O z -r "$contig" $SAMPLE_FILTER_STRING input_vcf_file.vcf.gz > "$contig.vcf.gz"
+                bcftools view -O z -r "${contig}" ${SAMPLE_FILTER_STRING} input_vcf_file.vcf.gz > "${contig}.vcf.gz"
             fi
         done < ~{write_lines(contigs)}
         rm input_vcf_file.vcf.gz input_vcf_file.vcf.gz.tbi
-        echo "*.vcf.gz" | rev | cut -f1 -d'/' | rev | sed s/.vcf.gz//g
+        ls *.vcf.gz | sed s/.vcf.gz//g
     >>>
     output {
         Array[File]+ contig_vcfs = glob("*.vcf.gz")
-        Array[String]+ contig_vcfs_contig_list = read_string(stdout())
+        Array[String]+ contig_vcfs_contig_list = read_lines(stdout())
     }
     runtime {
         memory: 50 + " GB"
@@ -651,22 +651,20 @@ task runPrepPhasing {
     command <<<
         set -exu -o pipefail
         mkdir eagle_data
-        tar -xzf ~{in_eagle_data} -C eagle_data
-        if [[ ~{in_eagle_data} == *"grch38"* ]]; then
-            for FILENAME in eagle_data_grch38/*.bcf; do
+        tar -xzf ~{in_eagle_data} -C eagle_data --strip-components 1
+        for FILENAME in eagle_data/*.bcf; do
+            if [[ ~{in_eagle_data} == *"grch38"* ]]; then
                 echo $FILENAME | rev | cut -f1 -d'/' | rev | sed s/CCDG_14151_B01_GRM_WGS_2020-08-05_//g | sed s/.filtered.shapeit2-duohmm-phased.bcf$//g | sed s/.filtered.eagle2-phased.bcf$//g
-            done
-        else
-            for FILENAME in eagle_data/*.bcf; do
+            else
                 echo $FILENAME | rev | cut -f1 -d'/' | rev | sed s/ALL.chr//g | sed s/.phase3_integrated.20130502.genotypes.bcf$//g
-            done
-        fi
+            fi
+        done
     >>>
     
     output {
         Array[File]+ eagle_data = glob("eagle_data/*.bcf")
         Array[File]+ eagle_data_index = glob("eagle_data/*.bcf.csi")
-        Array[String]+ eagle_contigs = read_string(stdout())
+        Array[String]+ eagle_contigs = read_lines(stdout())
     }
     
     runtime {
@@ -683,15 +681,18 @@ task runMakeContigMAP {
     Int in_eagle_contigs_length = length(in_eagle_contigs)
     command <<<
         python <<CODE
-        for i in xrange(~{in_eagle_contigs_length}):
-            print("~{in_eagle_contigs}[{idx}]\t{idx}".format(idx=i))
+        contigs = "~{sep='\t' in_eagle_contigs}"
+        contig_list = contigs.split()
+        for i in range(~{in_eagle_contigs_length}):
+            eagle_contig_name = contig_list[i]
+            print("{}\t{}".format(eagle_contig_name,i))
         CODE
     >>>
     output {
         Map[String, Int] eagle_vcf_contig_map = read_map(stdout())
     }
     runtime {
-        docker: "ubuntu:latest"
+        docker: "python:3.9-slim-bullseye"
     }
 }
 
