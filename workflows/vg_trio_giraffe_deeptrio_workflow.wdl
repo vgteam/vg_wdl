@@ -933,7 +933,7 @@ task snpEffAnnotateVCF {
         #to turn off echo do 'set +o xtrace'
 
         unzip ~{in_snpeff_database}
-        database_ref="GRCH38.99"
+        database_ref="GRCh38.99"
         if [[ "~{in_snpeff_database}" != *"GRCh38"* ]]; then
             database_ref="GRCh37.75"
         fi
