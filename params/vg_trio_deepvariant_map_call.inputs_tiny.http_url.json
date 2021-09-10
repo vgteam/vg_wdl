@@ -23,16 +23,12 @@
   "vgTrioPipeline.DEEPTRIO_CHILD_MODEL": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/grch38_inputs/dt-giraffe-child-0821.tar.gz",
   "vgTrioPipeline.DEEPTRIO_PARENT_MODEL": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/grch38_inputs/dt-giraffe-parent-0821.tar.gz",
   "vgTrioPipeline.DEEPVAR_MODEL": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/grch38_inputs/dv-giraffe-0507.tar.gz",
-  "vgTrioPipeline.SPLIT_READ_CORES": 2,
-  "vgTrioPipeline.SPLIT_READ_DISK": 10,
-  "vgTrioPipeline.MAP_CORES": 4,
-  "vgTrioPipeline.MAP_DISK": 80,
-  "vgTrioPipeline.MAP_MEM": 10,
   "vgTrioPipeline.PED_FILE": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/test_input_reads/HG002.ped",
   "vgTrioPipeline.EAGLE_DATA": "https://storage.googleapis.com/cmarkell-vg-wdl-dev/grch38_inputs/eagle_data_grch38.tar.gz",
   "vgTrioPipeline.GRAPH_NAME": "HG002_test_graph_chr20_X",
   "vgTrioPipeline.CONTIGS": ["chr20", "chrX"],
   "vgTrioPipeline.USE_DECOYS": true,
-  "vgTrioPipeline.SNPEFF_ANNOTATION": true
+  "vgTrioPipeline.SNPEFF_ANNOTATION": true,
+  "vgTrioPipeline.SMALL_RESOURCES": true
 }
 
