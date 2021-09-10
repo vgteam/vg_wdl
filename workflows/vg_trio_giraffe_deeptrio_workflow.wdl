@@ -48,12 +48,15 @@ workflow vgTrioPipeline {
         Int MERGE_GAM_DISK = 400
         Int MERGE_GAM_MEM = 100
         Int MERGE_GAM_TIME = 1200
-        Int CHUNK_GAM_CORES = 32
-        Int CHUNK_GAM_DISK = 400
-        Int CHUNK_GAM_MEM = 100
+        Int MERGE_BAM_CORES = 10
+        Int MERGE_BAM_DISK = 100
+        Int MERGE_BAM_MEM = 50
         Int VGCALL_CORES = 8
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
+        Int PHASE_CORES = 2
+        Int PHASE_MEM = 20
+        Int PHASE_DISK = 50
         Array[String]+ CONTIGS = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY", "chrM"]
         File PED_FILE
         File EAGLE_DATA
@@ -62,12 +65,30 @@ workflow vgTrioPipeline {
         File? DEEPTRIO_PARENT_MODEL
         File? DEEPVAR_MODEL
         String GRAPH_NAME
+        Boolean SMALL_RESOURCES = false                 # Set to 'true' to use small resources for tiny test dataset
         Boolean GIRAFFE_INDEXES = true                  # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
         Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean CLEANUP_FILES = false                   # Set to 'true' to turn on intermediate file cleanup.
         Boolean ABRA_REALIGN = false                    # Set to 'true' to use GATK IndelRealigner instead of ABRA2 for indel realignment.
         String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
+    }
+    
+    if (SMALL_RESOURCES) {
+        Int SPLIT_READ_CORES = 2
+        Int SPLIT_READ_DISK = 1
+        Int MAP_CORES = 8
+        Int MAP_MEM = 70
+        Int MAP_DISK = 70
+        Int MERGE_BAM_CORES = 8
+        Int MERGE_BAM_MEM = 4
+        Int MERGE_BAM_DISK = 1
+        Int VGCALL_DISK = 2
+        Int VGCALL_MEM = 10
+        Int VGCALL_CORES = 8
+        Int PHASE_CORES = 2
+        Int PHASE_MEM = 20
+        Int PHASE_DISK = 50
     }
     
     File PROBAND_INPUT_READ_FILE_1 = SIBLING_INPUT_READ_FILE_1_LIST[0]  # Input proband 1st read pair fastq.gz
@@ -207,12 +228,18 @@ workflow vgTrioPipeline {
     call mergeIndelRealignedBAMs as mergeMaternalIndelRealignedBams{
         input:  
             in_sample_name=SAMPLE_NAME_MATERNAL,
-            in_alignment_bam_chunk_files=maternal_bams_by_contig
+            in_alignment_bam_chunk_files=maternal_bams_by_contig,
+            in_cores=MERGE_BAM_CORES,
+            in_disk=MERGE_BAM_DISK,
+            in_mem=MERGE_BAM_MEM
     }
     call mergeIndelRealignedBAMs as mergePaternalIndelRealignedBams{
         input:  
             in_sample_name=SAMPLE_NAME_PATERNAL,
-            in_alignment_bam_chunk_files=paternal_bams_by_contig
+            in_alignment_bam_chunk_files=paternal_bams_by_contig,
+            in_cores=MERGE_BAM_CORES,
+            in_disk=MERGE_BAM_DISK,
+            in_mem=MERGE_BAM_MEM
     }
     
     call runDeepVariantJointGenotyper as deepVarJointGenotyper1st {
@@ -272,9 +299,9 @@ workflow vgTrioPipeline {
                         in_eagle_bcf=eagle_vcf_and_index_pairs[eagle_vcf_contig_index].left,
                         in_eagle_bcf_index=eagle_vcf_and_index_pairs[eagle_vcf_contig_index].right,
                         in_contig=contig_pair.left,
-                        in_vgcall_cores=VGCALL_CORES,
-                        in_vgcall_disk=VGCALL_DISK,
-                        in_vgcall_mem=VGCALL_MEM
+                        in_cores=PHASE_CORES,
+                        in_disk=PHASE_DISK,
+                        in_mem=PHASE_MEM
                 }
             }
             File pre_whatshap_vcf_file = select_first([runEaglePhasing.phased_cohort_vcf, contig_pair.right.left])
@@ -292,7 +319,9 @@ workflow vgTrioPipeline {
                     in_genetic_map=GEN_MAP_FILES,
                     in_contig=contig_pair.left,
                     in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_disk=PHASE_DISK,
+                    in_mem=PHASE_MEM
             }
         }
         call concatClippedVCFChunks as concatCohortPhasedVCFs {
@@ -395,7 +424,10 @@ workflow vgTrioPipeline {
         call mergeIndelRealignedBAMs as mergeSiblingIndelRealignedBams{
             input:
                 in_sample_name=read_pair_set.right,
-                in_alignment_bam_chunk_files=secondTrioCallWorkflow.output_child_indelrealigned_bams
+                in_alignment_bam_chunk_files=secondTrioCallWorkflow.output_child_indelrealigned_bams,
+                in_cores=MERGE_BAM_CORES,
+                in_disk=MERGE_BAM_DISK,
+                in_mem=MERGE_BAM_MEM
         }
         
     }
@@ -487,9 +519,9 @@ task splitBAMbyPath {
         File in_merged_bam_file
         File in_merged_bam_file_index
         File in_path_list_file
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
+        Int? in_map_cores
+        Int? in_map_disk
+        Int? in_map_mem
     }
 
     command <<<
@@ -528,9 +560,9 @@ task runDeepVariantJointGenotyper {
         File? in_gvcf_file_maternal
         File? in_gvcf_file_paternal
         Array[File]+ in_gvcf_files_siblings
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Int? in_vgcall_cores
+        Int? in_vgcall_disk
+        Int? in_vgcall_mem
     }
 
     command <<<
@@ -611,6 +643,9 @@ task mergeIndelRealignedBAMs {
     input {
         String in_sample_name
         Array[File]? in_alignment_bam_chunk_files
+        Int? in_cores
+        Int? in_disk
+        Int? in_mem
     }
 
     command <<<
@@ -625,7 +660,7 @@ task mergeIndelRealignedBAMs {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 32 \
+          -f -p -c --threads ~{in_cores} \
           ~{in_sample_name}_merged.indel_realigned.bam \
           ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
@@ -636,9 +671,9 @@ task mergeIndelRealignedBAMs {
         File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
-        memory: 50 + " GB"
-        cpu: 32
-        disks: "local-disk 100 SSD"
+        memory: in_mem + " GB"
+        cpu: in_cores
+        disks: "local-disk " + in_disk + " SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
@@ -669,7 +704,7 @@ task runPrepPhasing {
     
     runtime {
         memory: "10 GB"
-        disks: "local-disk 150 SSD"
+        disks: "local-disk 140 SSD"
         docker: "ubuntu:latest"
     }
 }
@@ -703,9 +738,9 @@ task runEaglePhasing {
         File in_eagle_bcf
         File in_eagle_bcf_index
         String in_contig
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Int? in_cores
+        Int? in_disk
+        Int? in_mem
     }
     
     command <<<
@@ -721,7 +756,7 @@ task runEaglePhasing {
         --outputUnphased \
         --geneticMapFile ${gen_map_file} \
         --outPrefix "~{in_cohort_sample_name}_cohort_~{in_contig}.eagle_phased" \
-        --numThreads ~{in_vgcall_cores} \
+        --numThreads ~{in_cores} \
         --vcfRef input_eagle.bcf \
         --vcfTarget ~{joint_genotyped_vcf} \
         --chrom ~{in_contig}
@@ -733,9 +768,9 @@ task runEaglePhasing {
     
     runtime {
         time: 300
-        cpu: in_vgcall_cores
-        memory: in_vgcall_mem + " GB"
-        disks: "local-disk " + in_vgcall_disk + " SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: "quay.io/cmarkello/eagle"
     }
 }
@@ -755,6 +790,8 @@ task runWhatsHapPhasing {
         String in_contig
         File in_reference_file
         File in_reference_index_file
+        Int? in_disk
+        Int? in_mem
     }
     
     Boolean genetic_map_available = defined(in_genetic_map)
@@ -796,8 +833,8 @@ task runWhatsHapPhasing {
     }
     runtime {
         time: 300
-        memory: 50 + " GB"
-        disks: "local-disk 100 SSD"
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: "quay.io/biocontainers/whatshap@sha256:cf82de1173a35a0cb063469a602eff2e8999b4cfc0f0ee9cef0dbaedafa5ab6c"
     }
 }
@@ -806,8 +843,8 @@ task concatClippedVCFChunks {
     input {
         String in_sample_name
         Array[File] in_clipped_vcf_chunk_files
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Int? in_vgcall_disk
+        Int? in_vgcall_mem
     }
 
     command {
@@ -843,8 +880,8 @@ task bgzipMergedVCF {
         String in_sample_name
         File in_merged_vcf_file
         String in_vg_container
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Int? in_vgcall_disk
+        Int? in_vgcall_mem
     }
 
     # TODO:
@@ -880,9 +917,9 @@ task normalizeVCF {
     input {
         String in_sample_name
         File in_bgzip_vcf_file
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Int? in_vgcall_cores
+        Int? in_vgcall_disk
+        Int? in_vgcall_mem
     }
 
     command <<<
@@ -915,9 +952,9 @@ task snpEffAnnotateVCF {
         String in_sample_name
         File in_normalized_vcf_file
         File? in_snpeff_database
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Int? in_vgcall_cores
+        Int? in_vgcall_disk
+        Int? in_vgcall_mem
     }
 
     command <<<

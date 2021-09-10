@@ -702,13 +702,12 @@ task runDeepTrioMakeExamples {
         --pileup_image_height_parent 40 \
         --regions ${CONTIG_ID} \
         --task {}
-
-        ls | grep 'make_examples_child.tfrecord' | tar -czf 'make_examples_child.tfrecord.tar.gz' -T -
-        ls | grep 'make_examples_parent1.tfrecord' | tar -czf 'make_examples_parent1.tfrecord.tar.gz' -T -
-        ls | grep 'make_examples_parent2.tfrecord' | tar -czf 'make_examples_parent2.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf_child.tfrecord' | tar -czf 'gvcf_child.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf_parent1.tfrecord' | tar -czf 'gvcf_parent1.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf_parent2.tfrecord' | tar -czf 'gvcf_parent2.tfrecord.tar.gz' -T -
+        ls | grep 'make_examples_child.tfrecord-' | tar -czf 'make_examples_child.tfrecord.tar.gz' -T -
+        ls | grep 'make_examples_parent1.tfrecord-' | tar -czf 'make_examples_parent1.tfrecord.tar.gz' -T -
+        ls | grep 'make_examples_parent2.tfrecord-' | tar -czf 'make_examples_parent2.tfrecord.tar.gz' -T -
+        ls | grep 'gvcf_child.tfrecord-' | tar -czf 'gvcf_child.tfrecord.tar.gz' -T -
+        ls | grep 'gvcf_parent1.tfrecord-' | tar -czf 'gvcf_parent1.tfrecord.tar.gz' -T -
+        ls | grep 'gvcf_parent2.tfrecord-' | tar -czf 'gvcf_parent2.tfrecord.tar.gz' -T -
     >>>
     output {
         File child_examples_file = "make_examples_child.tfrecord.tar.gz"
