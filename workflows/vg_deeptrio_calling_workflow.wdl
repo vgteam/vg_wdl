@@ -8,6 +8,7 @@ version 1.0
 workflow vgDeepTrioCall {
     input {
         Boolean ABRA_REALIGN = false                                # Set to 'true' to use ABRA2 IndelRealigner instead of GATK for indel realignment
+        Boolean SMALL_RESOURCES = false                             # Set to 'true' to use small resources for tiny test dataset
         File? MATERNAL_BAM_FILE                                     # Input maternal surjected .bam file
         File? MATERNAL_BAM_FILE_INDEX                               # Input maternal .bai index of surjected .bam file.
         Array[File]? MATERNAL_BAM_CONTIG_LIST                       # Input maternal bam per contig in a list of files.
@@ -16,22 +17,19 @@ workflow vgDeepTrioCall {
         File? PATERNAL_BAM_FILE_INDEX                               # Input paternal .bai index of surjected .bam file.
         Array[File]? PATERNAL_BAM_CONTIG_LIST                       # Input paternal bam per contig in a list of files.
         Array[File]? PATERNAL_BAM_INDEX_CONTIG_LIST                 # Input paternal bam index per contig in a list of files following the same contig order as PATERNAL_BAM_CONTIG_LIST.
-        File? CHILD_BAM_FILE                                         # Input child surjected .bam file
-        File? CHILD_BAM_FILE_INDEX                                   # Input child .bai index of surjected .bam file.
+        File? CHILD_BAM_FILE                                        # Input child surjected .bam file
+        File? CHILD_BAM_FILE_INDEX                                  # Input child .bai index of surjected .bam file.
         String SAMPLE_NAME_CHILD                                    # The child sample name
         String SAMPLE_NAME_MATERNAL                                 # The maternal sample name
         String SAMPLE_NAME_PATERNAL                                 # The paternal sample name
         Array[String]+ CONTIGS = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY", "chrM"]
         File REF_FILE                                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                         # Path to .fai index of the REF_FILE fasta reference
-        File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        File REF_DICT_FILE                                          # Path to .dict file of the REF_FILE fasta reference
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"           # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         File? DEEPTRIO_CHILD_MODEL
         File? DEEPTRIO_PARENT_MODEL
         File? DEEPVAR_MODEL
-        Int MAP_CORES = 32
-        Int MAP_DISK = 100
-        Int MAP_MEM = 100
         Int VGCALL_CORES = 32
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 64
@@ -42,7 +40,8 @@ workflow vgDeepTrioCall {
             in_sample_name=SAMPLE_NAME_CHILD,
             in_merged_bam_file=CHILD_BAM_FILE,
             in_merged_bam_file_index=CHILD_BAM_FILE_INDEX,
-            contigs=CONTIGS
+            contigs=CONTIGS,
+            in_small_resources=SMALL_RESOURCES
     }
     if (!defined(MATERNAL_BAM_CONTIG_LIST)) {
         call splitBAMbyPath as splitMaternalBAMbyPath {
@@ -50,7 +49,8 @@ workflow vgDeepTrioCall {
                 in_sample_name=SAMPLE_NAME_MATERNAL,
                 in_merged_bam_file=MATERNAL_BAM_FILE,
                 in_merged_bam_file_index=MATERNAL_BAM_FILE_INDEX,
-                contigs=CONTIGS
+                contigs=CONTIGS,
+                in_small_resources=SMALL_RESOURCES
         }
     }
     if (!defined(PATERNAL_BAM_CONTIG_LIST)) {
@@ -59,7 +59,8 @@ workflow vgDeepTrioCall {
                 in_sample_name=SAMPLE_NAME_PATERNAL,
                 in_merged_bam_file=PATERNAL_BAM_FILE,
                 in_merged_bam_file_index=PATERNAL_BAM_FILE_INDEX,
-                contigs=CONTIGS
+                contigs=CONTIGS,
+                in_small_resources=SMALL_RESOURCES
         }
     }
     # Run distributed DeepTRIO linear variant calling for each chromosomal contig
@@ -154,7 +155,8 @@ workflow vgDeepTrioCall {
                     in_bam_index_file=child_bam_file_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_reference_dict_file=REF_DICT_FILE,
+                    in_small_resources=SMALL_RESOURCES
             }
             # Only do indel realignment of parents if there isn't already a supplied indel realigned bam set
             if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -165,7 +167,8 @@ workflow vgDeepTrioCall {
                         in_bam_index_file=maternal_bam_file_index,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
             if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -176,7 +179,8 @@ workflow vgDeepTrioCall {
                         in_bam_index_file=paternal_bam_file_index,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
         }
@@ -198,9 +202,7 @@ workflow vgDeepTrioCall {
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_model=DEEPVAR_MODEL,
-                    in_call_cores=VGCALL_CORES,
-                    in_call_disk=VGCALL_DISK,
-                    in_call_mem=VGCALL_MEM
+                    in_small_resources=SMALL_RESOURCES
             } 
             if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
                 call runDeepVariant as callDeepVariantMaternal {
@@ -211,9 +213,7 @@ workflow vgDeepTrioCall {
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_model=DEEPVAR_MODEL,
-                        in_call_cores=VGCALL_CORES,
-                        in_call_disk=VGCALL_DISK,
-                        in_call_mem=VGCALL_MEM
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
             if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -225,9 +225,7 @@ workflow vgDeepTrioCall {
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
                         in_model=DEEPVAR_MODEL,
-                        in_call_cores=VGCALL_CORES,
-                        in_call_disk=VGCALL_DISK,
-                        in_call_mem=VGCALL_MEM
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
         }
@@ -245,9 +243,7 @@ workflow vgDeepTrioCall {
                     in_paternal_bam_file_index=paternal_indel_realigned_bam_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_vgcall_cores=VGCALL_CORES,
-                    in_vgcall_disk=VGCALL_DISK,
-                    in_vgcall_mem=VGCALL_MEM
+                    in_small_resources=SMALL_RESOURCES
             }
             call runDeepTrioCallVariants as callVariantsChild {
                 input:
@@ -258,9 +254,7 @@ workflow vgDeepTrioCall {
                     in_examples_file=runDeepTrioMakeExamples.child_examples_file,
                     in_nonvariant_site_tf_file=runDeepTrioMakeExamples.child_nonvariant_site_tf_file,
                     in_model=DEEPTRIO_CHILD_MODEL,
-                    in_vgcall_cores=VGCALL_CORES,
-                    in_vgcall_disk=VGCALL_DISK,
-                    in_vgcall_mem=VGCALL_MEM
+                    in_small_resources=SMALL_RESOURCES
             }
             if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
                 call runDeepTrioCallVariants as callVariantsMaternal {
@@ -272,9 +266,7 @@ workflow vgDeepTrioCall {
                         in_examples_file=runDeepTrioMakeExamples.maternal_examples_file,
                         in_nonvariant_site_tf_file=runDeepTrioMakeExamples.maternal_nonvariant_site_tf_file,
                         in_model=DEEPTRIO_PARENT_MODEL,
-                        in_vgcall_cores=VGCALL_CORES,
-                        in_vgcall_disk=VGCALL_DISK,
-                        in_vgcall_mem=VGCALL_MEM
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
             if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -287,9 +279,7 @@ workflow vgDeepTrioCall {
                         in_examples_file=runDeepTrioMakeExamples.paternal_examples_file,
                         in_nonvariant_site_tf_file=runDeepTrioMakeExamples.paternal_nonvariant_site_tf_file,
                         in_model=DEEPTRIO_PARENT_MODEL,
-                        in_vgcall_cores=VGCALL_CORES,
-                        in_vgcall_disk=VGCALL_DISK,
-                        in_vgcall_mem=VGCALL_MEM
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
         }
@@ -302,8 +292,7 @@ workflow vgDeepTrioCall {
         input:
             in_sample_name=SAMPLE_NAME_CHILD,
             in_clipped_vcf_chunk_files=child_contig_gvcf_output_list,
-            in_vgcall_disk=VGCALL_DISK,
-            in_vgcall_mem=VGCALL_MEM
+            in_small_resources=SMALL_RESOURCES
     }
     # Extract either the normal or structural variant based VCFs and compress them
     call bgzipMergedVCF as bgzipVGCalledChildVCF {
@@ -311,8 +300,7 @@ workflow vgDeepTrioCall {
             in_sample_name=SAMPLE_NAME_CHILD,
             in_merged_vcf_file=concatVCFChunksChild.output_merged_vcf,
             in_vg_container=VG_CONTAINER,
-            in_vgcall_disk=VGCALL_DISK,
-            in_vgcall_mem=VGCALL_MEM
+            in_small_resources=SMALL_RESOURCES
     }
     if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
         Array[File] maDeepVarGVCF = select_all(callDeepVariantMaternal.output_gvcf_file)
@@ -323,8 +311,7 @@ workflow vgDeepTrioCall {
             input:
                 in_sample_name=SAMPLE_NAME_MATERNAL,
                 in_clipped_vcf_chunk_files=maternal_contig_gvcf_output_list,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
+                in_small_resources=SMALL_RESOURCES
         }
         # Extract either the normal or structural variant based VCFs and compress them
         call bgzipMergedVCF as bgzipVGCalledMaternalVCF {
@@ -332,8 +319,7 @@ workflow vgDeepTrioCall {
                 in_sample_name=SAMPLE_NAME_MATERNAL,
                 in_merged_vcf_file=concatVCFChunksMaternal.output_merged_vcf,
                 in_vg_container=VG_CONTAINER,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
+                in_small_resources=SMALL_RESOURCES
         }
     }
     if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -345,8 +331,7 @@ workflow vgDeepTrioCall {
             input:
                 in_sample_name=SAMPLE_NAME_PATERNAL,
                 in_clipped_vcf_chunk_files=paternal_contig_gvcf_output_list,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
+                in_small_resources=SMALL_RESOURCES
         }
         # Extract either the normal or structural variant based VCFs and compress them
         call bgzipMergedVCF as bgzipVGCalledPaternalVCF {
@@ -354,8 +339,7 @@ workflow vgDeepTrioCall {
                 in_sample_name=SAMPLE_NAME_PATERNAL,
                 in_merged_vcf_file=concatVCFChunksPaternal.output_merged_vcf,
                 in_vg_container=VG_CONTAINER,
-                in_vgcall_disk=VGCALL_DISK,
-                in_vgcall_mem=VGCALL_MEM
+                in_small_resources=SMALL_RESOURCES
         }
     }
     
@@ -393,8 +377,13 @@ task splitBAMbyPath {
         File? in_merged_bam_file
         File? in_merged_bam_file_index
         Array[String]+ contigs
+        Boolean in_small_resources
     }
-
+    
+    Int in_cores = if in_small_resources then 2 else 32
+    Int in_disk = if in_small_resources then 1 else 10
+    String in_mem = if in_small_resources then "1" else "40"
+    
     command <<<
         set -eux -o pipefail
 
@@ -403,7 +392,7 @@ task splitBAMbyPath {
         
         while read -r contig; do
             samtools view \
-              -@ 32 \
+              -@ ~{in_cores} \
               -h -O BAM \
               input_bam_file.bam ${contig} \
               -o ~{in_sample_name}.${contig}.bam \
@@ -416,9 +405,9 @@ task splitBAMbyPath {
         Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai")
     }
     runtime {
-        memory: "40 GB"
-        cpu: 32
-        disks: "local-disk 10 SSD"
+        memory: in_mem + " GB"
+        cpu: in_cores
+        disks: "local-disk " + in_disk + " SSD"
         docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
     }
 }
@@ -528,7 +517,12 @@ task runGATKIndelRealigner {
         File in_reference_file
         File in_reference_index_file
         File in_reference_dict_file
+        Boolean in_small_resources
     }
+    
+    Int in_cores = if in_small_resources then 4 else 32
+    Int in_disk = if in_small_resources then 1 else 50
+    String in_mem = if in_small_resources then "1" else "50"
     
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -552,7 +546,7 @@ task runGATKIndelRealigner {
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
-          -nt "32" \
+          -nt "~{in_cores}" \
           -R ref.fna \
           -I input_bam_file.bam \
           -L ${CONTIG_ID} \
@@ -569,8 +563,8 @@ task runGATKIndelRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        memory: 50 + " GB"
-        cpu: 32
+        memory: in_mem + " GB"
+        cpu: in_cores
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
     }
 }
@@ -583,10 +577,12 @@ task runDeepVariant {
         File in_reference_file
         File in_reference_index_file
         File? in_model
-        Int in_call_cores
-        Int in_call_disk
-        Int in_call_mem
+        Boolean in_small_resources
     }
+    
+    Int in_call_cores = if in_small_resources then 4 else 8
+    Int in_call_disk = if in_small_resources then 2 else 40
+    String in_call_mem = if in_small_resources then "5" else "64"
     
     Boolean custom_model = defined(in_model)
     
@@ -635,7 +631,7 @@ task runDeepVariant {
     }
     runtime {
         memory: in_call_mem + " GB"
-        cpu: 8
+        cpu: in_call_cores
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
         preemptible: 1
@@ -658,10 +654,12 @@ task runDeepTrioMakeExamples {
         File in_paternal_bam_file_index
         File in_reference_file
         File in_reference_index_file
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Boolean in_small_resources
     }
+    
+    Int in_vgcall_cores = if in_small_resources then 4 else 32
+    Int in_vgcall_disk = if in_small_resources then 2 else 40
+    String in_vgcall_mem = if in_small_resources then "5" else "64"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -735,10 +733,12 @@ task runDeepTrioCallVariants {
         File in_examples_file
         File in_nonvariant_site_tf_file
         File? in_model
-        Int in_vgcall_cores
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Boolean in_small_resources
     }
+    
+    Int in_vgcall_cores = if in_small_resources then 4 else 8
+    Int in_vgcall_disk = if in_small_resources then 2 else 40
+    String in_vgcall_mem = if in_small_resources then "5" else "64"
     
     Boolean custom_model = defined(in_model)
     
@@ -798,8 +798,8 @@ task runDeepTrioCallVariants {
     }
     runtime {
         memory: in_vgcall_mem + " GB"
-        cpu: 8
-        gpuType: "nvidia-tesla-p100"
+        cpu: in_vgcall_cores
+        gpuType: "nvidia-tesla-t4"
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -811,9 +811,11 @@ task concatClippedVCFChunks {
     input {
         String in_sample_name
         Array[File] in_clipped_vcf_chunk_files
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Boolean in_small_resources
     }
+    
+    Int in_disk = if in_small_resources then 1 else 10
+    String in_mem = if in_small_resources then "1" else "1"
 
     command {
         # Set the exit code of a pipeline to that of the rightmost command
@@ -837,8 +839,8 @@ task concatClippedVCFChunks {
     }
     runtime {
         time: 60
-        memory: "1 GB"
-        disks: "local-disk 10 SSD"
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
@@ -848,9 +850,12 @@ task bgzipMergedVCF {
         String in_sample_name
         File in_merged_vcf_file
         String in_vg_container
-        Int in_vgcall_disk
-        Int in_vgcall_mem
+        Boolean in_small_resources
     }
+    
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 1 else 10
+    String in_mem = if in_small_resources then "1" else "10"
 
     # TODO:
     #   If GVCF in in_merged_vcf_file then output_vcf_extension="gvcf" else output_vcf_extension="vcf"
@@ -875,8 +880,8 @@ task bgzipMergedVCF {
     }
     runtime {
         time: 30
-        memory: "10 GB"
-        disks: "local-disk 10 SSD"
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: in_vg_container
     }
 }
