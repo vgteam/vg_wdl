@@ -34,6 +34,9 @@ workflow vg_construct_and_index {
         # set true to include structural variants from input vcfs into VG graph construction
         Boolean use_svs = false
         
+        # Set to 'true' to use small resources for tiny test dataset
+        Boolean in_small_resources = false
+         
         # regex to use in grep for extracting decoy contig names from reference FASTA
         String decoy_regex = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_"
         
@@ -50,7 +53,7 @@ workflow vg_construct_and_index {
             use_haplotypes = giraffe_indexes,
             use_svs = use_svs,
             vg_docker = vg_docker,
-            construct_cores = 2
+            in_small_resources = in_small_resources
         }
     }
     
@@ -59,7 +62,8 @@ workflow vg_construct_and_index {
         call extract_decoys { input:
             ref_fasta_gz = ref_fasta_gz,
             decoy_regex = decoy_regex,
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            in_small_resources = in_small_resources
         }
         scatter (contig in extract_decoys.decoy_contig_ids) {
             call construct_graph as construct_decoy_graph { input:
@@ -68,7 +72,7 @@ workflow vg_construct_and_index {
                 use_haplotypes = false,
                 use_svs = false,
                 vg_docker = vg_docker,
-                construct_cores = 2
+                in_small_resources = in_small_resources
             }
         }
         call concat as concat_vg_graph_lists { input:
@@ -84,7 +88,8 @@ workflow vg_construct_and_index {
     call combine_graphs { input:
         graph_name = graph_name,
         contigs_vg = select_first([combined_contig_vg_list]),
-        vg_docker = vg_docker
+        vg_docker = vg_docker,
+        in_small_resources = in_small_resources
     }
 
     # make GBWT index, if so configured
@@ -93,14 +98,16 @@ workflow vg_construct_and_index {
             call gbwt_index { input:
                 vg = p.left,
                 vcf_gz = p.right,
-                vg_docker = vg_docker
+                vg_docker = vg_docker,
+                in_small_resources = in_small_resources
             }
         }
         if (length(gbwt_index.gbwt) > 1) {
             call gbwt_merge { input:
                 gbwts = gbwt_index.gbwt,
                 graph_name = graph_name,
-                vg_docker = vg_docker
+                vg_docker = vg_docker,
+                in_small_resources = in_small_resources
             }
         }
         File? final_gbwt = if (defined(gbwt_merge.gbwt)) then gbwt_merge.gbwt else gbwt_index.gbwt[0]
@@ -110,7 +117,8 @@ workflow vg_construct_and_index {
     call xg_index { input:
         graph_name = graph_name,
         vg = combine_graphs.vg,
-        vg_docker = vg_docker
+        vg_docker = vg_docker,
+        in_small_resources = in_small_resources
     }
 
     # Prune the graph of repetitive sequences in preparation for GCSA indexing.
@@ -122,7 +130,8 @@ workflow vg_construct_and_index {
         scatter (contig_vg in combine_graphs.all_contigs_uid_vg) {
             call prune_graph { input:
                 contig_vg = contig_vg,
-                vg_docker = vg_docker
+                vg_docker = vg_docker,
+                in_small_resources = in_small_resources
             }
         }
     }
@@ -131,7 +140,8 @@ workflow vg_construct_and_index {
             contigs_vg = combine_graphs.contigs_uid_vg,
             contigs_gbwt = select_first([gbwt_index.gbwt]),
             empty_id_map = combine_graphs.empty_id_map,
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            in_small_resources = in_small_resources
         }
         # If decoys are to be included, prune those graphs and merge
         #  them with the haplotype pruned graphs
@@ -139,7 +149,8 @@ workflow vg_construct_and_index {
             scatter (contig_vg in select_first([combine_graphs.decoy_contigs_uid_vg])) {
                 call prune_graph as prune_decoy_graphs { input:
                     contig_vg = contig_vg,
-                    vg_docker = vg_docker
+                    vg_docker = vg_docker,
+                    in_small_resources = in_small_resources
                 }
             }
             call concat as concat_pruned_vg_graph_lists { input:
@@ -157,13 +168,14 @@ workflow vg_construct_and_index {
                 vg = contig_vg,
                 graph_name = graph_name,
                 vg_docker = vg_docker,
-                construct_cores = 2
+                in_small_resources = in_small_resources
             }
         }
         call snarls_merge { input:
             snarls = snarls_index.snarls,
             graph_name = graph_name,
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            in_small_resources = in_small_resources
         }
         # make Distance index
         call dist_index { input:
@@ -171,7 +183,7 @@ workflow vg_construct_and_index {
             xg = xg_index.xg,
             trivial_snarls = snarls_merge.merged_snarls,
             vg_docker = vg_docker,
-            construct_cores = 32
+            in_small_resources = in_small_resources
         }
         # make Graph GBWT index
         call sampled_gbwt_index { input:
@@ -179,7 +191,7 @@ workflow vg_construct_and_index {
             gbwt = final_gbwt,
             xg = xg_index.xg,
             vg_docker = vg_docker,
-            construct_cores = 32
+            in_small_resources = in_small_resources
         }
         # make Minimizer index
         call min_index { input:
@@ -188,7 +200,7 @@ workflow vg_construct_and_index {
             sampled_gg = sampled_gbwt_index.sampled_gg,
             dist = dist_index.dist,
             vg_docker = vg_docker,
-            construct_cores = 32
+            in_small_resources = in_small_resources
         }
     }
     if (!giraffe_indexes) {
@@ -197,7 +209,8 @@ workflow vg_construct_and_index {
             graph_name = graph_name,
             contigs_pruned_vg = select_first([concat_pruned_vg_graph_lists.out, prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
             id_map = select_first([prune_graph_with_haplotypes.pruned_id_map,combine_graphs.empty_id_map]),
-            vg_docker = vg_docker
+            vg_docker = vg_docker,
+            in_small_resources = in_small_resources
         }
     }
 
@@ -220,7 +233,10 @@ task extract_decoys {
         File ref_fasta_gz
         String decoy_regex
         String vg_docker
+        Boolean in_small_resources
     }
+
+    String in_mem = if in_small_resources then "1" else "5"
     
     command <<<
         set -exu -o pipefail
@@ -232,7 +248,7 @@ task extract_decoys {
     }
     runtime {
         time: 10
-        memory: 5 + " GB"
+        memory: in_mem + " GB"
         docker: vg_docker
     }
 }
@@ -247,9 +263,13 @@ task construct_graph {
         Boolean use_svs
         String vg_construct_options="--node-max 32"
         String vg_docker
-        Int construct_cores
+        Boolean in_small_resources
     }
-    
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 1 else 10
+    String in_mem = if in_small_resources then "1" else "5"
+ 
     Boolean use_vcf = defined(vcf_gz)
     
     command <<<
@@ -266,7 +286,7 @@ task construct_graph {
             VG_SV_OPTION="--handle-sv"
         fi
 
-        vg construct --threads ~{construct_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ${VG_SV_OPTION} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg" \
+        vg construct --threads ~{in_cores} -R "~{contig}" -C -r ref.fa ${VCF_OPTION_STRING} ~{vg_construct_options} ${VG_SV_OPTION} ~{if use_haplotypes then "-a" else ""} > "~{contig}.vg" \
         && rm -f ref.fa
     >>>
 
@@ -276,9 +296,9 @@ task construct_graph {
 
     runtime {
         time: 200
-        cpu: construct_cores
-        memory: 5 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -311,7 +331,12 @@ task combine_graphs {
         String graph_name
         Array[File]+ contigs_vg
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 2 else 50
+    String in_mem = if in_small_resources then "2" else "40"
 
     command {
         set -exu -o pipefail
@@ -344,7 +369,8 @@ task combine_graphs {
 
     runtime {
         time: 800
-        memory: 100 + " GB"
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -355,14 +381,19 @@ task gbwt_index {
         File vg
         File vcf_gz
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 2 else 20
+    String in_mem = if in_small_resources then "2" else "5"
 
     command <<<
         set -exu -o pipefail
         nm=$(basename "~{vg}" .vg)
         tabix "~{vcf_gz}"
 
-        vg index --threads "$(nproc --all)" --force-phasing --discard-overlaps -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
+        vg index --threads ~{in_cores} --force-phasing --discard-overlaps -G "$nm.gbwt" -v "~{vcf_gz}" "~{vg}"
     >>>
 
     output {
@@ -371,9 +402,9 @@ task gbwt_index {
 
     runtime {
         time: 800
-        cpu: 30
-        memory: 100 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -384,7 +415,12 @@ task gbwt_merge {
         Array[File]+ gbwts
         String graph_name
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 2 else 10
+    String in_mem = if in_small_resources then "2" else "5"
 
     command {
         set -exu -o pipefail
@@ -397,8 +433,9 @@ task gbwt_merge {
 
     runtime {
         time: 100
-        memory: 100 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -409,13 +446,17 @@ task snarls_index {
         File vg
         String graph_name
         String vg_docker
-        Int construct_cores
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 1 else 1
+    Int in_disk = if in_small_resources then 1 else 100
+    String in_mem = if in_small_resources then "1" else "120"
     
     command {
         set -exu -o pipefail
         nm=$(basename "~{vg}" .vg)
-        vg snarls -t ~{construct_cores} --include-trivial ~{vg} > "$nm.snarls"
+        vg snarls -t ~{in_cores} --include-trivial ~{vg} > "$nm.snarls"
     }
     
     output {
@@ -423,9 +464,9 @@ task snarls_index {
     }
      
     runtime {
-        cpu: construct_cores
-        memory: 40 + " GB"
-        disks: "local-disk 100 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -436,7 +477,10 @@ task snarls_merge {
         Array[File]+ snarls
         String graph_name
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_disk = if in_small_resources then 1 else 20
     
     command {
         set -exu -o pipefail
@@ -448,7 +492,7 @@ task snarls_merge {
     }
      
     runtime {
-        disks: "local-disk 20 SSD"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -460,11 +504,16 @@ task xg_index {
         File vg
         String xg_options = ""
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 8 else 32
+    Int in_disk = if in_small_resources then 2 else 10
+    String in_mem = if in_small_resources then "2" else "35"
 
     command <<<
         set -exu -o pipefail
-        vg index --threads "$(nproc --all)" -x "~{graph_name}.xg" ~{xg_options} "~{vg}"
+        vg index --threads ~{in_cores} -x "~{graph_name}.xg" ~{xg_options} "~{vg}"
     >>>
 
     output {
@@ -473,9 +522,9 @@ task xg_index {
 
     runtime {
         time: 240
-        cpu: 32
-        memory: 50 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -486,21 +535,26 @@ task dist_index {
         String graph_name
         File xg
         File trivial_snarls
-        Int construct_cores
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 4
+    Int in_disk = if in_small_resources then 2 else 10
+    String in_mem = if in_small_resources then "2" else "80"
+    
     command <<<
         set -exu -o pipefail
-        vg index --threads ~{construct_cores} -x ~{xg} -s ~{trivial_snarls} -j "~{graph_name}.dist"
+        vg index --threads ~{in_cores} -x ~{xg} -s ~{trivial_snarls} -j "~{graph_name}.dist"
     >>>
     output {
         File dist = "~{graph_name}.dist"
     }
     runtime {
         time: 240
-        cpu: construct_cores
-        memory: 50 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -511,12 +565,17 @@ task sampled_gbwt_index {
         String graph_name
         File? gbwt
         File xg
-        Int construct_cores
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 2 else 10
+    String in_mem = if in_small_resources then "2" else "80"
+    
     command <<<
         set -exu -o pipefail
-        vg gbwt -l -n 16 --num-threads ~{construct_cores} ~{gbwt} -x ~{xg} -o "~{graph_name}.sampled.gbwt" -g "~{graph_name}.sampled.gg"
+        vg gbwt -l -n 64 --num-threads ~{in_cores} ~{gbwt} -x ~{xg} -o "~{graph_name}.sampled.gbwt" -g "~{graph_name}.sampled.gg"
     >>>
     output {
         File sampled_gbwt = "~{graph_name}.sampled.gbwt"
@@ -524,9 +583,9 @@ task sampled_gbwt_index {
     }
     runtime {
         time: 240
-        cpu: construct_cores
-        memory: 50 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -538,21 +597,26 @@ task min_index {
         File sampled_gbwt
         File sampled_gg
         File dist
-        Int construct_cores
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 4 else 10
+    String in_mem = if in_small_resources then "4" else "60"
+    
     command <<<
         set -exu -o pipefail
-        vg minimizer --threads ~{construct_cores} -g ~{sampled_gbwt} -G ~{sampled_gg} -d ~{dist} -i "~{graph_name}.min"
+        vg minimizer --threads ~{in_cores} -g ~{sampled_gbwt} -G ~{sampled_gg} -d ~{dist} -i "~{graph_name}.min"
     >>>
     output {
         File min = "~{graph_name}.min"
     }
     runtime {
         time: 240
-        cpu: construct_cores
-        memory: 50 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -563,12 +627,17 @@ task prune_graph {
         File contig_vg
         String prune_options = ""
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 1 else 10
+    String in_mem = if in_small_resources then "1" else "20"
 
     command {
         set -exu -o pipefail
         nm=$(basename "${contig_vg}" .vg)
-        vg prune --threads 2 -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
+        vg prune --threads ~{in_cores} -r "${contig_vg}" ~{prune_options} > "$nm.pruned.vg"
     }
 
     output {
@@ -577,9 +646,9 @@ task prune_graph {
 
     runtime {
         time: 180
-        cpu: 2
-        memory: 20 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -592,7 +661,12 @@ task prune_graph_with_haplotypes {
         File empty_id_map
         String prune_options = ""
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 2 else 2
+    Int in_disk = if in_small_resources then 4 else 10
+    String in_mem = if in_small_resources then "4" else "20"
 
     command <<<
         set -exu -o pipefail
@@ -603,7 +677,7 @@ task prune_graph_with_haplotypes {
             contig_gbwt="${p[1]}"
             nm=$(basename "${contig_vg}" .vg)
             contig_pruned_vg="${nm}.pruned.vg"
-            vg prune --threads 2 -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
+            vg prune --threads ~{in_cores} -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
             echo "$contig_pruned_vg" >> contigs_pruned_vg
         done < "inputs"
     >>>
@@ -615,9 +689,9 @@ task prune_graph_with_haplotypes {
 
     runtime {
         time: 180
-        cpu: 2
-        memory: 20 + " GB"
-        disks: "local-disk 10 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
@@ -630,11 +704,16 @@ task gcsa_index {
         File id_map
         String gcsa_options = ""
         String vg_docker
+        Boolean in_small_resources
     }
+
+    Int in_cores = if in_small_resources then 8 else 32
+    Int in_disk = if in_small_resources then 4 else 50
+    String in_mem = if in_small_resources then "4" else "250"
 
     command <<<
         set -exu -o pipefail
-        vg index --threads 32 -p -g "~{graph_name}.gcsa" -f "~{id_map}" ~{gcsa_options} ~{sep=" " contigs_pruned_vg}
+        vg index --threads ~{in_cores} -p -g "~{graph_name}.gcsa" -f "~{id_map}" ~{gcsa_options} ~{sep=" " contigs_pruned_vg}
     >>>
 
     output {
@@ -644,9 +723,9 @@ task gcsa_index {
 
     runtime {
         time: 1200
-        cpu: 32
-        memory: 250 + " GB"
-        disks: "local-disk 50 SSD"
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
 }
