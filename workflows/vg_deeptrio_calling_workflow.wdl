@@ -94,7 +94,8 @@ workflow vgDeepTrioCall {
                     in_bam_index_file=child_bam_file_index,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE
+                    in_reference_dict_file=REF_DICT_FILE,
+                    in_small_resources=SMALL_RESOURCES
             }
             call runAbraRealigner as abraRealignChild {
                 input:
@@ -103,7 +104,8 @@ workflow vgDeepTrioCall {
                     in_bam_index_file=child_bam_file_index,
                     in_target_bed_file=realignTargetCreateChild.realigner_target_bed,
                     in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE
+                    in_reference_index_file=REF_INDEX_FILE,
+                    in_small_resources=SMALL_RESOURCES
             }
             # Only do indel realignment of parents if there isn't already a supplied indel realigned bam set
             if (!defined(MATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -114,7 +116,8 @@ workflow vgDeepTrioCall {
                         in_bam_index_file=maternal_bam_file_index,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_small_resources=SMALL_RESOURCES
                 }
                 call runAbraRealigner as abraRealignMaternal {
                     input:
@@ -123,7 +126,8 @@ workflow vgDeepTrioCall {
                         in_bam_index_file=maternal_bam_file_index,
                         in_target_bed_file=realignTargetCreateMaternal.realigner_target_bed,
                         in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
             if (!defined(PATERNAL_BAM_INDEX_CONTIG_LIST)) {
@@ -134,7 +138,8 @@ workflow vgDeepTrioCall {
                         in_bam_index_file=paternal_bam_file_index,
                         in_reference_file=REF_FILE,
                         in_reference_index_file=REF_INDEX_FILE,
-                        in_reference_dict_file=REF_DICT_FILE
+                        in_reference_dict_file=REF_DICT_FILE,
+                        in_small_resources=SMALL_RESOURCES
                 }
                 call runAbraRealigner as abraRealignPaternal {
                     input:
@@ -143,7 +148,8 @@ workflow vgDeepTrioCall {
                         in_bam_index_file=paternal_bam_file_index,
                         in_target_bed_file=realignTargetCreatePaternal.realigner_target_bed,
                         in_reference_file=REF_FILE,
-                        in_reference_index_file=REF_INDEX_FILE
+                        in_reference_index_file=REF_INDEX_FILE,
+                        in_small_resources=SMALL_RESOURCES
                 }
             }
         }
@@ -420,8 +426,12 @@ task runGATKRealignerTargetCreator {
         File in_reference_file 
         File in_reference_index_file
         File in_reference_dict_file
+        Boolean in_small_resources
     }
     
+    Int in_cores = if in_small_resources then 4 else 32
+    Int in_disk = if in_small_resources then 1 else 50
+    String in_mem = if in_small_resources then "1" else "50"
     
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command 
@@ -445,7 +455,7 @@ task runGATKRealignerTargetCreator {
           --remove_program_records \ 
           -drf DuplicateRead \ 
           --disable_bam_indexing \ 
-          -nt "32" \ 
+          -nt "~{in_cores}" \ 
           -R ref.fna \ 
           -L ${CONTIG_ID} \ 
           -I input_bam_file.bam \ 
@@ -456,9 +466,10 @@ task runGATKRealignerTargetCreator {
     output { 
         File realigner_target_bed = glob("*.bed")[0] 
     } 
-    runtime { 
-        memory: 50 + " GB" 
-        cpu: 32 
+    runtime {
+        preemptible: 1
+        memory: in_mem + " GB"
+        cpu: in_cores
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b" 
     } 
 }
@@ -471,7 +482,12 @@ task runAbraRealigner {
         File in_target_bed_file
         File in_reference_file
         File in_reference_index_file
+        Boolean in_small_resources
     }
+    
+    Int in_cores = if in_small_resources then 4 else 32
+    Int in_disk = if in_small_resources then 1 else 50
+    String in_mem = if in_small_resources then "1" else "50"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -496,15 +512,16 @@ task runAbraRealigner {
           --out ~{in_sample_name}.${CONTIG_ID}.indel_realigned.bam \
           --ref ref.fna \
           --index \
-          --threads 32
+          --threads ~{in_cores}
     >>>
     output {
         File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")[0]
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        memory: 50 + " GB"
-        cpu: 32
+        preemptible: 1
+        memory: in_mem + " GB"
+        cpu: in_cores
         docker: "dceoy/abra2:latest"
     }
 }
@@ -563,6 +580,7 @@ task runGATKIndelRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
+        preemptible: 1
         memory: in_mem + " GB"
         cpu: in_cores
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
@@ -716,6 +734,7 @@ task runDeepTrioMakeExamples {
         File maternal_nonvariant_site_tf_file = "gvcf_parent2.tfrecord.tar.gz"
     }
     runtime {
+        preemptible: 1
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -797,6 +816,7 @@ task runDeepTrioCallVariants {
         File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
     }
     runtime {
+        preemptible: 1
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         gpuType: "nvidia-tesla-t4"
@@ -838,6 +858,7 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
+        preemptible: 1
         time: 60
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -879,6 +900,7 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
+        preemptible: 1
         time: 30
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"

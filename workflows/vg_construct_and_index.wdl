@@ -295,6 +295,7 @@ task construct_graph {
     }
 
     runtime {
+        preemptible: 1
         time: 200
         cpu: in_cores
         memory: in_mem + " GB"
@@ -368,6 +369,7 @@ task combine_graphs {
     }
 
     runtime {
+        preemptible: 1
         time: 800
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -401,6 +403,7 @@ task gbwt_index {
     }
 
     runtime {
+        preemptible: 1
         time: 800
         cpu: in_cores
         memory: in_mem + " GB"
@@ -432,6 +435,7 @@ task gbwt_merge {
     }
 
     runtime {
+        preemptible: 1
         time: 100
         cpu: in_cores
         memory: in_mem + " GB"
@@ -464,6 +468,7 @@ task snarls_index {
     }
      
     runtime {
+        preemptible: 1
         cpu: in_cores
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -492,6 +497,7 @@ task snarls_merge {
     }
      
     runtime {
+        preemptible: 1
         disks: "local-disk " + in_disk + " SSD"
         docker: vg_docker
     }
@@ -521,6 +527,7 @@ task xg_index {
     }
 
     runtime {
+        preemptible: 1
         time: 240
         cpu: in_cores
         memory: in_mem + " GB"
@@ -551,6 +558,7 @@ task dist_index {
         File dist = "~{graph_name}.dist"
     }
     runtime {
+        preemptible: 1
         time: 240
         cpu: in_cores
         memory: in_mem + " GB"
@@ -582,6 +590,7 @@ task sampled_gbwt_index {
         File sampled_gg = "~{graph_name}.sampled.gg"
     }
     runtime {
+        preemptible: 1
         time: 240
         cpu: in_cores
         memory: in_mem + " GB"
@@ -613,6 +622,7 @@ task min_index {
         File min = "~{graph_name}.min"
     }
     runtime {
+        preemptible: 1
         time: 240
         cpu: in_cores
         memory: in_mem + " GB"
@@ -645,6 +655,7 @@ task prune_graph {
     }
 
     runtime {
+        preemptible: 1
         time: 180
         cpu: in_cores
         memory: in_mem + " GB"
@@ -688,6 +699,7 @@ task prune_graph_with_haplotypes {
     }
 
     runtime {
+        preemptible: 1
         time: 180
         cpu: in_cores
         memory: in_mem + " GB"
@@ -722,6 +734,7 @@ task gcsa_index {
     }
 
     runtime {
+        preemptible: 1
         time: 1200
         cpu: in_cores
         memory: in_mem + " GB"

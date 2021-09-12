@@ -5,9 +5,12 @@ version 1.0
 ## Description: Trio-backed VG mapping and variant calling workflow for mother-father-child trio datasets using giraffe and deeptrio platforms.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "./vg_multi_map.wdl" as vgMultiMapWorkflow
-import "./vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
-import "./vg_construct_and_index.wdl" as vgConstructWorkflow
+#import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+#import "./vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
+#import "./vg_construct_and_index.wdl" as vgConstructWorkflow
+import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
+import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
+import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
     meta {
@@ -468,6 +471,7 @@ task runDeepVariantJointGenotyper {
         File joint_genotyped_vcf_index = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
+        preemptible: 1
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         docker: "quay.io/mlin/glnexus:v1.2.7"
@@ -518,6 +522,7 @@ task runSplitJointGenotypedVCF {
         Array[String]+ contig_vcfs_contig_list = read_lines(stdout())
     }
     runtime {
+        preemptible: 1
         cpu: in_cores
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -559,6 +564,7 @@ task mergeIndelRealignedBAMs {
         File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
+        preemptible: 1
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -591,6 +597,7 @@ task runPrepPhasing {
     }
     
     runtime {
+        preemptible: 1
         memory: "10 GB"
         disks: "local-disk 140 SSD"
         docker: "ubuntu:latest"
@@ -615,6 +622,7 @@ task runMakeContigMAP {
         Map[String, Int] eagle_vcf_contig_map = read_map(stdout())
     }
     runtime {
+        preemptible: 1
         docker: "python:3.9-slim-bullseye"
     }
 }
@@ -657,6 +665,7 @@ task runEaglePhasing {
     }
     
     runtime {
+        preemptible: 1
         time: 300
         cpu: in_cores
         memory: in_mem + " GB"
@@ -725,6 +734,7 @@ task runWhatsHapPhasing {
         File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf.gz"
     }
     runtime {
+        preemptible: 1
         time: 300
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -763,6 +773,7 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
+        preemptible: 1
         time: 60
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -803,6 +814,7 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
+        preemptible: 1
         time: 30
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -839,6 +851,7 @@ task normalizeVCF {
         File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"
     }
     runtime {
+        preemptible: 1
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -881,6 +894,7 @@ task snpEffAnnotateVCF {
         File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
     }
     runtime {
+        preemptible: 1
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
