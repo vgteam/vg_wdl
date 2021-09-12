@@ -342,8 +342,8 @@ task runVGMAP {
     Boolean gbwt_options = defined(in_gbwt_file)
     
     Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 70 else 100
-    String in_map_mem = if in_small_resources then "70" else "100"
+    Int in_map_disk = if in_small_resources then 80 else 100
+    String in_map_mem = if in_small_resources then "80" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -417,8 +417,8 @@ task runVGMPMAP {
     Boolean gbwt_options = defined(in_gbwt_file)
     Boolean snarl_options = defined(in_snarls_file)
     Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 70 else 100
-    String in_map_mem = if in_small_resources then "70" else "100"
+    Int in_map_disk = if in_small_resources then 80 else 100
+    String in_map_mem = if in_small_resources then "80" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -493,9 +493,9 @@ task runVGGIRAFFE {
         Boolean in_small_resources
     }
     
-    Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 70 else 100
-    String in_map_mem = if in_small_resources then "70" else "100"
+    Int in_map_cores = if in_small_resources then 4 else 32
+    Int in_map_disk = if in_small_resources then 80 else 100
+    String in_map_mem = if in_small_resources then "80" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -540,6 +540,7 @@ task runVGGIRAFFE {
         File chunk_gam_file = glob("*am")[0]
     }
     runtime {
+        preemptible: 1
         time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
@@ -629,7 +630,7 @@ task mergeAlignmentBAMChunks {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
         samtools merge \
-          -f -p -c --threads 24 \
+          -f -p -c --threads ~{in_merge_bam_cores} \
           ~{in_sample_name}_merged.positionsorted.bam \
           ~{sep=" " in_alignment_bam_chunk_files} \
         && samtools index \
