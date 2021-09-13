@@ -755,7 +755,7 @@ task runDeepTrioCallVariants {
         Boolean in_small_resources
     }
     
-    Int in_vgcall_cores = if in_small_resources then 4 else 8
+    Int in_vgcall_cores = if in_small_resources then 4 else 32
     Int in_vgcall_disk = if in_small_resources then 2 else 40
     String in_vgcall_mem = if in_small_resources then "5" else "64"
     
