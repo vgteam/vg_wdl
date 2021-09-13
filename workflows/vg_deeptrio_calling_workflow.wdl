@@ -430,8 +430,8 @@ task runGATKRealignerTargetCreator {
     }
     
     Int in_cores = if in_small_resources then 4 else 32
-    Int in_disk = if in_small_resources then 1 else 50
-    String in_mem = if in_small_resources then "1" else "50"
+    Int in_disk = if in_small_resources then 20 else 50
+    String in_mem = if in_small_resources then "20" else "50"
     
     command <<< 
         # Set the exit code of a pipeline to that of the rightmost command 
@@ -470,6 +470,7 @@ task runGATKRealignerTargetCreator {
         preemptible: 1
         memory: in_mem + " GB"
         cpu: in_cores
+        disks: "local-disk " + in_disk + " SSD"
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b" 
     } 
 }
@@ -486,8 +487,8 @@ task runAbraRealigner {
     }
     
     Int in_cores = if in_small_resources then 4 else 32
-    Int in_disk = if in_small_resources then 1 else 50
-    String in_mem = if in_small_resources then "1" else "50"
+    Int in_disk = if in_small_resources then 20 else 50
+    String in_mem = if in_small_resources then "20" else "50"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -522,6 +523,7 @@ task runAbraRealigner {
         preemptible: 1
         memory: in_mem + " GB"
         cpu: in_cores
+        disks: "local-disk " + in_disk + " SSD"
         docker: "dceoy/abra2:latest"
     }
 }
@@ -538,8 +540,8 @@ task runGATKIndelRealigner {
     }
     
     Int in_cores = if in_small_resources then 4 else 32
-    Int in_disk = if in_small_resources then 1 else 50
-    String in_mem = if in_small_resources then "1" else "50"
+    Int in_disk = if in_small_resources then 20 else 50
+    String in_mem = if in_small_resources then "20" else "50"
     
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -583,6 +585,7 @@ task runGATKIndelRealigner {
         preemptible: 1
         memory: in_mem + " GB"
         cpu: in_cores
+        disks: "local-disk " + in_disk + " SSD"
         docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
     }
 }
