@@ -267,8 +267,8 @@ task construct_graph {
     }
 
     Int in_cores = if in_small_resources then 2 else 2
-    Int in_disk = if in_small_resources then 1 else 10
-    String in_mem = if in_small_resources then "1" else "5"
+    Int in_disk = if in_small_resources then 20 else 20
+    String in_mem = if in_small_resources then "20" else "50"
  
     Boolean use_vcf = defined(vcf_gz)
     
