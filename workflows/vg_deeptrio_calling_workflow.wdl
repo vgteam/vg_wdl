@@ -30,9 +30,6 @@ workflow vgDeepTrioCall {
         File? DEEPTRIO_CHILD_MODEL
         File? DEEPTRIO_PARENT_MODEL
         File? DEEPVAR_MODEL
-        Int VGCALL_CORES = 32
-        Int VGCALL_DISK = 40
-        Int VGCALL_MEM = 64
     }
     # Split merged alignment by contigs list
     call splitBAMbyPath as splitChildBAMbyPath {
