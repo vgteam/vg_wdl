@@ -676,8 +676,8 @@ task runDeepTrioMakeExamples {
     }
     
     Int in_vgcall_cores = if in_small_resources then 8 else 32
-    Int in_vgcall_disk = if in_small_resources then 2 else 40
-    String in_vgcall_mem = if in_small_resources then "5" else "64"
+    Int in_vgcall_disk = if in_small_resources then 15 else 40
+    String in_vgcall_mem = if in_small_resources then "15" else "64"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -756,8 +756,8 @@ task runDeepTrioCallVariants {
     }
     
     Int in_vgcall_cores = if in_small_resources then 8 else 32
-    Int in_vgcall_disk = if in_small_resources then 2 else 40
-    String in_vgcall_mem = if in_small_resources then "5" else "64"
+    Int in_vgcall_disk = if in_small_resources then 15 else 40
+    String in_vgcall_mem = if in_small_resources then "15" else "64"
     
     Boolean custom_model = defined(in_model)
     
