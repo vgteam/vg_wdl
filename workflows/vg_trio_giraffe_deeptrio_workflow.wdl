@@ -638,8 +638,8 @@ task runEaglePhasing {
     }
 
     Int in_cores = if in_small_resources then 2 else 8
-    Int in_disk = if in_small_resources then 5 else 50
-    String in_mem = if in_small_resources then "1" else "20"
+    Int in_disk = if in_small_resources then 50 else 50
+    String in_mem = if in_small_resources then "10" else "20"
     
     command <<<
         set -exu -o pipefail
