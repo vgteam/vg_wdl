@@ -293,6 +293,7 @@ task splitReads {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
+        preemptible: 1
         time: 120
         cpu: in_split_read_cores
         memory: "2 GB"
@@ -390,6 +391,7 @@ task runVGMAP {
         File chunk_gam_file = glob("*am")[0]
     }
     runtime {
+        preemptible: 1
         time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
@@ -469,6 +471,7 @@ task runVGMPMAP {
         File chunk_gam_file = glob("*am")[0]
     }
     runtime {
+        preemptible: 1
         time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
@@ -559,8 +562,8 @@ task sortMDTagBAMFile {
     }
     
     Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 1 else 100
-    String in_map_mem = if in_small_resources then "1" else "100"
+    Int in_map_disk = if in_small_resources then 10 else 100
+    String in_map_mem = if in_small_resources then "10" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -614,8 +617,8 @@ task mergeAlignmentBAMChunks {
     }
     
     Int in_merge_bam_cores = if in_small_resources then 4 else 12
-    Int in_merge_bam_disk = if in_small_resources then 1 else 10
-    String in_merge_bam_mem = if in_small_resources then "1" else "5"
+    Int in_merge_bam_disk = if in_small_resources then 10 else 20
+    String in_merge_bam_mem = if in_small_resources then "10" else "20"
     Int in_merge_bam_time = if in_small_resources then 30 else 240
     
     command <<<
@@ -658,8 +661,8 @@ task mergeAlignmentGAMChunks {
     }
     
     Int in_merge_gam_cores = if in_small_resources then 1 else 56
-    Int in_merge_gam_disk = if in_small_resources then 1 else 400
-    String in_merge_gam_mem = if in_small_resources then "2" else "100"
+    Int in_merge_gam_disk = if in_small_resources then 20 else 400
+    String in_merge_gam_mem = if in_small_resources then "20" else "100"
     Int in_merge_gam_time = if in_small_resources then 30 else 1200
 
     command {
