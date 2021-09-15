@@ -337,7 +337,7 @@ task combine_graphs {
 
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 2 else 50
-    String in_mem = if in_small_resources then "2" else "40"
+    String in_mem = if in_small_resources then "20" else "40"
 
     command {
         set -exu -o pipefail
@@ -387,8 +387,8 @@ task gbwt_index {
     }
 
     Int in_cores = if in_small_resources then 2 else 2
-    Int in_disk = if in_small_resources then 2 else 20
-    String in_mem = if in_small_resources then "2" else "5"
+    Int in_disk = if in_small_resources then 5 else 20
+    String in_mem = if in_small_resources then "5" else "50"
 
     command <<<
         set -exu -o pipefail
@@ -423,7 +423,7 @@ task gbwt_merge {
 
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 2 else 10
-    String in_mem = if in_small_resources then "2" else "5"
+    String in_mem = if in_small_resources then "5" else "50"
 
     command {
         set -exu -o pipefail
@@ -455,7 +455,7 @@ task snarls_index {
 
     Int in_cores = if in_small_resources then 1 else 1
     Int in_disk = if in_small_resources then 1 else 100
-    String in_mem = if in_small_resources then "1" else "120"
+    String in_mem = if in_small_resources then "10" else "120"
     
     command {
         set -exu -o pipefail
@@ -515,7 +515,7 @@ task xg_index {
 
     Int in_cores = if in_small_resources then 8 else 32
     Int in_disk = if in_small_resources then 2 else 10
-    String in_mem = if in_small_resources then "2" else "35"
+    String in_mem = if in_small_resources then "20" else "35"
 
     command <<<
         set -exu -o pipefail
@@ -548,7 +548,7 @@ task dist_index {
 
     Int in_cores = if in_small_resources then 2 else 4
     Int in_disk = if in_small_resources then 2 else 10
-    String in_mem = if in_small_resources then "2" else "80"
+    String in_mem = if in_small_resources then "10" else "80"
     
     command <<<
         set -exu -o pipefail
@@ -579,7 +579,7 @@ task sampled_gbwt_index {
 
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 2 else 10
-    String in_mem = if in_small_resources then "2" else "80"
+    String in_mem = if in_small_resources then "5" else "80"
     
     command <<<
         set -exu -o pipefail
@@ -612,7 +612,7 @@ task min_index {
 
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 4 else 10
-    String in_mem = if in_small_resources then "4" else "60"
+    String in_mem = if in_small_resources then "5" else "60"
     
     command <<<
         set -exu -o pipefail
@@ -642,7 +642,7 @@ task prune_graph {
 
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 1 else 10
-    String in_mem = if in_small_resources then "1" else "20"
+    String in_mem = if in_small_resources then "10" else "20"
 
     command {
         set -exu -o pipefail
@@ -677,7 +677,7 @@ task prune_graph_with_haplotypes {
 
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 4 else 10
-    String in_mem = if in_small_resources then "4" else "20"
+    String in_mem = if in_small_resources then "5" else "20"
 
     command <<<
         set -exu -o pipefail
