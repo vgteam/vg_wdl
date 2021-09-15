@@ -598,7 +598,7 @@ task runPrepPhasing {
     
     runtime {
         preemptible: 1
-        memory: "10 GB"
+        memory: "1 GB"
         disks: "local-disk 140 SSD"
         docker: "ubuntu:latest"
     }
@@ -638,8 +638,8 @@ task runEaglePhasing {
     }
 
     Int in_cores = if in_small_resources then 2 else 8
-    Int in_disk = if in_small_resources then 50 else 50
-    String in_mem = if in_small_resources then "20" else "20"
+    Int in_disk = if in_small_resources then 5 else 50
+    String in_mem = if in_small_resources then "1" else "20"
     
     command <<<
         set -exu -o pipefail
@@ -868,8 +868,8 @@ task snpEffAnnotateVCF {
     }
 
     Int in_vgcall_cores = if in_small_resources then 6 else 6
-    Int in_vgcall_disk = if in_small_resources then 1 else 25
-    String in_vgcall_mem = if in_small_resources then "1" else "50"
+    Int in_vgcall_disk = if in_small_resources then 10 else 25
+    String in_vgcall_mem = if in_small_resources then "10" else "50"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
