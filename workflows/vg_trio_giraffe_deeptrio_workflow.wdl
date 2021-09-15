@@ -5,12 +5,12 @@ version 1.0
 ## Description: Trio-backed VG mapping and variant calling workflow for mother-father-child trio datasets using giraffe and deeptrio platforms.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "./vg_multi_map.wdl" as vgMultiMapWorkflow
-import "./vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
-import "./vg_construct_and_index.wdl" as vgConstructWorkflow
-#import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
-#import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
-#import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
+#import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+#import "./vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
+#import "./vg_construct_and_index.wdl" as vgConstructWorkflow
+import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_multi_map.wdl" as vgMultiMapWorkflow
+import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_deeptrio_calling_workflow.wdl" as vgDeepTrioCallWorkflow
+import "https://raw.githubusercontent.com/vgteam/vg_wdl/master/workflows/vg_construct_and_index.wdl" as vgConstructWorkflow
 
 workflow vgTrioPipeline {
     meta {
