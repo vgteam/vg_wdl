@@ -286,7 +286,7 @@ task construct_graph {
     >>>
 
     output {
-        File contig_vg = "${contig}.vg"
+        File contig_vg = "~{contig}.vg"
     }
 
     runtime {
@@ -342,42 +342,41 @@ task combine_graphs {
         set -exu -o pipefail
         # we approach this in a particular way to ensure the output array contigs_uid_vg has the
         # same order as the input array contigs_vg (so we can't rely on glob patterns)
-        mkdir vg/
-        touch decoy_contigs_uid_vg
+        mkdir vg_decoy_contigs/ vg_contigs/ vg_all_contigs/
         while read -r contig_vg; do
             nm=$(basename "$contig_vg")
-            cp "$contig_vg" "vg/$nm"
             if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* || $nm == *"KI"* || $nm == *"chrEBV"* || $nm == *"chrUn"* || $nm == *"hs38d1_decoys"* ]]; then
-                echo "vg/$nm" >> decoy_contigs_uid_vg
+                cp "$contig_vg" "vg_decoy_contigs/$nm"
+                echo "vg_decoy_contigs/$nm" >> all_contigs_uid_vg
             else
-                echo "vg/$nm" >> contigs_uid_vg
+                cp "$contig_vg" "vg_contigs/$nm"
+                echo "vg_contigs/$nm" >> all_contigs_uid_vg
             fi
-            echo "vg/$nm" >> all_contigs_uid_vg
         done < "~{write_lines(contigs_vg)}"
         
         if [ ~{decoy_contigs_exist} == true ]; then
             while read -r decoy_contig_vg; do
                 nm=$(basename "$decoy_contig_vg")
-                cp "$decoy_contig_vg" "vg/$nm"
                 if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* || $nm == *"KI"* || $nm == *"chrEBV"* || $nm == *"chrUn"* || $nm == *"hs38d1_decoys"* ]]; then
-                    echo "vg/$nm" >> decoy_contigs_uid_vg
+                    cp "$decoy_contig_vg" "vg_decoy_contigs/$nm"
+                    echo "vg_decoy_contigs/$nm" >> all_contigs_uid_vg
                 else
-                    echo "vg/$nm" >> contigs_uid_vg
+                    cp "$decoy_contig_vg" "vg_contigs/$nm"
+                    echo "vg_contigs/$nm" >> all_contigs_uid_vg
                 fi
-                echo "vg/$nm" >> all_contigs_uid_vg
             done < "~{write_lines(decoy_contigs_vg_resolved)}"
         fi
         xargs -n 999999 vg ids -j -m empty.id_map < all_contigs_uid_vg
         mkdir concat
-        xargs -n 999999 vg combine < all_contigs_uid_vg > "concat/${graph_name}.vg"
+        xargs -n 999999 vg combine < all_contigs_uid_vg > "concat/~{graph_name}.vg"
     }
 
     output {
         File vg = "concat/~{graph_name}.vg"
         File empty_id_map = "empty.id_map"
-        Array[File]+ contigs_uid_vg = read_lines("contigs_uid_vg")
-        Array[File]+ all_contigs_uid_vg = read_lines("all_contigs_uid_vg")
-        Array[File]? decoy_contigs_uid_vg = read_lines("decoy_contigs_uid_vg")
+        Array[File]+ contigs_uid_vg = glob("vg_contigs/*.vg")
+        Array[File]? decoy_contigs_uid_vg = glob("vg_decoy_contigs/*.vg")
+        Array[File]+ all_contigs_uid_vg = flatten([contigs_uid_vg, decoy_contigs_uid_vg])
     }
 
     runtime {
