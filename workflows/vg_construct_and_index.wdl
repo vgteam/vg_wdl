@@ -376,7 +376,7 @@ task combine_graphs {
         File empty_id_map = "empty.id_map"
         Array[File]+ contigs_uid_vg = glob("vg_contigs/*.vg")
         Array[File]? decoy_contigs_uid_vg = glob("vg_decoy_contigs/*.vg")
-        Array[File]+ all_contigs_uid_vg = flatten([contigs_uid_vg, decoy_contigs_uid_vg])
+        Array[File]+ all_contigs_uid_vg = flatten([contigs_uid_vg, select_first(decoy_contigs_uid_vg,[])])
     }
 
     runtime {
