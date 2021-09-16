@@ -75,19 +75,14 @@ workflow vg_construct_and_index {
                 in_small_resources = in_small_resources
             }
         }
-        call concat as concat_vg_graph_lists { input:
-            array_1 = construct_chromosome_graph.contig_vg,
-            array_2 = construct_decoy_graph.contig_vg,
-            vg_docker = vg_docker
-        }
     }
     
-    Array[File]? combined_contig_vg_list = if (use_decoys) then concat_vg_graph_lists.out else construct_chromosome_graph.contig_vg
 
     # combine them into a single graph with unique node IDs
     call combine_graphs { input:
         graph_name = graph_name,
-        contigs_vg = select_first([combined_contig_vg_list]),
+        contigs_vg = select_first([construct_chromosome_graph.contig_vg]),
+        decoy_contigs_vg = construct_decoy_graph.contig_vg,
         vg_docker = vg_docker,
         in_small_resources = in_small_resources
     }
@@ -331,6 +326,7 @@ task combine_graphs {
     input {
         String graph_name
         Array[File]+ contigs_vg
+        Array[File]? decoy_contigs_vg
         String vg_docker
         Boolean in_small_resources
     }
@@ -338,7 +334,9 @@ task combine_graphs {
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 2 else 50
     String in_mem = if in_small_resources then "20" else "40"
-
+    
+    Boolean decoy_contigs_exist = defined(decoy_contigs_vg)
+    
     command {
         set -exu -o pipefail
         # we approach this in a particular way to ensure the output array contigs_uid_vg has the
@@ -355,13 +353,26 @@ task combine_graphs {
             fi
             echo "vg/$nm" >> all_contigs_uid_vg
         done < "~{write_lines(contigs_vg)}"
+        
+        if [ ~{decoy_contigs_exist} == true ]; then
+            while read -r decoy_contig_vg; do
+                nm=$(basename "$decoy_contig_vg")
+                cp "$decoy_contig_vg" "vg/$nm"
+                if [[ $nm == *"GL"* || $nm == *"NC_007605"* || $nm == *"hs37d5"* || $nm == *"KI"* || $nm == *"chrEBV"* || $nm == *"chrUn"* || $nm == *"hs38d1_decoys"* ]]; then
+                    echo "vg/$nm" >> decoy_contigs_uid_vg
+                else
+                    echo "vg/$nm" >> contigs_uid_vg
+                fi
+                echo "vg/$nm" >> all_contigs_uid_vg
+            done < "~{write_lines(decoy_contigs_vg)}"
+        fi
         xargs -n 999999 vg ids -j -m empty.id_map < all_contigs_uid_vg
         mkdir concat
         xargs -n 999999 vg combine < all_contigs_uid_vg > "concat/${graph_name}.vg"
     }
 
     output {
-        File vg = "concat/${graph_name}.vg"
+        File vg = "concat/~{graph_name}.vg"
         File empty_id_map = "empty.id_map"
         Array[File]+ contigs_uid_vg = read_lines("contigs_uid_vg")
         Array[File]+ all_contigs_uid_vg = read_lines("all_contigs_uid_vg")
