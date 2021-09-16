@@ -336,6 +336,7 @@ task combine_graphs {
     String in_mem = if in_small_resources then "20" else "40"
     
     Boolean decoy_contigs_exist = defined(decoy_contigs_vg)
+    Array[File] decoy_contigs_vg_resolved = if decoy_contigs_exist then decoy_contigs_vg else []
     
     command {
         set -exu -o pipefail
@@ -364,7 +365,7 @@ task combine_graphs {
                     echo "vg/$nm" >> contigs_uid_vg
                 fi
                 echo "vg/$nm" >> all_contigs_uid_vg
-            done < "~{write_lines(decoy_contigs_vg)}"
+            done < "~{write_lines(decoy_contigs_vg_resolved)}"
         fi
         xargs -n 999999 vg ids -j -m empty.id_map < all_contigs_uid_vg
         mkdir concat
