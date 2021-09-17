@@ -148,11 +148,7 @@ workflow vg_construct_and_index {
                     in_small_resources = in_small_resources
                 }
             }
-            call concat as concat_pruned_vg_graph_lists { input:
-                array_1 = prune_graph_with_haplotypes.contigs_pruned_vg,
-                array_2 = prune_decoy_graphs.contig_pruned_vg,
-                vg_docker = vg_docker
-            }
+            Array[File] concat_pruned_vg_graph_lists = flatten([select_first([prune_graph_with_haplotypes.contigs_pruned_vg,[]]), select_first([prune_decoy_graphs.contig_pruned_vg,[]])]) 
         }
     }
     
@@ -202,7 +198,7 @@ workflow vg_construct_and_index {
         # make GCSA index
         call gcsa_index { input:
             graph_name = graph_name,
-            contigs_pruned_vg = select_first([concat_pruned_vg_graph_lists.out, prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
+            contigs_pruned_vg = select_first([concat_pruned_vg_graph_lists, prune_graph.contig_pruned_vg, prune_graph_with_haplotypes.contigs_pruned_vg]),
             id_map = select_first([prune_graph_with_haplotypes.pruned_id_map,combine_graphs.empty_id_map]),
             vg_docker = vg_docker,
             in_small_resources = in_small_resources
@@ -589,8 +585,8 @@ task sampled_gbwt_index {
     }
 
     Int in_cores = if in_small_resources then 2 else 2
-    Int in_disk = if in_small_resources then 2 else 10
-    String in_mem = if in_small_resources then "5" else "80"
+    Int in_disk = if in_small_resources then 20 else 80
+    String in_mem = if in_small_resources then "20" else "80"
     
     command <<<
         set -exu -o pipefail
@@ -694,18 +690,18 @@ task prune_graph_with_haplotypes {
         set -exu -o pipefail
         cp "~{empty_id_map}" mapping
         paste -d ";" "~{write_lines(contigs_vg)}" "~{write_lines(contigs_gbwt)}" > inputs
+        mkdir outdir
         while IFS=';' read -ra p; do
             contig_vg="${p[0]}"
             contig_gbwt="${p[1]}"
             nm=$(basename "${contig_vg}" .vg)
             contig_pruned_vg="${nm}.pruned.vg"
-            vg prune --threads ~{in_cores} -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "$contig_pruned_vg"
-            echo "$contig_pruned_vg" >> contigs_pruned_vg
+            vg prune --threads ~{in_cores} -u -g "$contig_gbwt" -a -m mapping "$contig_vg" ~{prune_options} > "outdir/$contig_pruned_vg"
         done < "inputs"
     >>>
 
     output {
-        Array[File]+ contigs_pruned_vg=read_lines("contigs_pruned_vg")
+        Array[File]+ contigs_pruned_vg = glob("outdir/*.vg") 
         File pruned_id_map = "mapping"
     }
 
