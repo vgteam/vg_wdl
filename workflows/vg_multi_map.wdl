@@ -496,7 +496,7 @@ task runVGGIRAFFE {
         Boolean in_small_resources
     }
     
-    Int in_map_cores = if in_small_resources then 4 else 32
+    Int in_map_cores = if in_small_resources then 4 else 16
     Int in_map_disk = if in_small_resources then 80 else 100
     String in_map_mem = if in_small_resources then "80" else "100"
 

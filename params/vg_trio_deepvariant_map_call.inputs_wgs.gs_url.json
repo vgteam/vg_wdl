@@ -9,7 +9,7 @@
   "vgTrioPipeline.SAMPLE_NAME_MATERNAL": "HG004",
   "vgTrioPipeline.SAMPLE_NAME_PATERNAL": "HG003",
   "vgTrioPipeline.VG_CONTAINER": "quay.io/vgteam/vg:v1.34.0",
-  "vgTrioPipeline.READS_PER_CHUNK": 200000000,
+  "vgTrioPipeline.READS_PER_CHUNK": 100000000,
   "vgTrioPipeline.PATH_LIST_FILE": "gs://cmarkell-vg-wdl-dev/grch38_inputs/path_list_whole_genome.txt",
   "vgTrioPipeline.XG_FILE": "gs://cmarkell-vg-wdl-dev/grch38_inputs/liftover_snp1kg_grch38_nosegdup.xg",
   "vgTrioPipeline.GBWT_FILE": "gs://cmarkell-vg-wdl-dev/grch38_inputs/liftover_snp1kg_grch38_nosegdup.gbwt",
