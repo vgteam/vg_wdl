@@ -625,6 +625,7 @@ task sortMDTagBAMFile {
         File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.bam"
     }
     runtime {
+        preemptible: 1
         time: 90
         memory: in_map_mem + " GB"
         cpu: in_map_cores
@@ -668,6 +669,7 @@ task mergeAlignmentBAMChunks {
         File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
     }
     runtime {
+        preemptible: 1
         time: in_merge_bam_time
         memory: in_merge_bam_mem + " GB"
         cpu: in_merge_bam_cores
@@ -712,6 +714,7 @@ task mergeAlignmentGAMChunks {
         File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
     }
     runtime {
+        preemptible: 1
         memory: in_merge_gam_mem + " GB"
         cpu: in_merge_gam_cores
         disks: "local-disk " + in_merge_gam_disk  + " SSD"
