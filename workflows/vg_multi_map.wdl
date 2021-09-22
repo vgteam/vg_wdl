@@ -16,7 +16,7 @@ workflow vgMultiMap {
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                              # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
+        Int READS_PER_CHUNK = 200000000                 # Number of reads contained in each mapping chunk (20000000 for wgs)
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                                    # Path to .xg index file
         File? GCSA_FILE                                 # (OPTIONAL) Path to .gcsa index file
@@ -141,6 +141,7 @@ workflow vgMultiMap {
                     in_bam_chunk_file=vg_map_algorithm_chunk_gam_output,
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
+                    in_mapper_used=MAPPER,
                     in_small_resources=SMALL_RESOURCES
             }
             # Cleanup intermediate surject files after use
@@ -558,12 +559,13 @@ task sortMDTagBAMFile {
         File in_bam_chunk_file
         File in_reference_file
         File in_reference_index_file
+        String in_mapper_used
         Boolean in_small_resources
     }
     
-    Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 10 else 100
-    String in_map_mem = if in_small_resources then "10" else "100"
+    Int in_map_cores = if in_small_resources then 8 else 8
+    Int in_map_disk = if in_small_resources then 10 else 50
+    String in_map_mem = if in_small_resources then "10" else "32"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -578,24 +580,46 @@ task sortMDTagBAMFile {
         #to turn off echo do 'set +o xtrace'
         gzip -dc ~{in_reference_file} > ref.fna
         ln -f -s ~{in_reference_index_file} ref.fna.fai
-        samtools sort \
-          --threads ~{in_map_cores} \
-          ~{in_bam_chunk_file} \
-          -O BAM \
-        | samtools calmd \
-          -b \
-          - \
-          ref.fna \
-          > ~{in_sample_name}_positionsorted.mdtag.bam \
-        && samtools index \
-          ~{in_sample_name}_positionsorted.mdtag.bam
-        java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
-          PROGRAM_RECORD_ID=null \
-          VALIDATION_STRINGENCY=LENIENT \
-          I=~{in_sample_name}_positionsorted.mdtag.bam \
-          O=~{in_sample_name}.mdtag.dupmarked.bam \
-          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai \
+        if [[ ~{in_mapper_used} == *"grch38"* ]]; then
+            samtools sort \
+              --threads ~{in_map_cores} \
+              ~{in_bam_chunk_file} \
+              -O BAM \
+            | samtools calmd \
+              -b \
+              - \
+              ref.fna \
+              > ~{in_sample_name}_positionsorted.mdtag.bam \
+            && samtools index \
+              ~{in_sample_name}_positionsorted.mdtag.bam
+            java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
+              PROGRAM_RECORD_ID=null \
+              VALIDATION_STRINGENCY=LENIENT \
+              I=~{in_sample_name}_positionsorted.mdtag.bam \
+              O=~{in_sample_name}.mdtag.dupmarked.bam \
+              M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
+            && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai
+        else
+            samtools sort \
+              --threads ~{in_map_cores} \
+              ~{in_bam_chunk_file} \
+              -O BAM \
+            | samtools calmd \
+              -b \
+              - \
+              ref.fna \
+              > ~{in_sample_name}_positionsorted.mdtag.bam \
+            | samtools addreplacerg \
+                -O BAM \
+                -@ ~{in_map_cores} \
+                -o ~{in_sample_name}.mdtag.dupmarked.bam \
+                -r ID:1 \
+                -r LB:lib1 \
+                -r SM:~{in_sample_name} \
+                -r PL:illumina \
+                -r PU:unit1 \
+                -
+        fi
     >>>
     output {
         File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.bam"
