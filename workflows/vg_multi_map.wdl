@@ -617,8 +617,7 @@ task sortMDTagBAMFile {
                 -r LB:lib1 \
                 -r SM:~{in_sample_name} \
                 -r PL:illumina \
-                -r PU:unit1 \
-                -
+                -r PU:unit1 > ~{in_sample_name}.mdtag.dupmarked.bam
         fi
     >>>
     output {
