@@ -610,14 +610,14 @@ task sortMDTagBAMFile {
               ref.fna \
               > ~{in_sample_name}_positionsorted.mdtag.bam \
             | samtools addreplacerg \
+                - \
                 -O BAM \
-                -@ ~{in_map_cores} \
                 -o ~{in_sample_name}.mdtag.dupmarked.bam \
                 -r ID:1 \
                 -r LB:lib1 \
                 -r SM:~{in_sample_name} \
                 -r PL:illumina \
-                -r PU:unit1 > ~{in_sample_name}.mdtag.dupmarked.bam
+                -r PU:unit1
         fi
     >>>
     output {
