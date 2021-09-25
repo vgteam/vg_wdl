@@ -580,7 +580,25 @@ task sortMDTagBAMFile {
         #to turn off echo do 'set +o xtrace'
         gzip -dc ~{in_reference_file} > ref.fna
         ln -f -s ~{in_reference_index_file} ref.fna.fai
-        if [[ ~{in_mapper_used} == *"grch38"* ]]; then
+        if [[ ~{in_mapper_used} == *"GIRAFFE"* ]]; then
+            samtools sort \
+              --threads ~{in_map_cores} \
+              ~{in_bam_chunk_file} \
+              -O BAM \
+            | samtools calmd \
+              -b \
+              - \
+              ref.fna \
+            | samtools addreplacerg \
+                - \
+                -O BAM \
+                -o ~{in_sample_name}.mdtag.dupmarked.bam \
+                -r ID:1 \
+                -r LB:lib1 \
+                -r SM:~{in_sample_name} \
+                -r PL:illumina \
+                -r PU:unit1
+        else
             samtools sort \
               --threads ~{in_map_cores} \
               ~{in_bam_chunk_file} \
@@ -599,25 +617,6 @@ task sortMDTagBAMFile {
               O=~{in_sample_name}.mdtag.dupmarked.bam \
               M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
             && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai
-        else
-            samtools sort \
-              --threads ~{in_map_cores} \
-              ~{in_bam_chunk_file} \
-              -O BAM \
-            | samtools calmd \
-              -b \
-              - \
-              ref.fna \
-              > ~{in_sample_name}_positionsorted.mdtag.bam \
-            | samtools addreplacerg \
-                - \
-                -O BAM \
-                -o ~{in_sample_name}.mdtag.dupmarked.bam \
-                -r ID:1 \
-                -r LB:lib1 \
-                -r SM:~{in_sample_name} \
-                -r PL:illumina \
-                -r PU:unit1
         fi
     >>>
     output {
@@ -625,7 +624,7 @@ task sortMDTagBAMFile {
     }
     runtime {
         preemptible: 1
-        time: 90
+        time: 300
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
