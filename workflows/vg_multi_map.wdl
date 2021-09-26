@@ -640,7 +640,7 @@ task mergeAlignmentBAMChunks {
     }
     
     Int in_merge_bam_cores = if in_small_resources then 4 else 12
-    Int in_merge_bam_disk = if in_small_resources then 10 else 50
+    Int in_merge_bam_disk = if in_small_resources then 10 else 100
     String in_merge_bam_mem = if in_small_resources then "10" else "20"
     Int in_merge_bam_time = if in_small_resources then 30 else 240
     
