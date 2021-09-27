@@ -677,7 +677,7 @@ task runDeepTrioMakeExamples {
     
     Int in_vgcall_cores = if in_small_resources then 8 else 8
     Int in_vgcall_disk = if in_small_resources then 15 else 40
-    String in_vgcall_mem = if in_small_resources then "15" else "80"
+    String in_vgcall_mem = if in_small_resources then "15" else "64"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -734,7 +734,7 @@ task runDeepTrioMakeExamples {
         File maternal_nonvariant_site_tf_file = "gvcf_parent2.tfrecord.tar.gz"
     }
     runtime {
-        preemptible: 1
+        preemptible: 3
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
