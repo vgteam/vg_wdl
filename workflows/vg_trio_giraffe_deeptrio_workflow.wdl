@@ -232,7 +232,7 @@ workflow vgTrioPipeline {
         Array[Pair[File,File]] child_bam_index_by_contigs_pair = zip(child_bams_by_contig, child_bam_indexes_by_contig)
         Array[Pair[Pair[File,File],Pair[Pair[File,File],Pair[File,File]]]] trio_bam_index_by_contigs_pair = zip(child_bam_index_by_contigs_pair,zip(maternal_bam_index_by_contigs_pair,paternal_bam_index_by_contigs_pair))
         scatter (contig_pair in zip(splitJointGenotypedVCF.contig_vcfs_contig_list, zip(splitJointGenotypedVCF.contig_vcfs, trio_bam_index_by_contigs_pair))) {
-            if (defined(runMakeContigMAP.eagle_vcf_contig_map[contig_pair.left])) {
+            if (contig_pair.left != "chrY" && contig_pair.left != "chrM" && contig_pair.left != "Y" && contig_pair.left != "M") { 
                 Int eagle_vcf_contig_index = runMakeContigMAP.eagle_vcf_contig_map[contig_pair.left]
                 call runEaglePhasing {
                     input:
