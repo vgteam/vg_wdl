@@ -835,7 +835,7 @@ task concatClippedVCFChunks {
     }
     
     Int in_disk = if in_small_resources then 1 else 10
-    String in_mem = if in_small_resources then "1" else "1"
+    String in_mem = if in_small_resources then "1" else "10"
 
     command {
         # Set the exit code of a pipeline to that of the rightmost command
