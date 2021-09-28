@@ -676,8 +676,8 @@ task runDeepTrioMakeExamples {
     }
     
     Int in_vgcall_cores = if in_small_resources then 8 else 8
-    Int in_vgcall_disk = if in_small_resources then 15 else 40
-    String in_vgcall_mem = if in_small_resources then "15" else "64"
+    Int in_vgcall_disk = if in_small_resources then 15 else 80
+    String in_vgcall_mem = if in_small_resources then "15" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
