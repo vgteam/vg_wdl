@@ -554,8 +554,8 @@ task dist_index {
     }
 
     Int in_cores = if in_small_resources then 2 else 4
-    Int in_disk = if in_small_resources then 2 else 10
-    String in_mem = if in_small_resources then "10" else "80"
+    Int in_disk = if in_small_resources then 2 else 50
+    String in_mem = if in_small_resources then "10" else "100"
     
     command <<<
         set -exu -o pipefail

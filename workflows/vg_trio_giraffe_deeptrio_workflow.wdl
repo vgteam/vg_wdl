@@ -889,9 +889,10 @@ task snpEffAnnotateVCF {
             database_ref="GRCh37.75"
         fi
         snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${PWD}/data ${database_ref} ~{in_normalized_vcf_file} > ~{in_sample_name}.snpeff.unrolled.vcf
+        bgzip ~{in_sample_name}.snpeff.unrolled.vcf
     >>>
     output {
-        File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf"
+        File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf.gz"
     }
     runtime {
         preemptible: 1
