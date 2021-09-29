@@ -521,7 +521,7 @@ task xg_index {
     }
 
     Int in_cores = if in_small_resources then 8 else 32
-    Int in_disk = if in_small_resources then 2 else 10
+    Int in_disk = if in_small_resources then 2 else 50
     String in_mem = if in_small_resources then "20" else "35"
 
     command <<<
@@ -683,7 +683,7 @@ task prune_graph_with_haplotypes {
     }
 
     Int in_cores = if in_small_resources then 2 else 2
-    Int in_disk = if in_small_resources then 4 else 10
+    Int in_disk = if in_small_resources then 4 else 50
     String in_mem = if in_small_resources then "5" else "20"
 
     command <<<
