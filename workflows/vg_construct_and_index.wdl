@@ -618,7 +618,7 @@ task min_index {
     }
 
     Int in_cores = if in_small_resources then 2 else 2
-    Int in_disk = if in_small_resources then 4 else 10
+    Int in_disk = if in_small_resources then 4 else 60
     String in_mem = if in_small_resources then "5" else "60"
     
     command <<<
