@@ -875,7 +875,7 @@ task bgzipMergedVCF {
     }
     
     Int in_cores = if in_small_resources then 2 else 2
-    Int in_disk = if in_small_resources then 1 else 40
+    Int in_disk = if in_small_resources then 1 else 100
     String in_mem = if in_small_resources then "1" else "10"
 
     # TODO:
