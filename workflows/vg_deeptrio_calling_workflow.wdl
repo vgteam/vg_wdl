@@ -834,7 +834,7 @@ task concatClippedVCFChunks {
         Boolean in_small_resources
     }
     
-    Int in_disk = if in_small_resources then 1 else 40
+    Int in_disk = if in_small_resources then 1 else 100
     String in_mem = if in_small_resources then "1" else "10"
 
     command {
