@@ -835,7 +835,7 @@ task concatClippedVCFChunks {
     }
     
     Int in_disk = if in_small_resources then 1 else 100
-    String in_mem = if in_small_resources then "1" else "10"
+    String in_mem = if in_small_resources then "1" else "40"
 
     command {
         # Set the exit code of a pipeline to that of the rightmost command
@@ -858,7 +858,7 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
-        preemptible: 1
+        preemptible: 3
         time: 60
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -876,7 +876,7 @@ task bgzipMergedVCF {
     
     Int in_cores = if in_small_resources then 2 else 2
     Int in_disk = if in_small_resources then 1 else 100
-    String in_mem = if in_small_resources then "1" else "10"
+    String in_mem = if in_small_resources then "1" else "40"
 
     # TODO:
     #   If GVCF in in_merged_vcf_file then output_vcf_extension="gvcf" else output_vcf_extension="vcf"
