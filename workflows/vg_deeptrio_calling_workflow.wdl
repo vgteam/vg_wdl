@@ -848,11 +848,11 @@ task concatClippedVCFChunks {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
+        mkdir -p tmp
         for vcf_file in ${sep=" " in_clipped_vcf_chunk_files} ; do
             bcftools index "$vcf_file"
         done
-        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort - > ${in_sample_name}_merged.vcf
+        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort --temp-dir ./tmp - > ${in_sample_name}_merged.vcf
     }
     output {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
