@@ -445,7 +445,7 @@ task runDeepVariantJointGenotyper {
     }
 
     Int in_vgcall_cores = if in_small_resources then 6 else 6
-    Int in_vgcall_disk = if in_small_resources then 1 else 25
+    Int in_vgcall_disk = if in_small_resources then 1 else 50
     String in_vgcall_mem = if in_small_resources then "1" else "50"
 
     command <<<
@@ -456,8 +456,10 @@ task runDeepVariantJointGenotyper {
         for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
             tabix -f -p vcf "${sibling_gvcf_file}"
         done
-        
+        mkdir -p tmp
+        --temp-dir ./tmp
         /usr/local/bin/glnexus_cli \
+        --mem-gbytes ~{in_vgcall_mem} \
         --config DeepVariant_unfiltered \
         --threads ~{in_vgcall_cores} \
         ~{in_gvcf_file_maternal} \
@@ -763,11 +765,11 @@ task concatClippedVCFChunks {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-
+        mkdir -p tmp
         for vcf_file in ${sep=" " in_clipped_vcf_chunk_files} ; do
             bcftools index "$vcf_file"
         done
-        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort - > ${in_sample_name}_merged.vcf
+        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort --temp-dir ./tmp - > ${in_sample_name}_merged.vcf
     }
     output {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
