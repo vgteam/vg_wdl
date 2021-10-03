@@ -456,8 +456,6 @@ task runDeepVariantJointGenotyper {
         for sibling_gvcf_file in ~{sep=" " in_gvcf_files_siblings} ; do
             tabix -f -p vcf "${sibling_gvcf_file}"
         done
-        mkdir -p tmp
-        --temp-dir ./tmp
         /usr/local/bin/glnexus_cli \
         --mem-gbytes ~{in_vgcall_mem} \
         --config DeepVariant_unfiltered \
