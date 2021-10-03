@@ -522,7 +522,7 @@ task runSplitJointGenotypedVCF {
         Array[String]+ contig_vcfs_contig_list = read_lines(stdout())
     }
     runtime {
-        preemptible: 1
+        preemptible: 3
         cpu: in_cores
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
