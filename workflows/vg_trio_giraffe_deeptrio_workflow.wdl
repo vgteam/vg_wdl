@@ -53,7 +53,7 @@ workflow vgTrioPipeline {
         Boolean SMALL_RESOURCES = false                 # Set to 'true' to use small resources for tiny test dataset
         Boolean GIRAFFE_INDEXES = true                  # Set to 'true' to construct the GBWT index which incorporates haplotype information into the graph.
         Boolean USE_DECOYS = true                       # Set to 'true' to include decoy contigs from the FASTA reference into the graph reference.
-        Boolean SNPEFF_ANNOTATION = true                # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
+        Boolean SNPEFF_ANNOTATION = false               # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean CLEANUP_FILES = false                   # Set to 'true' to turn on intermediate file cleanup.
         Boolean ABRA_REALIGN = false                    # Set to 'true' to use GATK IndelRealigner instead of ABRA2 for indel realignment.
         String DECOY_REGEX = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_" # grep regular expression string that is used to extract decoy contig ids. USE_DECOYS must be set to 'true'
