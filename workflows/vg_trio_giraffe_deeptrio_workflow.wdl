@@ -445,7 +445,7 @@ task runDeepVariantJointGenotyper {
     }
 
     Int in_vgcall_cores = if in_small_resources then 6 else 6
-    Int in_vgcall_disk = if in_small_resources then 1 else 50
+    Int in_vgcall_disk = if in_small_resources then 1 else 100
     String in_vgcall_mem = if in_small_resources then "1" else "50"
 
     command <<<
