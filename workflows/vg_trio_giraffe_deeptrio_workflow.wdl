@@ -474,6 +474,7 @@ task runDeepVariantJointGenotyper {
         preemptible: 1
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
+        disks: "local-disk " + in_disk + " SSD"
         docker: "quay.io/mlin/glnexus:v1.2.7"
     }
 }
