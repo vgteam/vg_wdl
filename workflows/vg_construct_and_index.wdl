@@ -520,9 +520,9 @@ task xg_index {
         Boolean in_small_resources
     }
 
-    Int in_cores = if in_small_resources then 8 else 32
-    Int in_disk = if in_small_resources then 2 else 50
-    String in_mem = if in_small_resources then "20" else "35"
+    Int in_cores = if in_small_resources then 8 else 16
+    Int in_disk = if in_small_resources then 2 else 60
+    String in_mem = if in_small_resources then "20" else "60"
 
     command <<<
         set -exu -o pipefail
