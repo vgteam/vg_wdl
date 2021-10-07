@@ -429,6 +429,7 @@ task extractPathNames {
         File output_path_list = "path_list.txt"
     }
     runtime {
+        preemptible: 2
         memory: "50 GB"
         disks: "local-disk 50 SSD"
         docker: in_vg_container
@@ -471,7 +472,7 @@ task runDeepVariantJointGenotyper {
         File joint_genotyped_vcf_index = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -565,7 +566,7 @@ task mergeIndelRealignedBAMs {
         File merged_indel_realigned_bam_file_index = "~{in_sample_name}_merged.indel_realigned.bam.bai"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -598,7 +599,7 @@ task runPrepPhasing {
     }
     
     runtime {
-        preemptible: 1
+        preemptible: 2
         memory: "1 GB"
         disks: "local-disk 140 SSD"
         docker: "ubuntu:latest"
@@ -623,7 +624,7 @@ task runMakeContigMAP {
         Map[String, Int] eagle_vcf_contig_map = read_map(stdout())
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         docker: "python:3.9-slim-bullseye"
     }
 }
@@ -666,7 +667,7 @@ task runEaglePhasing {
     }
     
     runtime {
-        preemptible: 1
+        preemptible: 2
         time: 300
         cpu: in_cores
         memory: in_mem + " GB"
@@ -735,7 +736,7 @@ task runWhatsHapPhasing {
         File phased_cohort_vcf = "~{in_cohort_sample_name}_cohort_~{in_contig}.phased.vcf.gz"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         time: 300
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
@@ -774,7 +775,7 @@ task concatClippedVCFChunks {
         File output_merged_vcf = "${in_sample_name}_merged.vcf"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         time: 60
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -815,7 +816,7 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         time: 30
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -852,7 +853,7 @@ task normalizeVCF {
         File output_normalized_vcf = "~{in_sample_name}.unrolled.vcf"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -896,7 +897,7 @@ task snpEffAnnotateVCF {
         File output_snpeff_annotated_vcf = "~{in_sample_name}.snpeff.unrolled.vcf.gz"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"

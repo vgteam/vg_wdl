@@ -408,6 +408,7 @@ task splitBAMbyPath {
         Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai")
     }
     runtime {
+        preemptible: 2
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -464,7 +465,7 @@ task runGATKRealignerTargetCreator {
         File realigner_target_bed = glob("*.bed")[0] 
     } 
     runtime {
-        preemptible: 1
+        preemptible: 2
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -517,7 +518,7 @@ task runAbraRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -579,7 +580,7 @@ task runGATKIndelRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -652,7 +653,7 @@ task runDeepVariant {
         cpu: in_call_cores
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
-        preemptible: 1
+        preemptible: 2
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_call_disk + " SSD"
         docker: "google/deepvariant:1.1.0-gpu"
@@ -816,7 +817,7 @@ task runDeepTrioCallVariants {
         File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
     }
     runtime {
-        preemptible: 1
+        preemptible: 3
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         gpuType: "nvidia-tesla-t4"
@@ -900,7 +901,7 @@ task bgzipMergedVCF {
         File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
     }
     runtime {
-        preemptible: 1
+        preemptible: 2
         time: 30
         memory: in_mem + " GB"
         disks: "local-disk " + in_disk + " SSD"
