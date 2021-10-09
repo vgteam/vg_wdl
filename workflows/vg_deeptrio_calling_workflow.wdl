@@ -450,14 +450,14 @@ task runGATKRealignerTargetCreator {
         ln -f -s ~{in_reference_index_file} ref.fna.fai
         ln -f -s ~{in_reference_dict_file} ref.dict
         CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g))
-        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \ 
-          --remove_program_records \ 
-          -drf DuplicateRead \ 
-          --disable_bam_indexing \ 
-          -nt "~{in_cores}" \ 
-          -R ref.fna \ 
-          -L ${CONTIG_ID} \ 
-          -I input_bam_file.bam \ 
+        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
+          --remove_program_records \
+          -drf DuplicateRead \
+          --disable_bam_indexing \
+          -nt "~{in_cores}" \
+          -R ref.fna \
+          -L ${CONTIG_ID} \
+          -I input_bam_file.bam \
           --out forIndelRealigner.intervals 
          
         awk -F '[:-]' 'BEGIN { OFS = "\t" } { if( $3 == "") { print $1, $2-1, $2 } else { print $1, $2-1, $3}}' forIndelRealigner.intervals > ~{in_sample_name}.${CONTIG_ID}.intervals.bed 
