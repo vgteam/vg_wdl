@@ -629,7 +629,7 @@ task sortMDTagBAMFile {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: if in_mapper_used == "GIRAFFE" then "quay.io/ucsc_cgl/samtools:latest" else "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
     }
 }
 

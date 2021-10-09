@@ -7,7 +7,7 @@ version 1.0
 
 workflow vgDeepTrioCall {
     input {
-        Boolean ABRA_REALIGN = false                                # Set to 'true' to use ABRA2 IndelRealigner instead of GATK for indel realignment
+        Boolean ABRA_REALIGN = true                                 # Set to 'true' to use ABRA2 IndelRealigner instead of GATK for indel realignment
         Boolean SMALL_RESOURCES = false                             # Set to 'true' to use small resources for tiny test dataset
         File? MATERNAL_BAM_FILE                                     # Input maternal surjected .bam file
         File? MATERNAL_BAM_FILE_INDEX                               # Input maternal .bai index of surjected .bam file.
