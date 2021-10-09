@@ -195,7 +195,8 @@ workflow vgDeepTrioCall {
         File paternal_indel_realigned_bam_index = select_first([abraRealignPaternal.indel_realigned_bam_index, gatkRealignPaternal.indel_realigned_bam_index, paternal_bam_file_index])
         
         #TODO
-        String contig_name = sub(sub(sub(child_indel_realigned_bam, ".indel_realigned.bam", ""), SAMPLE_NAME_CHILD, ""), ".", "")
+        String child_bam_basename = basename(child_indel_realigned_bam)
+        String contig_name = sub(sub(sub(child_indel_realigned_bam, "\\.indel_realigned.bam", ""), SAMPLE_NAME_CHILD, ""), "\\.", "")
         if ((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT")) {
             call runDeepVariant as callDeepVariantChild {
                 input:
@@ -649,11 +650,12 @@ task runDeepVariant {
         File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
     }
     runtime {
+        preemptible: 2
+        maxRetries: 3
         memory: in_call_mem + " GB"
         cpu: in_call_cores
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
-        preemptible: 2
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_call_disk + " SSD"
         docker: "google/deepvariant:1.1.0-gpu"
@@ -818,6 +820,7 @@ task runDeepTrioCallVariants {
     }
     runtime {
         preemptible: 3
+        maxRetries: 3
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         gpuType: "nvidia-tesla-t4"
