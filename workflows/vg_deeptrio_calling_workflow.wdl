@@ -506,12 +506,14 @@ task runAbraRealigner {
         gzip -dc ~{in_reference_file} > ref.fna
         ln -f -s ~{in_reference_index_file} ref.fna.fai
         CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g))
-        java -Xmx20G -jar /opt/abra2/abra2.jar \
+        mkdir -p tmp
+        /usr/local/bin/abra2 \
           --targets ~{in_target_bed_file} \
           --in input_bam_file.bam \
           --out ~{in_sample_name}.${CONTIG_ID}.indel_realigned.bam \
           --ref ref.fna \
           --index \
+          --tmpdir ./tmp \
           --threads ~{in_cores}
     >>>
     output {
@@ -523,7 +525,7 @@ task runAbraRealigner {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
-        docker: "dceoy/abra2:latest"
+        docker: "quay.io/biocontainers/abra2:2.24--h7d875b9_0"
     }
 }
 
