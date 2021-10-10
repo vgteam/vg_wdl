@@ -196,7 +196,7 @@ workflow vgDeepTrioCall {
         
         #TODO
         String child_bam_basename = basename(child_indel_realigned_bam)
-        String contig_name = sub(sub(sub(child_indel_realigned_bam, "\\.indel_realigned.bam", ""), SAMPLE_NAME_CHILD, ""), "\\.", "")
+        String contig_name = sub(sub(sub(child_bam_basename, "\\.indel_realigned.bam", ""), SAMPLE_NAME_CHILD, ""), "\\.", "")
         if ((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT")) {
             call runDeepVariant as callDeepVariantChild {
                 input:
