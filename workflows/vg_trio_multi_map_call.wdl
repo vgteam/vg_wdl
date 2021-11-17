@@ -563,6 +563,8 @@ task runDeepVariantJointGenotyper {
         File joint_genotyped_vcf_index = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
+        preemptible: 5
+        maxRetries: 5
         memory: 100 + " GB"
         cpu: 32
         docker: "quay.io/mlin/glnexus:v1.2.7"
