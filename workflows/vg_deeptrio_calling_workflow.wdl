@@ -466,7 +466,7 @@ task runGATKRealignerTargetCreator {
         File realigner_target_bed = glob("*.bed")[0] 
     } 
     runtime {
-        preemptible: 2
+        preemptible: 5
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -521,7 +521,7 @@ task runAbraRealigner {
         File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned.bai")[0]
     }
     runtime {
-        preemptible: 2
+        preemptible: 5
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
@@ -652,8 +652,8 @@ task runDeepVariant {
         File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
     }
     runtime {
-        preemptible: 2
-        maxRetries: 3
+        preemptible: 5
+        maxRetries: 5
         memory: in_call_mem + " GB"
         cpu: in_call_cores
         gpuType: "nvidia-tesla-t4"
@@ -739,7 +739,8 @@ task runDeepTrioMakeExamples {
         File maternal_nonvariant_site_tf_file = "gvcf_parent2.tfrecord.tar.gz"
     }
     runtime {
-        preemptible: 3
+        preemptible: 5
+        maxRetries: 5
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
@@ -821,8 +822,8 @@ task runDeepTrioCallVariants {
         File output_gvcf_file = "~{in_sample_name}_deeptrio.g.vcf.gz"
     }
     runtime {
-        preemptible: 3
-        maxRetries: 3
+        preemptible: 5
+        maxRetries: 5
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         gpuType: "nvidia-tesla-t4"

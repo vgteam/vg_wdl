@@ -474,7 +474,8 @@ task runDeepVariantJointGenotyper {
         File joint_genotyped_vcf_index = "~{in_sample_name}_cohort.jointgenotyped.vcf.gz.tbi"
     }
     runtime {
-        preemptible: 2
+        preemptible: 5
+        maxRetries: 5
         memory: in_vgcall_mem + " GB"
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
