@@ -29,11 +29,15 @@ workflow vgMultiMap {
         File? DV_MODEL_INDEX                            # .index file for a custom DeepVariant calling model
         File? DV_MODEL_DATA                             # .data-00000-of-00001 file for a custom DeepVariant calling model
         Boolean LEFTALIGN_BAM = true                    # Whether or not to left-align reads in the BAM before DV
-        Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels
+        Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
         Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
+        # DeepVariant tontainer to use for CPU steps
+        String DV_CONTAINER = "google/deepvariant:1.3.0"
+        # DeepVariant container to use for GPU steps
+        String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
-        Boolean DV_NORM_READS = true                    # Should SV normalize reads?
+        Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 60
         Int MAP_CORES = 16
@@ -42,9 +46,9 @@ workflow vgMultiMap {
         Int CALL_CORES = 8
         Int CALL_DISK = 40
         Int CALL_MEM = 50
-        File? REFERENCE_FILE
-        File? REFERENCE_INDEX_FILE
-        File? REFERENCE_DICT_FILE
+        File? REFERENCE_FILE                            # (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.
+        File? REFERENCE_INDEX_FILE                      # (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
+        File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
     }
 
     # Split input reads into chunks for parallelized mapping
@@ -273,6 +277,7 @@ workflow vgMultiMap {
         ## DeepVariant calling
         call runDeepVariantMakeExamples {
             input:
+                in_dv_container=DV_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_bam_file=calling_bam,
                 in_bam_file_index=calling_bam_index,
@@ -287,6 +292,7 @@ workflow vgMultiMap {
         }
         call runDeepVariantCallVariants {
             input:
+                in_dv_gpu_container=DV_GPU_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
@@ -983,6 +989,7 @@ task leftShiftBAMFile {
 
 task runDeepVariantMakeExamples {
     input {
+        String in_dv_container
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
@@ -1054,12 +1061,13 @@ task runDeepVariantMakeExamples {
         memory: in_call_mem + " GB"
         cpu: in_call_cores
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "google/deepvariant:1.3.0"
+        docker: in_dv_container
     }
 }
 
 task runDeepVariantCallVariants {
     input {
+        String in_dv_gpu_container
         String in_sample_name
         File in_reference_file
         File in_reference_index_file
@@ -1131,7 +1139,7 @@ task runDeepVariantCallVariants {
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "google/deepvariant:1.3.0-gpu"
+        docker: in_dv_gpu_container
     }
 }
 
