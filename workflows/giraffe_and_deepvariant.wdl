@@ -13,7 +13,7 @@ workflow vgMultiMap {
         # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0"
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
-        String GIRAFFE_OPTIONS = "--prune-low-cplx"                     # (OPTIONAL) extra command line options for Giraffe mapper
+        String GIRAFFE_OPTIONS = ""                     # (OPTIONAL) extra command line options for Giraffe mapper
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
         String REFERENCE_PREFIX = ""                    # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
@@ -612,6 +612,7 @@ task surjectGAFtoBAM {
           --gaf-input --bam-output \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+          --prune-low-cplx \
           ~{in_gaf_file} > ~{out_prefix}.bam
     >>>
     output {
