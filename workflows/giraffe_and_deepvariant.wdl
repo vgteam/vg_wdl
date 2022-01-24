@@ -38,6 +38,7 @@ workflow vgMultiMap {
         String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
+        Boolean OUTPUT_GAF = true                      # Should a GAF file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 60
         Int MAP_CORES = 16
@@ -147,11 +148,21 @@ workflow vgMultiMap {
                 # REFERENCE_PREFIX and making sure the prefix isn't in the
                 # truth set.
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                in_ref_dict=reference_dict_file,
                 in_sample_name=SAMPLE_NAME,
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
+        }
+        call surjectGAFtoBAM {
+            input:
+            in_gaf_file=runVGGIRAFFE.chunk_gaf_file,
+            in_xg_file=XG_FILE,
+            in_ref_dict=reference_dict_file,
+            in_sample_name=SAMPLE_NAME,
+            in_vg_container=VG_CONTAINER,
+            in_map_cores=MAP_CORES,
+            in_map_disk=MAP_DISK,
+            in_map_mem=MAP_MEM
         }
         if (REFERENCE_PREFIX != "") {
             # use samtools to replace the header contigs with those from our dict.
@@ -160,22 +171,22 @@ workflow vgMultiMap {
             # also, strip out contig prefixes in the BAM body
             call fixBAMContigNaming {
                 input:
-                    in_bam_file=runVGGIRAFFE.chunk_bam_file,
+                    in_bam_file=surjectGAFtoBAM.chunk_bam_file,
                     in_ref_dict=reference_dict_file,
                     in_prefix_to_strip=REFERENCE_PREFIX,
                     in_map_cores=MAP_CORES,
                     in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM,
+                    in_map_mem=MAP_MEM
             }
         }
-        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, runVGGIRAFFE.chunk_bam_file]) 
+        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoBAM.chunk_bam_file]) 
         call sortBAMFile {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_bam_chunk_file=properly_named_bam_file,
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM,
+                in_map_mem=MAP_MEM
         }
     }
     Array[File] alignment_chunk_bam_files = select_all(sortBAMFile.sorted_chunk_bam)
@@ -359,12 +370,23 @@ workflow vgMultiMap {
                 in_call_mem=CALL_MEM
         }
     }
+
+    if (OUTPUT_GAF){
+        call mergeGAF {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_gaf_chunk_files=runVGGIRAFFE.chunk_gaf_file,
+            in_vg_container=VG_CONTAINER,
+            in_call_disk=CALL_DISK
+        }
+    }
     
     output {
         File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
         File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
         File output_vcf = bgzipMergedVCF.output_merged_vcf
         File output_vcf_index = bgzipMergedVCF.output_merged_vcf_index
+        File? output_gaf = mergeGAF.output_merged_gaf
         Array[File] output_calling_bams = calling_bam
         Array[File] output_calling_bam_indexes = calling_bam_index
     }   
@@ -511,7 +533,6 @@ task runVGGIRAFFE {
         File in_ggbwt_file
         File in_dist_file
         File in_min_file
-        File in_ref_dict
         String in_vg_container
         String in_giraffe_options
         String in_sample_name
@@ -537,19 +558,18 @@ task runVGGIRAFFE {
           --progress \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
-          --output-format BAM \
           ~{in_giraffe_options} \
-          --ref-paths ~{in_ref_dict} \
+          --output-format gaf \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
           -x ~{in_xg_file} \
           -H ~{in_gbwt_file} \
           -g ~{in_ggbwt_file} \
           -d ~{in_dist_file} \
           -m ~{in_min_file} \
-          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
+          -t ~{in_map_cores} | gzip > ~{in_sample_name}.${READ_CHUNK_ID}.gaf.gz
     >>>
     output {
-        File chunk_bam_file = glob("*bam")[0]
+        File chunk_gaf_file = glob("*gaf.gz")[0]
     }
     runtime {
         preemptible: 2
@@ -559,6 +579,88 @@ task runVGGIRAFFE {
         disks: "local-disk " + in_map_disk + " SSD"
         docker: in_vg_container
     }
+}
+
+task surjectGAFtoBAM {
+    input {
+        File in_gaf_file
+        File in_xg_file
+        File in_ref_dict
+        String in_sample_name
+        String in_vg_container
+        Int in_map_cores
+        Int in_map_disk
+        String in_map_mem
+    }
+    String out_prefix = basename(in_gaf_file, ".gaf.gz") 
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        vg surject \
+          --ref-paths ~{in_ref_dict} \
+          -x ~{in_xg_file} \
+          -t ~{in_map_cores} \
+          --gaf-input --bam-output \
+          --sample ~{in_sample_name} \
+          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+          ~{in_gaf_file} > ~{out_prefix}.bam
+    >>>
+    output {
+        File chunk_bam_file = "~{out_prefix}.bam"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + in_map_disk + " SSD"
+        docker: in_vg_container
+    }
+
+}
+
+task mergeGAF {
+    input {
+        String in_sample_name
+        Array[File] in_gaf_chunk_files
+        String in_vg_container
+        Int in_call_disk
+    }
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        cat ~{sep=" " in_gaf_chunk_files} > ~{in_sample_name}.gaf.gz
+    >>>
+    output {
+        File output_merged_gaf = "~{in_sample_name}.gaf.gz"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: "6GB"
+        cpu: 1
+        disks: "local-disk " + in_call_disk + " SSD"
+        docker: in_vg_container
+    }
+
 }
 
 task sortBAMFile {
