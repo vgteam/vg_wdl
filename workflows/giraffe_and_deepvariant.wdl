@@ -157,7 +157,7 @@ workflow vgMultiMap {
             input:
             in_gaf_file=runVGGIRAFFE.chunk_gaf_file,
             in_xg_file=XG_FILE,
-            in_ref_dict=reference_dict_file,
+            in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_vg_container=VG_CONTAINER,
             in_map_cores=MAP_CORES,
@@ -377,7 +377,7 @@ workflow vgMultiMap {
             in_sample_name=SAMPLE_NAME,
             in_gaf_chunk_files=runVGGIRAFFE.chunk_gaf_file,
             in_vg_container=VG_CONTAINER,
-            in_call_disk=CALL_DISK
+            in_disk=2*MAP_DISK
         }
     }
     
@@ -585,7 +585,7 @@ task surjectGAFtoBAM {
     input {
         File in_gaf_file
         File in_xg_file
-        File in_ref_dict
+        File in_path_list_file
         String in_sample_name
         String in_vg_container
         Int in_map_cores
@@ -606,7 +606,7 @@ task surjectGAFtoBAM {
         #to turn off echo do 'set +o xtrace'
 
         vg surject \
-          --ref-paths ~{in_ref_dict} \
+          -F ~{in_path_list_file} \
           -x ~{in_xg_file} \
           -t ~{in_map_cores} \
           --gaf-input --bam-output \
@@ -634,7 +634,7 @@ task mergeGAF {
         String in_sample_name
         Array[File] in_gaf_chunk_files
         String in_vg_container
-        Int in_call_disk
+        Int in_disk
     }
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -658,7 +658,7 @@ task mergeGAF {
         time: 300
         memory: "6GB"
         cpu: 1
-        disks: "local-disk " + in_call_disk + " SSD"
+        disks: "local-disk " + in_disk + " SSD"
         docker: in_vg_container
     }
 
