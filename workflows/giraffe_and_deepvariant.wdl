@@ -38,7 +38,8 @@ workflow vgMultiMap {
         String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
-        Boolean OUTPUT_GAF = true                      # Should a GAF file with the aligned reads be saved?
+        Boolean OUTPUT_GAF = true                       # Should a GAF file with the aligned reads be saved?
+        Boolean OUTPUT_GAM = true                       # Should a GAM file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 60
         Int MAP_CORES = 16
@@ -153,17 +154,17 @@ workflow vgMultiMap {
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
         }
-        call surjectGAFtoBAM {
-            input:
-            in_gaf_file=runVGGIRAFFE.chunk_gaf_file,
-            in_xg_file=XG_FILE,
-            in_path_list_file=pipeline_path_list_file,
-            in_sample_name=SAMPLE_NAME,
-            in_vg_container=VG_CONTAINER,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
-        }
+        call surjectGAMtoBAM {
+                input:
+                in_gam_file=runVGGIRAFFE.chunk_gam_file,
+                in_xg_file=XG_FILE,
+                in_path_list_file=pipeline_path_list_file,
+                in_sample_name=SAMPLE_NAME,
+                in_vg_container=VG_CONTAINER,
+                in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
+                in_map_mem=MAP_MEM
+            }
         if (REFERENCE_PREFIX != "") {
             # use samtools to replace the header contigs with those from our dict.
             # this allows the header to contain contigs that are not in the graph,
@@ -171,7 +172,7 @@ workflow vgMultiMap {
             # also, strip out contig prefixes in the BAM body
             call fixBAMContigNaming {
                 input:
-                    in_bam_file=surjectGAFtoBAM.chunk_bam_file,
+                    in_bam_file=surjectGAMtoBAM.chunk_bam_file,
                     in_ref_dict=reference_dict_file,
                     in_prefix_to_strip=REFERENCE_PREFIX,
                     in_map_cores=MAP_CORES,
@@ -179,7 +180,7 @@ workflow vgMultiMap {
                     in_map_mem=MAP_MEM
             }
         }
-        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoBAM.chunk_bam_file]) 
+        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAMtoBAM.chunk_bam_file]) 
         call sortBAMFile {
             input:
                 in_sample_name=SAMPLE_NAME,
@@ -372,10 +373,31 @@ workflow vgMultiMap {
     }
 
     if (OUTPUT_GAF){
+        scatter (gam_chunk_file in runVGGIRAFFE.chunk_gam_file) {
+            call convertGAMtoGAF {
+                input:
+                in_xg_file=XG_FILE,
+                in_gam_file= gam_chunk_file,
+                in_vg_container=VG_CONTAINER,
+                in_cores=MAP_CORES,
+                in_disk=MAP_DISK,
+                in_mem=MAP_MEM
+            }
+        }
         call mergeGAF {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=runVGGIRAFFE.chunk_gaf_file,
+            in_gaf_chunk_files=convertGAMtoGAF.output_gaf,
+            in_vg_container=VG_CONTAINER,
+            in_disk=2*MAP_DISK
+        }
+    }
+
+    if (OUTPUT_GAM){
+        call mergeGAM {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
             in_vg_container=VG_CONTAINER,
             in_disk=2*MAP_DISK
         }
@@ -387,6 +409,7 @@ workflow vgMultiMap {
         File output_vcf = bgzipMergedVCF.output_merged_vcf
         File output_vcf_index = bgzipMergedVCF.output_merged_vcf_index
         File? output_gaf = mergeGAF.output_merged_gaf
+        File? output_gam = mergeGAM.output_merged_gam
         Array[File] output_calling_bams = calling_bam
         Array[File] output_calling_bam_indexes = calling_bam_index
     }   
@@ -559,17 +582,17 @@ task runVGGIRAFFE {
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
           ~{in_giraffe_options} \
-          --output-format gaf \
+          --output-format gam \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
           -x ~{in_xg_file} \
           -H ~{in_gbwt_file} \
           -g ~{in_ggbwt_file} \
           -d ~{in_dist_file} \
           -m ~{in_min_file} \
-          -t ~{in_map_cores} | gzip > ~{in_sample_name}.${READ_CHUNK_ID}.gaf.gz
+          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
     >>>
     output {
-        File chunk_gaf_file = glob("*gaf.gz")[0]
+        File chunk_gam_file = glob("*gam")[0]
     }
     runtime {
         preemptible: 2
@@ -581,9 +604,9 @@ task runVGGIRAFFE {
     }
 }
 
-task surjectGAFtoBAM {
+task surjectGAMtoBAM {
     input {
-        File in_gaf_file
+        File in_gam_file
         File in_xg_file
         File in_path_list_file
         String in_sample_name
@@ -592,7 +615,7 @@ task surjectGAFtoBAM {
         Int in_map_disk
         String in_map_mem
     }
-    String out_prefix = basename(in_gaf_file, ".gaf.gz") 
+    String out_prefix = basename(in_gam_file, ".gam") 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -609,11 +632,11 @@ task surjectGAFtoBAM {
           -F ~{in_path_list_file} \
           -x ~{in_xg_file} \
           -t ~{in_map_cores} \
-          --gaf-input --bam-output \
+          --bam-output \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --prune-low-cplx \
-          ~{in_gaf_file} > ~{out_prefix}.bam
+          ~{in_gam_file} > ~{out_prefix}.bam
     >>>
     output {
         File chunk_bam_file = "~{out_prefix}.bam"
@@ -627,6 +650,43 @@ task surjectGAFtoBAM {
         docker: in_vg_container
     }
 
+}
+
+task convertGAMtoGAF {
+    input {
+        File in_xg_file
+        File in_gam_file
+        String in_vg_container
+        Int in_cores
+        Int in_disk
+        String in_mem
+    }
+    String out_prefix = basename(in_gam_file, ".gam") 
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        vg convert -G ~{in_gam_file} ~{in_xg_file} | gzip > ~{out_prefix}.gaf.gz
+    >>>
+    output {
+        File output_gaf = "~{out_prefix}.gaf.gz"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: in_mem + " GB"
+        cpu: in_cores
+        disks: "local-disk " + in_disk + " SSD"
+        docker: in_vg_container
+    }
 }
 
 task mergeGAF {
@@ -661,7 +721,40 @@ task mergeGAF {
         disks: "local-disk " + in_disk + " SSD"
         docker: in_vg_container
     }
+}
 
+task mergeGAM {
+    input {
+        String in_sample_name
+        Array[File] in_gam_chunk_files
+        String in_vg_container
+        Int in_disk
+    }
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        cat ~{sep=" " in_gam_chunk_files} > ~{in_sample_name}.gam
+    >>>
+    output {
+        File output_merged_gam = "~{in_sample_name}.gam"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: "6GB"
+        cpu: 1
+        disks: "local-disk " + in_disk + " SSD"
+        docker: in_vg_container
+    }
 }
 
 task sortBAMFile {
