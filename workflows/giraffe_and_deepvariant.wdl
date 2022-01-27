@@ -7,11 +7,13 @@ version 1.0
 
 workflow vgMultiMap {
     input {
-        File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
-        File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
+        File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
+        File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz
+        File? INPUT_CRAM_FILE                           # Input CRAM file
+	File? CRAM_REF                                  # Genome fasta file associated with the CRAM file
+        File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
-        # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0"
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String GIRAFFE_OPTIONS = ""                     # (OPTIONAL) extra command line options for Giraffe mapper
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
@@ -53,10 +55,23 @@ workflow vgMultiMap {
         File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
     }
 
+    if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
+	call convertCRAMtoFASTQ {
+            input:
+            in_cram_file=INPUT_CRAM_FILE,
+            in_ref_file=CRAM_REF,
+            in_ref_index_file=CRAM_REF_INDEX,
+            in_cores=SPLIT_READ_CORES
+	}
+    }
+
+    File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
+    File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
+    
     # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
         input:
-            in_read_file=INPUT_READ_FILE_1,
+            in_read_file=read_1_file,
             in_pair_id="1",
             in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
@@ -65,7 +80,7 @@ workflow vgMultiMap {
     }
     call splitReads as secondReadPair {
         input:
-            in_read_file=INPUT_READ_FILE_2,
+            in_read_file=read_2_file,
             in_pair_id="2",
             in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
@@ -418,6 +433,42 @@ workflow vgMultiMap {
 ########################
 ### TASK DEFINITIONS ###
 ########################
+
+task convertCRAMtoFASTQ {
+    input {
+	File? in_cram_file
+        File? in_ref_file
+        File? in_ref_index_file
+	Int in_cores
+    }
+    Int half_cores = in_cores / 2
+    Int disk_size = round(5 * size(in_cram_file, 'G')) + 50
+    command <<<
+    # Set the exit code of a pipeline to that of the rightmost command
+    # to exit with a non-zero status, or zero if all commands of the pipeline exit
+    set -o pipefail
+    # cause a bash script to exit immediately when a command fails
+    set -e
+    # cause the bash shell to treat unset variables as an error and exit immediately
+    set -u
+    # echo each line of the script to stdout so we can see what is happening
+    set -o xtrace
+    #to turn off echo do 'set +o xtrace'
+    
+    samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+    >>>
+    output {
+        File output_fastq_1_file = "reads.R1.fastq.gz"
+        File output_fastq_2_file = "reads.R2.fastq.gz"
+    }
+    runtime {
+        preemptible: 2
+        cpu: in_cores
+        memory: "50 GB"
+        disks: "local-disk " + disk_size + " SSD"
+        docker: "quay.io/biocontainers/samtools:1.14--hb421002_0"
+    }    
+}
 
 task splitReads {
     input {
