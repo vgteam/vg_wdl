@@ -943,9 +943,9 @@ task concatClippedVCFChunks {
     runtime {
         preemptible: 2
         time: 60
-        memory: "10 GB"
+        memory: "20 GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/jmonlong/bcftools-tabix:1.9"
+        docker: "quay.io/jmonlong/bcftools-tabix:1.14"
     }
 }
 
