@@ -1,5 +1,7 @@
 version 1.0
 
+import "giraffe_and_deepvariant.wdl" as main
+
 ### giraffe_and_deepvariant_lite.wdl ###
 ## Author: Jean Monlong
 ## Description: Core VG Giraffe mapping and DeepVariant calling workflow for single sample datasets.
@@ -227,16 +229,28 @@ workflow vgMultiMap {
                 in_call_mem=CALL_MEM
         }
     }
+
     # Merge distributed variant called VCFs
-    call concatClippedVCFChunks {
+    call main.concatClippedVCFChunks {
         input:
             in_sample_name=SAMPLE_NAME,
-            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_vcf_file
+            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_vcf_file,
+            in_call_disk=50,
+            in_call_mem=20
+    }
+    # Extract either the normal or structural variant based VCFs and compress them
+    call main.bgzipMergedVCF {
+        input:
+            in_sample_name=SAMPLE_NAME,
+            in_merged_vcf_file=concatClippedVCFChunks.output_merged_vcf,
+            in_vg_container=VG_CONTAINER,
+            in_call_disk=20,
+            in_call_mem=20
     }
         
     output {
-        File output_vcf = concatClippedVCFChunks.output_merged_vcf
-        File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
+        File output_vcf = bgzipMergedVCF.output_merged_vcf
+        File output_vcf_index = bgzipMergedVCF.output_merged_vcf_index
         File output_gam =mergeGAMandSort.output_merged_gam
         File output_gam_index =mergeGAMandSort.output_merged_gam_index
     }   
@@ -907,45 +921,6 @@ task runDeepVariantCallVariants {
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + disk_size + " SSD"
         docker: in_dv_gpu_container
-    }
-}
-
-task concatClippedVCFChunks {
-    input {
-        String in_sample_name
-        Array[File] in_clipped_vcf_chunk_files
-    }
-    Int disk_size = 3 * round(size(in_clipped_vcf_chunk_files, 'G')) + 20
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        for vcf_file in ${sep=" " in_clipped_vcf_chunk_files} ; do
-            bcftools index "$vcf_file"
-        done
-        bcftools concat -a ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort - > ${in_sample_name}_merged.vcf
-
-        bgzip -c ${in_sample_name}_merged.vcf > ${in_sample_name}_merged.vcf.gz && \
-        tabix -f -p vcf ${in_sample_name}_merged.vcf.gz
-    }
-    output {
-        File output_merged_vcf = "${in_sample_name}_merged.vcf.gz"
-        File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
-    }
-    runtime {
-        preemptible: 2
-        time: 60
-        memory: "20 GB"
-        disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/jmonlong/bcftools-tabix:1.14"
     }
 }
 
