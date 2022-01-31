@@ -9,14 +9,14 @@ import "giraffe_and_deepvariant.wdl" as main
 
 workflow vgMultiMap {
     input {
+        File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
+        File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz
         File INPUT_CRAM_FILE                           # Input CRAM file
 	File CRAM_REF                                  # Genome fasta file associated with the CRAM file
         File CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
-        Int NB_CRAM_CHUNKS = 15                         # Number of chunks to split the reads in
-        Int MAX_CRAM_CHUNKS = 15                        # Number of chunks to actually analyze
-        Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
+        Int READS_PER_CHUNK = 30000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
         File XG_FILE                                    # Path to .xg index file
@@ -37,8 +37,10 @@ workflow vgMultiMap {
         String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
+        Boolean SORT_GAM = false                        # Should the GAM be sorted
         Int SPLIT_READ_CORES = 8
-        Int MAP_CORES = 16
+        Int SPLIT_READ_DISK = 60
+        Int MAP_CORES = 20
         Int MAP_MEM = 120
         Int CALL_CORES = 8
         Int CALL_MEM = 50
@@ -47,15 +49,37 @@ workflow vgMultiMap {
         File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
     }
 
-    # Split the reads (CRAM file) in chunks (FASTQ)
-    call splitCramFastq {
+    if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
+	call main.convertCRAMtoFASTQ {
+            input:
+            in_cram_file=INPUT_CRAM_FILE,
+            in_ref_file=CRAM_REF,
+            in_ref_index_file=CRAM_REF_INDEX,
+            in_cores=SPLIT_READ_CORES
+	}
+    }
+
+    File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
+    File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
+    
+    # Split input reads into chunks for parallelized mapping
+    call main.splitReads as firstReadPair {
         input:
-        in_cram_file=INPUT_CRAM_FILE,
-        in_ref_file=CRAM_REF,
-        in_ref_index_file=CRAM_REF_INDEX,
-        in_cram_convert_cores=SPLIT_READ_CORES,
-        in_nb_chunks=NB_CRAM_CHUNKS,
-        in_max_chunks=MAX_CRAM_CHUNKS
+            in_read_file=read_1_file,
+            in_pair_id="1",
+            in_vg_container=VG_CONTAINER,
+            in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK
+    }
+    call main.splitReads as secondReadPair {
+        input:
+            in_read_file=read_2_file,
+            in_pair_id="2",
+            in_vg_container=VG_CONTAINER,
+            in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK
     }
 
     # Which path names to work on?
@@ -107,7 +131,7 @@ workflow vgMultiMap {
     ################################################################
     # Distribute vg mapping operation over each chunked read pair #
     ################################################################
-    Array[Pair[File,File]] read_pair_chunk_files_list = zip(splitCramFastq.output_read_chunks_1, splitCramFastq.output_read_chunks_2)
+    Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
         call runVGGIRAFFE {
             input:
@@ -139,18 +163,9 @@ workflow vgMultiMap {
         input:
         in_sample_name=SAMPLE_NAME,
         in_alignment_bam_chunk_files=surjectGAMtoSortedBAM.output_bam_file,
-        in_map_cores=MAP_CORES
+        in_map_cores=16
     }
-
-    call mergeGAMandSort {
-        input:
-        in_sample_name=SAMPLE_NAME,
-        in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
-        in_vg_container=VG_CONTAINER,
-        in_mem=MAP_MEM,
-        in_cores=MAP_CORES
-    }
-             
+    
     # Split merged alignment by contigs list
     call splitBAMbyPath { 
         input:
@@ -248,11 +263,33 @@ workflow vgMultiMap {
             in_call_mem=20
     }
         
+
+    if (SORT_GAM){
+        call mergeGAMandSort {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
+            in_vg_container=VG_CONTAINER,
+            in_mem=MAP_MEM,
+            in_cores=MAP_CORES
+        }
+    }
+    if (!SORT_GAM) {
+        call mergeGAM {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
+            in_vg_container=VG_CONTAINER
+        }
+    }
+
+    File gam_file = select_first([mergeGAM.output_merged_gam, mergeGAMandSort.output_merged_gam])
+
     output {
         File output_vcf = bgzipMergedVCF.output_merged_vcf
         File output_vcf_index = bgzipMergedVCF.output_merged_vcf_index
-        File output_gam =mergeGAMandSort.output_merged_gam
-        File output_gam_index =mergeGAMandSort.output_merged_gam_index
+        File output_gam = gam_file
+        File? output_gam_index = mergeGAMandSort.output_merged_gam_index
     }   
 }
 
@@ -528,6 +565,40 @@ task mergeAlignmentBAMChunks {
     }
 }
 
+task mergeGAM {
+    input {
+        String in_sample_name
+        Array[File] in_gam_chunk_files
+        String in_vg_container
+    }
+    Int disk_size = round(4 * size(in_gam_chunk_files, 'G')) + 20
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        cat ~{sep=" " in_gam_chunk_files} > ~{in_sample_name}.gam
+    >>>
+    output {
+        File output_merged_gam = "~{in_sample_name}.gam"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: "10 GB"
+        cpu: 1
+        disks: "local-disk " + disk_size + " SSD"
+        docker: in_vg_container
+    }
+}
+
 task mergeGAMandSort {
     input {
         String in_sample_name
@@ -549,12 +620,12 @@ task mergeGAMandSort {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        cat ~{sep=" " in_gam_chunk_files} | vg gamsort -p -i ~{in_sample_name}.gam.gai \
-                                               -t ~{in_cores} - > ~{in_sample_name}.gam
+        cat ~{sep=" " in_gam_chunk_files} | vg gamsort -p -i ~{in_sample_name}.sorted.gam.gai \
+                                               -t ~{in_cores} - > ~{in_sample_name}.sorted.gam
     >>>
     output {
-        File output_merged_gam = "~{in_sample_name}.gam"
-        File output_merged_gam_index = "~{in_sample_name}.gam.gai"
+        File output_merged_gam = "~{in_sample_name}.sorted.gam"
+        File output_merged_gam_index = "~{in_sample_name}.sorted.gam.gai"
     }
     runtime {
         preemptible: 2
