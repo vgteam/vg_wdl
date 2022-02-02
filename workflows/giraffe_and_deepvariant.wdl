@@ -1450,12 +1450,12 @@ task bgzipMergedVCF {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        bgzip -c ${in_merged_vcf_file} > ${in_sample_name}_merged.vcf.gz && \
-        tabix -f -p vcf ${in_sample_name}_merged.vcf.gz
+        bgzip -c ${in_merged_vcf_file} > ${in_sample_name}.vcf.gz && \
+        tabix -f -p vcf ${in_sample_name}.vcf.gz
     }
     output {
-        File output_merged_vcf = "${in_sample_name}_merged.vcf.gz"
-        File output_merged_vcf_index = "${in_sample_name}_merged.vcf.gz.tbi"
+        File output_merged_vcf = "${in_sample_name}.vcf.gz"
+        File output_merged_vcf_index = "${in_sample_name}.vcf.gz.tbi"
     }
     runtime {
         preemptible: 2
