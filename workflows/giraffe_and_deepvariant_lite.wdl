@@ -11,9 +11,9 @@ workflow vgMultiMap {
     input {
         File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
         File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz
-        File INPUT_CRAM_FILE                           # Input CRAM file
-	File CRAM_REF                                  # Genome fasta file associated with the CRAM file
-        File CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
+        File? INPUT_CRAM_FILE                           # Input CRAM file
+	File? CRAM_REF                                  # Genome fasta file associated with the CRAM file
+        File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 30000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
