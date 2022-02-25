@@ -268,7 +268,7 @@ workflow vgMultiMap {
         input:
             in_sample_name=SAMPLE_NAME,
             in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_gvcf_file,
-            in_call_disk=50,
+            in_call_disk=200,
             in_call_mem=20
     }
     # Extract either the normal or structural variant based VCFs and compress them
@@ -277,7 +277,7 @@ workflow vgMultiMap {
             in_sample_name=SAMPLE_NAME + '.g',
             in_merged_vcf_file=concatClippedGVCFChunks.output_merged_vcf,
             in_vg_container=VG_CONTAINER,
-            in_call_disk=20,
+            in_call_disk=100,
             in_call_mem=20
     }
     
