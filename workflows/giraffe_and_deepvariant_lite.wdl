@@ -12,9 +12,10 @@ workflow vgMultiMap {
         File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
         File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz
         File? INPUT_CRAM_FILE                           # Input CRAM file
-	File? CRAM_REF                                  # Genome fasta file associated with the CRAM file
+        File? CRAM_REF                                  # Genome fasta file associated with the CRAM file
         File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
+        Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 30000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
@@ -153,6 +154,7 @@ workflow vgMultiMap {
             in_xg_file=XG_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
+            in_max_fragment_length=MAX_FRAGMENT_LENGTH,
             in_vg_container=VG_CONTAINER,
             in_map_cores=MAP_CORES,
             in_map_mem=MAP_MEM
@@ -501,6 +503,7 @@ task surjectGAMtoSortedBAM {
         File in_xg_file
         File in_path_list_file
         String in_sample_name
+        Int in_max_fragment_length
         String in_vg_container
         Int in_map_cores
         String in_map_mem
@@ -528,6 +531,7 @@ task surjectGAMtoSortedBAM {
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --prune-low-cplx \
+          --interleaved --max-frag-len ~{in_max_fragment_length} \
           ~{in_gam_file} | samtools sort --threads ~{half_cores} \
                                     -O BAM > ~{out_prefix}.bam
     >>>
