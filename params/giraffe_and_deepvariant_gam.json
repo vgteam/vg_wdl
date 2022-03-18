@@ -1,0 +1,9 @@
+{
+  "vgMultiMap.XG_FILE": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/hprc-f1-D10M-clipped-indexes/GRCh38-f1g-90-mc-aug11-clip.d9.m1000.D10M.m1000.xg",
+  "vgMultiMap.SAMPLE_NAME": "HG00106",
+  "vgMultiMap.INPUT_GAM": "HG00106.gam",
+  "vgMultiMap.DV_MODEL_META": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/giraffe-hprc-20211021/dv-giraffe-model/model.ckpt-267000.meta",
+  "vgMultiMap.DV_MODEL_INDEX": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/giraffe-hprc-20211021/dv-giraffe-model/model.ckpt-267000.index",
+  "vgMultiMap.DV_MODEL_DATA": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/giraffe-hprc-20211021/dv-giraffe-model/model.ckpt-267000.data-00000-of-00001",
+}
+
