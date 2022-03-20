@@ -14,7 +14,7 @@ workflow vgMultiMap {
         String SAMPLE_NAME                              # The sample name
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
-        Int READS_PER_CHUNK = 30000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
+        Int READS_PER_CHUNK = 100000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
         File XG_FILE                                    # Path to .xg index file
@@ -95,8 +95,8 @@ workflow vgMultiMap {
         in_gam_file=INPUT_GAM,
 	in_read_per_chunk=READS_PER_CHUNK,
         in_sample_name=SAMPLE_NAME,
-        in_mem=VG_MEM,
-        in_cores=VG_CORES,
+        in_mem=30,
+        in_cores=1,
         in_vg_container=VG_CONTAINER,
     }
 
