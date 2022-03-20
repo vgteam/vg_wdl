@@ -33,7 +33,7 @@ workflow vgMultiMap {
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
         Int CALL_CORES = 8
         Int CALL_MEM = 50
-        Int VG_CORES = 16                               # cores used by vg commands
+        Int VG_CORES = 20                               # cores used by vg commands
         Int VG_MEM = 120                                # memory used by vg commands to load indexes etc
         File? REFERENCE_FILE                            # (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.
         File? REFERENCE_INDEX_FILE                      # (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
