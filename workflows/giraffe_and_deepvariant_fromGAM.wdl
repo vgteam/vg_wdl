@@ -31,6 +31,7 @@ workflow vgMultiMap {
         String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
+        Boolean SPLIT_AND_SURJECT = true
         Int CALL_CORES = 8
         Int CALL_MEM = 50
         Int VG_CORES = 20                               # cores used by vg commands
@@ -86,24 +87,47 @@ workflow vgMultiMap {
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
     File reference_dict_file = select_first([REFERENCE_DICT_FILE, indexReference.reference_dict_file])
 
-    ##
-    ## Split GAM into one GAM per chromosome
-    ##
 
-    call splitGAM {
-        input:
-        in_gam_file=INPUT_GAM,
-	in_read_per_chunk=READS_PER_CHUNK,
-        in_sample_name=SAMPLE_NAME,
-        in_mem=30,
-        in_cores=1,
-        in_vg_container=VG_CONTAINER,
-    }
+    if (SPLIT_AND_SURJECT){
+        ##
+        ## Split GAM into one GAM per chromosome
+        ##
 
-    scatter (gam_chunk_file in splitGAM.gam_chunk_files) {
-        call lite.surjectGAMtoSortedBAM {
+        call splitGAM {
             input:
-            in_gam_file=gam_chunk_file,
+            in_gam_file=INPUT_GAM,
+	    in_read_per_chunk=READS_PER_CHUNK,
+            in_sample_name=SAMPLE_NAME,
+            in_mem=30,
+            in_cores=1,
+            in_vg_container=VG_CONTAINER,
+        }
+
+        scatter (gam_chunk_file in splitGAM.gam_chunk_files) {
+            call lite.surjectGAMtoSortedBAM {
+                input:
+                in_gam_file=gam_chunk_file,
+                in_xg_file=XG_FILE,
+                in_path_list_file=pipeline_path_list_file,
+                in_sample_name=SAMPLE_NAME,
+                in_max_fragment_length=MAX_FRAGMENT_LENGTH,
+                in_vg_container=VG_CONTAINER,
+                in_map_cores=VG_CORES,
+                in_map_mem=VG_MEM
+            }
+        }
+
+        call lite.mergeAlignmentBAMChunks {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_alignment_bam_chunk_files=surjectGAMtoSortedBAM.output_bam_file,
+            in_map_cores=16
+        }
+    }
+    if (!SPLIT_AND_SURJECT){
+        call surjectGAMtoSortedIndexedBAM {
+            input:
+            in_gam_file=INPUT_GAM,
             in_xg_file=XG_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
@@ -114,23 +138,19 @@ workflow vgMultiMap {
         }
     }
 
-    call lite.mergeAlignmentBAMChunks {
-        input:
-        in_sample_name=SAMPLE_NAME,
-        in_alignment_bam_chunk_files=surjectGAMtoSortedBAM.output_bam_file,
-        in_map_cores=16
-    }
+    File merged_bam = select_first([mergeAlignmentBAMChunks.merged_bam_file, surjectGAMtoSortedIndexedBAM.output_bam_file])
+    File merged_bam_index = select_first([mergeAlignmentBAMChunks.merged_bam_file_index, surjectGAMtoSortedIndexedBAM.output_bam_index_file])
     
     # Split merged alignment by contigs list
     call lite.splitBAMbyPath { 
         input:
             in_sample_name=SAMPLE_NAME,
-            in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-            in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
+            in_merged_bam_file=merged_bam,
+            in_merged_bam_file_index=merged_bam_index,
             in_path_list_file=pipeline_path_list_file,
             in_map_cores=VG_CORES
     }
-
+    
     ##
     ## Call variants with DeepVariant in each contig
     ##
@@ -284,4 +304,58 @@ task splitGAM {
         disks: "local-disk " + disk_size + " SSD"
         docker: in_vg_container
     }
+}
+
+task surjectGAMtoSortedIndexedBAM {
+    input {
+        File in_gam_file
+        File in_xg_file
+        File in_path_list_file
+        String in_sample_name
+        Int in_max_fragment_length
+        String in_vg_container
+        Int in_map_cores
+        String in_map_mem
+    }
+    String out_prefix = basename(in_gam_file, ".gam")
+    Int half_cores = in_map_cores / 2
+    Int disk_size = 3 * round(size(in_xg_file, 'G') + size(in_gam_file, 'G')) + 20
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        vg surject \
+          -F ~{in_path_list_file} \
+          -x ~{in_xg_file} \
+          -t ~{half_cores} \
+          --bam-output \
+          --sample ~{in_sample_name} \
+          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+          --prune-low-cplx \
+          --interleaved --max-frag-len ~{in_max_fragment_length} \
+          ~{in_gam_file} | samtools sort --threads ~{half_cores} \
+                                    -O BAM > ~{out_prefix}.bam \
+            && samtools index ~{out_prefix}.bam
+    >>>
+    output {
+        File output_bam_file = "~{out_prefix}.bam"
+        File output_bam_index_file = "~{out_prefix}.bam.bai"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: in_map_mem + " GB"
+        cpu: in_map_cores
+        disks: "local-disk " + disk_size + " SSD"
+        docker: in_vg_container
+    }
+
 }
