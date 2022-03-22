@@ -99,7 +99,7 @@ workflow vgMultiMap {
 	    in_read_per_chunk=READS_PER_CHUNK,
             in_sample_name=SAMPLE_NAME,
             in_mem=30,
-            in_cores=1,
+            in_cores=6,
             in_vg_container=VG_CONTAINER,
         }
 
@@ -291,7 +291,7 @@ task splitGAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        vg chunk -a ~{in_gam_file} -b chunk -m ~{in_read_per_chunk}
+        vg chunk -t ~{in_cores} -a ~{in_gam_file} -b chunk -m ~{in_read_per_chunk}
     >>>
     output {
         Array[File] gam_chunk_files = glob("chunk*.gam")
@@ -302,7 +302,7 @@ task splitGAM {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:ci-252-fd123d040bb469f6409cb9e570531b9f71627ae9"
     }
 }
 
