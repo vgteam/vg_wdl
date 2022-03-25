@@ -247,13 +247,14 @@ workflow vgMultiMap {
         }
     }
 
+    Int vcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_vcf_file, 'G')) + 20
     # Merge distributed variant called VCFs
     call main.concatClippedVCFChunks {
         input:
             in_sample_name=SAMPLE_NAME,
             in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_vcf_file,
-            in_call_disk=50,
-            in_call_mem=20
+            in_call_disk=vcf_disk_size,
+            in_call_mem=10
     }
     # Extract either the normal or structural variant based VCFs and compress them
     call main.bgzipMergedVCF {
@@ -261,17 +262,18 @@ workflow vgMultiMap {
             in_sample_name=SAMPLE_NAME,
             in_merged_vcf_file=concatClippedVCFChunks.output_merged_vcf,
             in_vg_container=VG_CONTAINER,
-            in_call_disk=20,
-            in_call_mem=20
+            in_call_disk=vcf_disk_size,
+            in_call_mem=10
     }
-        
+
+    Int gvcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_gvcf_file, 'G')) + 20
     # Merge distributed variant called GVCFs
     call main.concatClippedVCFChunks as concatClippedGVCFChunks {
         input:
             in_sample_name=SAMPLE_NAME,
             in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_gvcf_file,
-            in_call_disk=200,
-            in_call_mem=20
+            in_call_disk=gvcf_disk_size,
+            in_call_mem=10
     }
     # Extract either the normal or structural variant based VCFs and compress them
     call main.bgzipMergedVCF as bgzipMergedGVCF{
@@ -279,8 +281,8 @@ workflow vgMultiMap {
             in_sample_name=SAMPLE_NAME + '.g',
             in_merged_vcf_file=concatClippedGVCFChunks.output_merged_vcf,
             in_vg_container=VG_CONTAINER,
-            in_call_disk=100,
-            in_call_mem=20
+            in_call_disk=gvcf_disk_size,
+            in_call_mem=10
     }
     
     if (SORT_GAM){
