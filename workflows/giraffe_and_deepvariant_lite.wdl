@@ -247,7 +247,7 @@ workflow vgMultiMap {
         }
     }
 
-    Int vcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_vcf_file, 'G')) + 20
+    Int vcf_disk_size =  * round(size(runDeepVariantCallVariants.output_vcf_file, 'G')) + 50
     # Merge distributed variant called VCFs
     call main.concatClippedVCFChunks {
         input:
@@ -266,7 +266,7 @@ workflow vgMultiMap {
             in_call_mem=10
     }
 
-    Int gvcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_gvcf_file, 'G')) + 20
+    Int gvcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_gvcf_file, 'G')) + 50
     # Merge distributed variant called GVCFs
     call main.concatClippedVCFChunks as concatClippedGVCFChunks {
         input:
