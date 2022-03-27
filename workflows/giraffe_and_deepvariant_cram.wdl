@@ -322,15 +322,6 @@ workflow vgMultiMap {
             in_call_disk=CALL_DISK,
             in_call_mem=CALL_MEM
     }
-    # Extract either the normal or structural variant based VCFs and compress them
-    call main.bgzipMergedVCF {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_merged_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-            in_vg_container=VG_CONTAINER,
-            in_call_disk=CALL_DISK,
-            in_call_mem=CALL_MEM
-    }
     
     if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
     
@@ -343,8 +334,8 @@ workflow vgMultiMap {
         # Direct vcfeval comparison makes an archive with FP and FN VCFs
         call main.compareCalls {
             input:
-                in_sample_vcf_file=bgzipMergedVCF.output_merged_vcf,
-                in_sample_vcf_index_file=bgzipMergedVCF.output_merged_vcf_index,
+                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
+                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
                 in_truth_vcf_file=select_first([TRUTH_VCF]),
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_template_archive=buildReferenceTemplate.output_template_archive,
@@ -356,8 +347,8 @@ workflow vgMultiMap {
         # Hap.py comparison makes accuracy results stratified by SNPs and indels
         call main.compareCallsHappy {
             input:
-                in_sample_vcf_file=bgzipMergedVCF.output_merged_vcf,
-                in_sample_vcf_index_file=bgzipMergedVCF.output_merged_vcf_index,
+                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
+                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
                 in_truth_vcf_file=select_first([TRUTH_VCF]),
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_reference_file=reference_file,
@@ -402,8 +393,8 @@ workflow vgMultiMap {
     output {
         File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
         File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
-        File output_vcf = bgzipMergedVCF.output_merged_vcf
-        File output_vcf_index = bgzipMergedVCF.output_merged_vcf_index
+        File output_vcf = concatClippedVCFChunks.output_merged_vcf
+        File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
         File? output_gaf = mergeGAF.output_merged_gaf
         File? output_gam = mergeGAM.output_merged_gam
         Array[File] output_calling_bams = calling_bam

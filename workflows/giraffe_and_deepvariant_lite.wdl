@@ -247,7 +247,7 @@ workflow vgMultiMap {
         }
     }
 
-    Int vcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_vcf_file, 'G')) + 50
+    Int vcf_disk_size = 30 * round(size(runDeepVariantCallVariants.output_vcf_file, 'G')) + 50
     # Merge distributed variant called VCFs
     call main.concatClippedVCFChunks {
         input:
@@ -256,31 +256,13 @@ workflow vgMultiMap {
             in_call_disk=vcf_disk_size,
             in_call_mem=10
     }
-    # Extract either the normal or structural variant based VCFs and compress them
-    call main.bgzipMergedVCF {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_merged_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-            in_vg_container=VG_CONTAINER,
-            in_call_disk=vcf_disk_size,
-            in_call_mem=10
-    }
 
-    Int gvcf_disk_size = 5 * round(size(runDeepVariantCallVariants.output_gvcf_file, 'G')) + 50
+    Int gvcf_disk_size = 30 * round(size(runDeepVariantCallVariants.output_gvcf_file, 'G')) + 50
     # Merge distributed variant called GVCFs
     call main.concatClippedVCFChunks as concatClippedGVCFChunks {
         input:
             in_sample_name=SAMPLE_NAME,
             in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_gvcf_file,
-            in_call_disk=gvcf_disk_size,
-            in_call_mem=10
-    }
-    # Extract either the normal or structural variant based VCFs and compress them
-    call main.bgzipMergedVCF as bgzipMergedGVCF{
-        input:
-            in_sample_name=SAMPLE_NAME + '.g',
-            in_merged_vcf_file=concatClippedGVCFChunks.output_merged_vcf,
-            in_vg_container=VG_CONTAINER,
             in_call_disk=gvcf_disk_size,
             in_call_mem=10
     }
@@ -307,10 +289,10 @@ workflow vgMultiMap {
     File gam_file = select_first([mergeGAM.output_merged_gam, mergeGAMandSort.output_merged_gam])
 
     output {
-        File output_vcf = bgzipMergedVCF.output_merged_vcf
-        File output_vcf_index = bgzipMergedVCF.output_merged_vcf_index
-        File output_gvcf = bgzipMergedGVCF.output_merged_vcf
-        File output_gvcf_index = bgzipMergedGVCF.output_merged_vcf_index
+        File output_vcf = concatClippedVCFChunks.output_merged_vcf
+        File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
+        File output_gvcf = concatClippedGVCFChunks.output_merged_vcf
+        File output_gvcf_index = concatClippedGVCFChunks.output_merged_vcf_index
         File output_gam = gam_file
         File? output_gam_index = mergeGAMandSort.output_merged_gam_index
     }   
