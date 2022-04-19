@@ -6,6 +6,11 @@ version 1.0
 ## Reference: https://github.com/vgteam/vg/wiki
 
 workflow vgGiraffeMap {
+    meta {
+        author: "Charles Markello"
+        email: "cmarkell@ucsc.edu"
+        description: "Core VG Giraffe mapping and DeepTrio calling workflow for maternal-paternal-child sample datasets. It takes as inputs reads in FASTQ and graphs containing the population-based haplotypes to genotype. The graphs files required include the XG, GCSA, GBWT, graph GBWT, Distance and Minimizer indexes. It outputs a VCF file and BAM file for the child along with optional RTG and hap.py vcf evaluation if the user provides benchmark truth-set VCFs."
+    }
     input {
         File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
