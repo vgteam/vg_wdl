@@ -41,6 +41,7 @@ workflow vgMultiMap {
         String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
+        String OTHER_MAKEEXAMPLES_ARG = ""              # Additional arguments for the make_examples step of DeepVariant
         Boolean OUTPUT_GAF = true                       # Should a GAF file with the aligned reads be saved?
         Boolean OUTPUT_GAM = true                       # Should a GAM file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
@@ -315,6 +316,7 @@ workflow vgMultiMap {
                 in_min_mapq=MIN_MAPQ,
                 in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
                 in_norm_reads=DV_NORM_READS,
+                in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
                 in_call_cores=CALL_CORES,
                 in_call_disk=CALL_DISK,
                 in_call_mem=CALL_MEM
@@ -1240,11 +1242,11 @@ task runDeepVariantMakeExamples {
         Int in_min_mapq
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
+        String in_other_makeexamples_arg
         Int in_call_cores
         Int in_call_disk
         Int in_call_mem
     }
-    
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1262,22 +1264,21 @@ task runDeepVariantMakeExamples {
         # Files may or may not be indel realigned or left shifted in the names.
         # TODO: move tracking of contig ID to WDL variables!
         CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g | sed s/.indel_realigned$//g | sed s/.left_shifted$//g))
-
         # Reference and its index must be adjacent and not at arbitrary paths
         # the runner gives.
         ln -f -s ~{in_reference_file} reference.fa
         ln -f -s ~{in_reference_index_file} reference.fa.fai
-                
+        
         NORM_READS_ARG=""
-        if [ ~{in_norm_reads} == true ]; then
+        if [ ~{in_norm_reads} == true ] ; then
           NORM_READS_ARG="--normalize_reads"
         fi
-
+        
         KEEP_LEGACY_AC_ARG=""
-        if [ ~{in_keep_legacy_ac} == true ]; then
+        if [ ~{in_keep_legacy_ac} == true ] ; then
           KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
         fi
-
+        
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
@@ -1287,7 +1288,7 @@ task runDeepVariantMakeExamples {
         --sample_name ~{in_sample_name} \
         --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
         --min_mapping_quality ~{in_min_mapq} \
-        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} \
+        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg} \
         --regions ${CONTIG_ID} \
         --task {}
         ls | grep 'make_examples.tfrecord-' | tar -czf 'make_examples.tfrecord.tar.gz' -T -
@@ -1299,7 +1300,7 @@ task runDeepVariantMakeExamples {
     }
     runtime {
         preemptible: 5
-        maxRetries: 5
+        maxRetries: 1
         memory: in_call_mem + " GB"
         cpu: in_call_cores
         disks: "local-disk " + in_call_disk + " SSD"
