@@ -29,6 +29,8 @@ Workflow Description Language (WDL) scripts for common vg workflows
 - [workflow file](workflows/giraffe_and_deepvariant.wdl)
 - [parameter file](params/giraffe_and_deepvariant.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariant:giraffedv?tab=info)
+- Other workflows are also available for different types of input files, e.g. starting from [CRAM files](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromCRAM:giraffedv?tab=info) or [GAM files](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAM:giraffedv?tab=info).
+
 
 ## Usage
 
@@ -63,10 +65,9 @@ To modify the input parameters, edit the input `.json` with the necessary change
 WDL needs the runtime Docker image to be present on Dockerhub.  
 VG images are available in [quay](https://quay.io/repository/vgteam/vg?tab=tags)
 and selected images are available in [ the variantgraphs Dockerhub](https://cloud.docker.com/u/variantgraphs/repository/docker/variantgraphs/vg),  
-and can be pulled with: 
-
+and can be pulled with:  
 ```
-docker pull variantgraphs/vg
+docker pull variantgraphs/vg  
 ```
 
 Specific tags can be specified like so:  
