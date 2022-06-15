@@ -1,7 +1,7 @@
 vg\_wdl
 ---------------
-Eric T Dawson, Mike Lin and Charles Markello
-MIT License, 2018
+Eric T Dawson, Mike Lin and Charles Markello, Jean Monlong, Adam Novak
+MIT License, 2022
 
 Workflow Description Language (WDL) scripts for common vg workflows
 
@@ -29,7 +29,10 @@ Workflow Description Language (WDL) scripts for common vg workflows
 - [workflow file](workflows/giraffe_and_deepvariant.wdl)
 - [parameter file](params/giraffe_and_deepvariant.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariant:giraffedv?tab=info)
-- Other workflows are also available for different types of input files, e.g. starting from [CRAM files](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromCRAM:giraffedv?tab=info) or [GAM files](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAM:giraffedv?tab=info).
+- Two other flavors of this workflow are also available:
+    1. [GiraffeDeepVariantLite](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantLite:giraffedv?tab=info) defined by [giraffe_and_deepvariant_lite.wdl](workflows/giraffe_and_deepvariant_lite.wdl) is the slightly more optimized workflow that we used to analyze the 1000 Genomes Project dataset with the HPRC pangenome.
+    1. [GiraffeDeepVariantFromGAM](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAM:giraffedv?tab=info) defined by [giraffe_and_deepvariant_fromGAM.wdl](workflows/giraffe_and_deepvariant_fromGAM.wdl) starts from already aligned reads in the GAM format
+
 
 ## Usage
 
@@ -60,12 +63,13 @@ miniwdl cromwell vg_multi_map_call.wdl -i vg_multi_map_call.inputs_tiny.http_url
 To modify the input parameters, edit the input `.json` with the necessary changes.
 
 ## Docker Containers
+
 WDL needs the runtime Docker image to be present on Dockerhub.  
 VG images are available in [quay](https://quay.io/repository/vgteam/vg?tab=tags)
 and selected images are available in [ the variantgraphs Dockerhub](https://cloud.docker.com/u/variantgraphs/repository/docker/variantgraphs/vg),  
 and can be pulled with:  
 ```
-    docker pull variantgraphs/vg  
+docker pull variantgraphs/vg  
 ```
 
 Specific tags can be specified like so:  
@@ -75,6 +79,7 @@ docker pull variantgraphs/vg:1.3.1
 ```
 
 ## Contributing, Help, Bugs and Requests
+
 Please open an Issue on [github](https://github.com/vgteam/vg_wdl) for help, bug reports, or feature requests.
-When doing so, please remember that vg\_wdl is open-source software made by a community of developers. Please
-be considerate and support a positive environment.
+When doing so, please remember that vg\_wdl is open-source software made by a community of developers. 
+Please be considerate and support a positive environment.

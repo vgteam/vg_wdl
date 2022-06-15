@@ -1,0 +1,15 @@
+{
+  "vgMultiMap.XG_FILE": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/hprc-f1-D10M-clipped-indexes/GRCh38-f1g-90-mc-aug11-clip.d9.m1000.D10M.m1000.xg",
+  "vgMultiMap.GBWT_FILE": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/hprc-f1-D10M-clipped-indexes/GRCh38-f1g-90-mc-aug11-clip.d9.m1000.D10M.m1000.gbwt",
+  "vgMultiMap.GGBWT_FILE": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/hprc-f1-D10M-clipped-indexes/GRCh38-f1g-90-mc-aug11-clip.d9.m1000.D10M.m1000.gg",
+  "vgMultiMap.MIN_FILE": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/hprc-f1-D10M-clipped-indexes/GRCh38-f1g-90-mc-aug11-clip.d9.m1000.D10M.m1000.min",
+  "vgMultiMap.DIST_FILE": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/hprc-f1-D10M-clipped-indexes/GRCh38-f1g-90-mc-aug11-clip.d9.m1000.D10M.m1000.dist",
+  "vgMultiMap.SAMPLE_NAME": "HG00106",
+  "vgMultiMap.INPUT_CRAM_FILE": "gs://fc-56ac46ea-efc4-4683-b6d5-6d95bed41c5e/CCDG_13607/Project_CCDG_13607_B01_GRM_WGS.cram.2019-02-06/Sample_HG00106/analysis/HG00106.final.cram",
+  "vgMultiMap.CRAM_REF": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/fasta-indexes-for-crams/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+  "vgMultiMap.CRAM_REF_INDEX": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/fasta-indexes-for-crams/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai",
+  "vgMultiMap.DV_MODEL_META": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/giraffe-hprc-20211021/dv-giraffe-model/model.ckpt-267000.meta",
+  "vgMultiMap.DV_MODEL_INDEX": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/giraffe-hprc-20211021/dv-giraffe-model/model.ckpt-267000.index",
+  "vgMultiMap.DV_MODEL_DATA": "gs://fc-0e9b62da-2dd8-42e5-bb50-8d08e7cdebc3/giraffe-hprc-20211021/dv-giraffe-model/model.ckpt-267000.data-00000-of-00001",
+}
+

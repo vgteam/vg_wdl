@@ -1,0 +1,48 @@
+version: 1.2
+workflows:
+  - name: GiraffeDeepVariant
+    subclass: WDL
+    description: Maps raw short reads from a pair of FASTQs or a CRAM file on a pangenome with vg Giraffe and call variants with DeepVariant.
+    primaryDescriptorPath: /workflows/giraffe_and_deepvariant.wdl
+    testParameterFiles:
+      - /params/giraffe_and_deepvariant.json
+    branches:
+      - giraffedv
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
+      - name: Adam Novak
+        email: anovak@soe.ucsc.edu
+      - name: Charles Markello
+        email: cmarkell@ucsc.edu
+  - name: GiraffeDeepVariantLite
+    subclass: WDL
+    description: More optimized workflow to map short reads from a pair of FASTQs or a CRAM file on a pangenome with vg Giraffe and call variants with DeepVariant.
+    primaryDescriptorPath: /workflows/giraffe_and_deepvariant_lite.wdl
+    testParameterFiles:
+      - /params/giraffe_and_deepvariant_cram.json
+    branches:
+      - giraffedv
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
+      - name: Adam Novak
+        email: anovak@soe.ucsc.edu
+      - name: Charles Markello
+        email: cmarkell@ucsc.edu
+  - name: GiraffeDeepVariantFromGAM
+    subclass: WDL
+    description: More optimized workflow that starts from aligned GAM, surject to a linear genome and call variants with DeepVariant.
+    primaryDescriptorPath: /workflows/giraffe_and_deepvariant_fromGAM.wdl
+    testParameterFiles:
+      - /params/giraffe_and_deepvariant_gam.json
+    branches:
+      - giraffedv
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
+      - name: Adam Novak
+        email: anovak@soe.ucsc.edu
+      - name: Charles Markello
+        email: cmarkell@ucsc.edu
+      
