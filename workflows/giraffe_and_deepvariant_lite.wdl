@@ -4,8 +4,8 @@ import "giraffe_and_deepvariant.wdl" as main
 
 ### giraffe_and_deepvariant_lite.wdl ###
 ## Author: Jean Monlong
-## Description: Core VG Giraffe mapping and DeepVariant calling workflow for single sample datasets.
-## Reference: https://github.com/vgteam/vg/wiki
+## Description: Core VG Giraffe mapping and DeepVariant calling workflow for single sample datasets. This workflow is slightly more optimisized than the GiraffeDeepVariant (giraffe_and_deepvariant.wdl) one.
+## Reference: https://github.com/vgteam/vg_wdl
 
 workflow vgMultiMap {
     input {
@@ -16,7 +16,6 @@ workflow vgMultiMap {
         File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 30000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
@@ -32,10 +31,6 @@ workflow vgMultiMap {
         Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
         Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
-        # DeepVariant tontainer to use for CPU steps
-        String DV_CONTAINER = "google/deepvariant:1.3.0"
-        # DeepVariant container to use for GPU steps
-        String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
         Boolean SORT_GAM = false                        # Should the GAM be sorted
@@ -68,7 +63,6 @@ workflow vgMultiMap {
         input:
             in_read_file=read_1_file,
             in_pair_id="1",
-            in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
@@ -77,7 +71,6 @@ workflow vgMultiMap {
         input:
             in_read_file=read_2_file,
             in_pair_id="2",
-            in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
@@ -94,8 +87,7 @@ workflow vgMultiMap {
             call extractSubsetPathNames {
                 input:
                     in_xg_file=XG_FILE,
-                    in_vg_container=VG_CONTAINER,
-                    in_extract_mem=MAP_MEM
+                            in_extract_mem=MAP_MEM
             }
         }
     } 
@@ -114,8 +106,7 @@ workflow vgMultiMap {
             input:
                 in_xg_file=XG_FILE,
                 in_path_list_file=pipeline_path_list_file,
-                in_vg_container=VG_CONTAINER,
-                in_extract_mem=MAP_MEM
+                    in_extract_mem=MAP_MEM
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
@@ -138,7 +129,6 @@ workflow vgMultiMap {
             input:
             in_left_read_pair_chunk_file=read_pair_chunk_files.left,
             in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-            in_vg_container=VG_CONTAINER,
             in_xg_file=XG_FILE,
             in_gbwt_file=GBWT_FILE,
             in_ggbwt_file=GGBWT_FILE,
@@ -155,7 +145,6 @@ workflow vgMultiMap {
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_vg_container=VG_CONTAINER,
             in_map_cores=MAP_CORES,
             in_map_mem=MAP_MEM
         }
@@ -219,7 +208,6 @@ workflow vgMultiMap {
         ## DeepVariant calling
         call runDeepVariantMakeExamples {
             input:
-                in_dv_container=DV_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_bam_file=calling_bam,
                 in_bam_file_index=calling_bam_index,
@@ -233,7 +221,6 @@ workflow vgMultiMap {
         }
         call runDeepVariantCallVariants {
             input:
-                in_dv_gpu_container=DV_GPU_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
@@ -272,7 +259,6 @@ workflow vgMultiMap {
             input:
             in_sample_name=SAMPLE_NAME,
             in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
-            in_vg_container=VG_CONTAINER,
             in_mem=MAP_MEM,
             in_cores=MAP_CORES
         }
@@ -281,8 +267,7 @@ workflow vgMultiMap {
         call mergeGAM {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
-            in_vg_container=VG_CONTAINER
+            in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file
         }
     }
 
@@ -344,7 +329,6 @@ task splitCramFastq {
 task extractSubsetPathNames {
     input {
         File in_xg_file
-        String in_vg_container
         Int in_extract_mem
     }
     Int disk_size = round(3 * size(in_xg_file, 'G')) + 20
@@ -364,7 +348,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.37.0"
     }
 }
 
@@ -372,7 +356,6 @@ task extractReference {
     input {
         File in_xg_file
         File in_path_list_file
-        String in_vg_container
         Int in_extract_mem
     }
     Int disk_size = round(3 * size(in_xg_file, 'G')) + 20
@@ -393,7 +376,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.37.0"
     }
 }
 
@@ -436,7 +419,6 @@ task runVGGIRAFFE {
         File in_ggbwt_file
         File in_dist_file
         File in_min_file
-        String in_vg_container
         String in_sample_name
         Int in_map_cores
         String in_map_mem
@@ -477,7 +459,7 @@ task runVGGIRAFFE {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.37.0"
     }
 }
 
@@ -488,7 +470,6 @@ task surjectGAMtoSortedBAM {
         File in_path_list_file
         String in_sample_name
         Int in_max_fragment_length
-        String in_vg_container
         Int in_map_cores
         String in_map_mem
     }
@@ -528,7 +509,7 @@ task surjectGAMtoSortedBAM {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.37.0"
     }
 
 }
@@ -576,7 +557,6 @@ task mergeGAM {
     input {
         String in_sample_name
         Array[File] in_gam_chunk_files
-        String in_vg_container
     }
     Int disk_size = round(4 * size(in_gam_chunk_files, 'G')) + 20
     command <<<
@@ -602,7 +582,7 @@ task mergeGAM {
         memory: "10 GB"
         cpu: 1
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.37.0"
     }
 }
 
@@ -610,7 +590,6 @@ task mergeGAMandSort {
     input {
         String in_sample_name
         Array[File] in_gam_chunk_files
-        String in_vg_container
         Int in_cores
         Int in_mem
     }
@@ -640,7 +619,7 @@ task mergeGAMandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.37.0"
     }
 }
 
@@ -850,7 +829,6 @@ task runAbraRealigner {
 
 task runDeepVariantMakeExamples {
     input {
-        String in_dv_container
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
@@ -921,13 +899,12 @@ task runDeepVariantMakeExamples {
         memory: in_call_mem + " GB"
         cpu: in_call_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_dv_container
+        docker: "google/deepvariant:1.3.0"
     }
 }
 
 task runDeepVariantCallVariants {
     input {
-        String in_dv_gpu_container
         String in_sample_name
         File in_reference_file
         File in_reference_index_file
@@ -998,7 +975,7 @@ task runDeepVariantCallVariants {
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + disk_size + " SSD"
-        docker: in_dv_gpu_container
+        docker: "google/deepvariant:1.3.0"
     }
 }
 

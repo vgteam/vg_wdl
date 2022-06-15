@@ -75,7 +75,6 @@ workflow vgMultiMap {
         input:
             in_read_file=read_1_file,
             in_pair_id="1",
-            in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
@@ -84,7 +83,6 @@ workflow vgMultiMap {
         input:
             in_read_file=read_2_file,
             in_pair_id="2",
-            in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
@@ -469,7 +467,6 @@ task splitReads {
     input {
         File in_read_file
         String in_pair_id
-        String in_vg_container
         Int in_reads_per_chunk
         Int in_split_read_cores
         Int in_split_read_disk

@@ -29,7 +29,9 @@ Workflow Description Language (WDL) scripts for common vg workflows
 - [workflow file](workflows/giraffe_and_deepvariant.wdl)
 - [parameter file](params/giraffe_and_deepvariant.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariant:giraffedv?tab=info)
-- Other workflows are also available for different types of input files, e.g. starting from [CRAM files](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromCRAM:giraffedv?tab=info) or [GAM files](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAM:giraffedv?tab=info).
+- Two other flavors of this workflow are also available:
+    1. [GiraffeDeepVariantLite](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantLite:giraffedv?tab=info) defined by [giraffe_and_deepvariant_lite.wdl](workflows/giraffe_and_deepvariant_lite.wdl) is the slightly more optimized workflow that we used to analyze the 1000 Genomes Project dataset with the HPRC pangenome.
+    1. [GiraffeDeepVariantFromGAM](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAM:giraffedv?tab=info) defined by [giraffe_and_deepvariant_fromGAM.wdl](workflows/giraffe_and_deepvariant_fromGAM.wdl) starts from already aligned reads in the GAM format
 
 
 ## Usage
