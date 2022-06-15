@@ -7,7 +7,7 @@ workflows:
     testParameterFiles:
       - /params/giraffe_and_deepvariant.json
     branches:
-      - giraffedv
+      - master
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
@@ -22,7 +22,7 @@ workflows:
     testParameterFiles:
       - /params/giraffe_and_deepvariant_cram.json
     branches:
-      - giraffedv
+      - master
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
@@ -37,7 +37,7 @@ workflows:
     testParameterFiles:
       - /params/giraffe_and_deepvariant_gam.json
     branches:
-      - giraffedv
+      - master
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
