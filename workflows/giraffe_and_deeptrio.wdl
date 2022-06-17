@@ -23,8 +23,6 @@ workflow vgGiraffeDeeptrio {
         String SAMPLE_NAME                              # The child sample name
         String MATERNAL_NAME                            # The maternal sample name
         String PATERNAL_NAME                            # The paternal sample name
-        # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.36.0"
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String? GIRAFFE_OPTIONS                         # (OPTIONAL) extra command line options for Giraffe mapper
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
@@ -77,7 +75,6 @@ workflow vgGiraffeDeeptrio {
             call extractSubsetPathNames {
                 input:
                     in_xg_file=XG_FILE,
-                    in_vg_container=VG_CONTAINER,
                     in_extract_disk=MAP_DISK,
                     in_extract_mem=MAP_MEM
             }
@@ -98,7 +95,6 @@ workflow vgGiraffeDeeptrio {
             input:
                 in_xg_file=XG_FILE,
                 in_path_list_file=pipeline_path_list_file,
-                in_vg_container=VG_CONTAINER,
                 in_extract_disk=MAP_DISK,
                 in_extract_mem=MAP_MEM
         }
@@ -124,7 +120,6 @@ workflow vgGiraffeDeeptrio {
             INPUT_READ_FILE_1=MATERNAL_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=MATERNAL_INPUT_READ_FILE_2,
             SAMPLE_NAME=MATERNAL_NAME,
-            VG_CONTAINER=VG_CONTAINER,
             READS_PER_CHUNK=READS_PER_CHUNK,
             GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
             PATH_LIST_FILE=pipeline_path_list_file,
@@ -154,7 +149,6 @@ workflow vgGiraffeDeeptrio {
             INPUT_READ_FILE_1=PATERNAL_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=PATERNAL_INPUT_READ_FILE_2,
             SAMPLE_NAME=PATERNAL_NAME,
-            VG_CONTAINER=VG_CONTAINER,
             READS_PER_CHUNK=READS_PER_CHUNK,
             GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
             PATH_LIST_FILE=pipeline_path_list_file,
@@ -184,7 +178,6 @@ workflow vgGiraffeDeeptrio {
             INPUT_READ_FILE_1=CHILD_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=CHILD_INPUT_READ_FILE_2,
             SAMPLE_NAME=SAMPLE_NAME,
-            VG_CONTAINER=VG_CONTAINER,
             READS_PER_CHUNK=READS_PER_CHUNK,
             GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
             PATH_LIST_FILE=pipeline_path_list_file,
@@ -411,7 +404,6 @@ workflow vgGiraffeDeeptrio {
         input:
             in_sample_name=SAMPLE_NAME,
             in_merged_vcf_file=concatVCFChunksChild.output_merged_vcf,
-            in_vg_container=VG_CONTAINER,
             in_call_disk=CALL_DISK,
             in_call_mem=CALL_MEM
     }
@@ -431,7 +423,6 @@ workflow vgGiraffeDeeptrio {
         input:
             in_sample_name=MATERNAL_NAME,
             in_merged_vcf_file=concatVCFChunksMaternal.output_merged_vcf,
-            in_vg_container=VG_CONTAINER,
             in_call_disk=CALL_DISK,
             in_call_mem=CALL_MEM
     }
@@ -451,7 +442,6 @@ workflow vgGiraffeDeeptrio {
         input:
             in_sample_name=PATERNAL_NAME,
             in_merged_vcf_file=concatVCFChunksPaternal.output_merged_vcf,
-            in_vg_container=VG_CONTAINER,
             in_call_disk=CALL_DISK,
             in_call_mem=CALL_MEM
     }
@@ -509,7 +499,6 @@ task splitReads {
     input {
         File in_read_file
         String in_pair_id
-        String in_vg_container
         Int in_reads_per_chunk
         Int in_split_read_cores
         Int in_split_read_disk
@@ -546,7 +535,6 @@ task splitReads {
 task extractSubsetPathNames {
     input {
         File in_xg_file
-        String in_vg_container
         Int in_extract_disk
         Int in_extract_mem
     }
@@ -567,7 +555,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 
@@ -575,7 +563,6 @@ task extractReference {
     input {
         File in_xg_file
         File in_path_list_file
-        String in_vg_container
         Int in_extract_disk
         Int in_extract_mem
     }
@@ -597,7 +584,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 
@@ -643,7 +630,6 @@ task runVGGIRAFFE {
         File in_dist_file
         File in_min_file
         File in_ref_dict
-        String in_vg_container
         String? in_giraffe_options
         String in_sample_name
         Int in_map_cores
@@ -688,7 +674,7 @@ task runVGGIRAFFE {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 
@@ -1313,7 +1299,6 @@ task bgzipMergedVCF {
     input {
         String in_sample_name
         File in_merged_vcf_file
-        String in_vg_container
         Int in_call_disk
         Int in_call_mem
     }
@@ -1344,7 +1329,7 @@ task bgzipMergedVCF {
         time: 30
         memory: in_call_mem + " GB"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 

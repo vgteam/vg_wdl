@@ -15,8 +15,6 @@ workflow vgGiraffeMap {
         File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                              # The sample name
-        # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.36.0"
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String? GIRAFFE_OPTIONS                         # (OPTIONAL) extra command line options for Giraffe mapper
         File PATH_LIST_FILE                             # Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
@@ -47,7 +45,6 @@ workflow vgGiraffeMap {
         input:
             in_read_file=INPUT_READ_FILE_1,
             in_pair_id="1",
-            in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
@@ -56,7 +53,6 @@ workflow vgGiraffeMap {
         input:
             in_read_file=INPUT_READ_FILE_2,
             in_pair_id="2",
-            in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
@@ -69,7 +65,6 @@ workflow vgGiraffeMap {
             input:
                 in_xg_file=XG_FILE,
                 in_path_list_file=PATH_LIST_FILE,
-                in_vg_container=VG_CONTAINER,
                 in_extract_disk=MAP_DISK,
                 in_extract_mem=MAP_MEM
         }
@@ -96,7 +91,6 @@ workflow vgGiraffeMap {
             input:
                 in_left_read_pair_chunk_file=read_pair_chunk_files.left,
                 in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-                in_vg_container=VG_CONTAINER,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_xg_file=XG_FILE,
                 in_gbwt_file=GBWT_FILE,
@@ -256,7 +250,6 @@ task splitReads {
     input {
         File in_read_file
         String in_pair_id
-        String in_vg_container
         Int in_reads_per_chunk
         Int in_split_read_cores
         Int in_split_read_disk
@@ -293,7 +286,6 @@ task splitReads {
 task extractSubsetPathNames {
     input {
         File in_xg_file
-        String in_vg_container
         Int in_extract_disk
         Int in_extract_mem
     }
@@ -314,7 +306,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 
@@ -322,7 +314,6 @@ task extractReference {
     input {
         File in_xg_file
         File in_path_list_file
-        String in_vg_container
         Int in_extract_disk
         Int in_extract_mem
     }
@@ -344,7 +335,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 
@@ -390,7 +381,6 @@ task runVGGIRAFFE {
         File in_dist_file
         File in_min_file
         File in_ref_dict
-        String in_vg_container
         String? in_giraffe_options
         String in_sample_name
         Int in_map_cores
@@ -435,7 +425,7 @@ task runVGGIRAFFE {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 
@@ -1060,7 +1050,6 @@ task bgzipMergedVCF {
     input {
         String in_sample_name
         File in_merged_vcf_file
-        String in_vg_container
         Int in_call_disk
         Int in_call_mem
     }
@@ -1091,7 +1080,7 @@ task bgzipMergedVCF {
         time: 30
         memory: in_call_mem + " GB"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: in_vg_container
+        docker: "quay.io/vgteam/vg:v1.38.0"
     }
 }
 

@@ -975,7 +975,7 @@ task runDeepVariantCallVariants {
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "google/deepvariant:1.3.0"
+        docker: "google/deepvariant:1.3.0-gpu"
     }
 }
 

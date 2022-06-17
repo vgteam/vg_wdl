@@ -1,5 +1,20 @@
 version: 1.2
 workflows:
+  - name: GiraffeDeepTrio
+    subclass: WDL
+    description: Core VG Giraffe mapping and DeepTrio calling workflow for maternal-paternal-child sample datasets. It takes as inputs reads in FASTQ and graphs containing the population-based haplotypes to genotype. The graphs files required include the XG, GCSA, GBWT, graph GBWT, Distance and Minimizer indexes. It outputs a VCF file and BAM file for the child along with optional RTG and hap.py vcf evaluation if the user provides benchmark truth-set VCFs.
+    primaryDescriptorPath: /workflows/giraffe_and_deeptrio.wdl
+    testParameterFiles:
+      - /params/vg_hprc_deeptrio_map_call.inputs_tiny.gs_url.json
+    branches:
+      - master
+    authors:
+      - name: Charles Markello
+        email: cmarkell@ucsc.edu
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
+      - name: Adam Novak
+        email: anovak@soe.ucsc.edu
   - name: GiraffeDeepVariant
     subclass: WDL
     description: Maps raw short reads from a pair of FASTQs or a CRAM file on a pangenome with vg Giraffe and call variants with DeepVariant.
