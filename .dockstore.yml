@@ -23,6 +23,7 @@ workflows:
       - /params/giraffe_and_deepvariant.json
     branches:
       - master
+      - giraffedv
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
