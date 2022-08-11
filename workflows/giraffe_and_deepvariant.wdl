@@ -42,7 +42,7 @@ workflow vgMultiMap {
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
         String OTHER_MAKEEXAMPLES_ARG = ""              # Additional arguments for the make_examples step of DeepVariant
-        Boolean OUTPUT_GAF = true                       # Should a GAF file with the aligned reads be saved?
+        Boolean OUTPUT_GAF = false                       # Should a GAF file with the aligned reads be saved?
         Boolean OUTPUT_GAM = true                       # Should a GAM file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 60
@@ -906,10 +906,9 @@ task fixBAMContigNaming {
         samtools view -H ~{in_bam_file}  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
 
         # insert the new header, and strip all instances of the prefix
-        samtools reheader -P new_header.sam  ~{in_bam_file} | \
-          samtools view -h | \
+        cat <(cat new_header.sam) <(samtools view ~{in_bam_file}) | \
           sed -e "s/~{in_prefix_to_strip}//g" | \
-          samtools view --threads ~{in_map_cores} -O BAM > fixed.bam   
+          samtools view --threads ~{in_map_cores} -O BAM > fixed.bam
     >>>
     output {
         File fixed_bam_file = "fixed.bam"
