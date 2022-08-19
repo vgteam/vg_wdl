@@ -83,3 +83,13 @@ docker pull variantgraphs/vg:1.3.1
 Please open an Issue on [github](https://github.com/vgteam/vg_wdl) for help, bug reports, or feature requests.
 When doing so, please remember that vg\_wdl is open-source software made by a community of developers. 
 Please be considerate and support a positive environment.
+
+## Testing locally
+
+To test the workflow locally, e.g. on the [small simulated dataset](tests/small_sim_graph):
+
+```
+## GAM/GAF sorting
+java -jar $CROMWELL_JAR run workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_aligned_reads.gam.json
+java -jar $CROMWELL_JAR run workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_aligned_reads.gaf.json
+```

@@ -61,4 +61,17 @@ workflows:
         email: anovak@soe.ucsc.edu
       - name: Charles Markello
         email: cmarkell@ucsc.edu
+  - name: sortGraphAlignedReads
+    subclass: WDL
+    description: Sort a GAM file or a GAF file
+    primaryDescriptorPath: /workflows/sort_graph_aligned_reads.wdl
+    testParameterFiles:
+      - /params/sort_graph_aligned_reads.gam.json
+      - /params/sort_graph_aligned_reads.gaf.json
+    branches:
+      - master
+      - giraffedv
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
       
