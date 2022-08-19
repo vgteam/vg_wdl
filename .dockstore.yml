@@ -48,12 +48,14 @@ workflows:
         email: cmarkell@ucsc.edu
   - name: GiraffeDeepVariantFromGAM
     subclass: WDL
-    description: More optimized workflow that starts from aligned GAM, surject to a linear genome and call variants with DeepVariant.
+    description: Starts from an aligned GAM file (or GAF file), surject to a linear genome and call variants with DeepVariant.
     primaryDescriptorPath: /workflows/giraffe_and_deepvariant_fromGAM.wdl
     testParameterFiles:
       - /params/giraffe_and_deepvariant_gam.json
+      - /params/giraffe_and_deepvariant_gaf.json
     branches:
       - master
+      - giraffedv
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu

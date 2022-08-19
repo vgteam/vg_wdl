@@ -1,6 +1,7 @@
 version 1.0
 
 import "giraffe_and_deepvariant.wdl" as main
+import "../tasks/gam_gaf_utils.wdl" as gautils
 
 ### giraffe_and_deepvariant_lite.wdl ###
 ## Author: Jean Monlong
@@ -86,8 +87,8 @@ workflow vgMultiMap {
             # calling on the decoys is semantically meaningless.
             call extractSubsetPathNames {
                 input:
-                    in_xg_file=XG_FILE,
-                            in_extract_mem=MAP_MEM
+                in_xg_file=XG_FILE,
+                in_extract_mem=MAP_MEM
             }
         }
     } 
@@ -138,7 +139,7 @@ workflow vgMultiMap {
             in_map_cores=MAP_CORES,
             in_map_mem=MAP_MEM
         }
-        call surjectGAMtoSortedBAM {
+        call gautils.surjectGAMtoSortedBAM {
             input:
             in_gam_file=runVGGIRAFFE.chunk_gam_file,
             in_xg_file=XG_FILE,
@@ -461,57 +462,6 @@ task runVGGIRAFFE {
         disks: "local-disk " + disk_size + " SSD"
         docker: "quay.io/vgteam/vg:v1.37.0"
     }
-}
-
-task surjectGAMtoSortedBAM {
-    input {
-        File in_gam_file
-        File in_xg_file
-        File in_path_list_file
-        String in_sample_name
-        Int in_max_fragment_length
-        Int in_map_cores
-        String in_map_mem
-    }
-    String out_prefix = basename(in_gam_file, ".gam")
-    Int half_cores = in_map_cores / 2
-    Int disk_size = 3 * round(size(in_xg_file, 'G') + size(in_gam_file, 'G')) + 20
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        vg surject \
-          -F ~{in_path_list_file} \
-          -x ~{in_xg_file} \
-          -t ~{half_cores} \
-          --bam-output \
-          --sample ~{in_sample_name} \
-          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx \
-          --interleaved --max-frag-len ~{in_max_fragment_length} \
-          ~{in_gam_file} | samtools sort --threads ~{half_cores} \
-                                    -O BAM > ~{out_prefix}.bam
-    >>>
-    output {
-        File output_bam_file = "~{out_prefix}.bam"
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.37.0"
-    }
-
 }
 
 task mergeAlignmentBAMChunks {

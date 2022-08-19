@@ -1,4 +1,4 @@
 {
   "sortGraphAlignedReads.GAF_FILE": "tests/small_sim_graph/reads.gaf.gz",
-  "sortGraphAlignedReads.XG_FILE": "tests/small_sim_graph/index.xg"
+  "sortGraphAlignedReads.XG_FILE": "tests/small_sim_graph/graph.xg"
 }

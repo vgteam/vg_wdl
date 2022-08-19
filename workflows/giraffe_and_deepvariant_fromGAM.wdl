@@ -2,15 +2,18 @@ version 1.0
 
 import "giraffe_and_deepvariant.wdl" as main
 import "giraffe_and_deepvariant_lite.wdl" as lite
+import "../tasks/gam_gaf_utils.wdl" as gautils
+import "../tasks/deepvariant.wdl" as deepvariant
 
 ### giraffe_and_deepvariant_fromGAM.wdl ###
 ## Author: Jean Monlong
 ## Description: Surject a GAM and run DeepVariant calling workflow for single sample datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-workflow vgMultiMap {
+workflow GiraffeDeepVariantFromGAM {
     input {
-        File INPUT_GAM                                 # Input GAM
+        File? INPUT_GAM                                 # Input GAM
+        File? INPUT_GAF                                 # Input GAF
         String SAMPLE_NAME                              # The sample name
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
@@ -52,7 +55,6 @@ workflow vgMultiMap {
             call lite.extractSubsetPathNames {
                 input:
                     in_xg_file=XG_FILE,
-                    in_vg_container=VG_CONTAINER,
                     in_extract_mem=VG_MEM
             }
         }
@@ -72,7 +74,6 @@ workflow vgMultiMap {
             input:
                 in_xg_file=XG_FILE,
                 in_path_list_file=pipeline_path_list_file,
-                in_vg_container=VG_CONTAINER,
                 in_extract_mem=VG_MEM
         }
     }
@@ -90,28 +91,35 @@ workflow vgMultiMap {
 
     if (SPLIT_AND_SURJECT){
         ##
-        ## Split GAM into one GAM per chromosome
+        ## Split GAM into chunks
         ##
 
-        call splitGAM {
-            input:
-            in_gam_file=INPUT_GAM,
-	    in_read_per_chunk=READS_PER_CHUNK,
-            in_sample_name=SAMPLE_NAME,
-            in_mem=30,
-            in_cores=6,
-            in_vg_container=VG_CONTAINER,
+        if(defined(INPUT_GAM)){
+            call gautils.splitGAM {
+                input:
+                in_gam_file=select_first([INPUT_GAM]),
+	            in_read_per_chunk=READS_PER_CHUNK
+            }
+        }
+        if(defined(INPUT_GAF)){
+            call gautils.splitGAF {
+                input:
+                in_gaf_file=select_first([INPUT_GAF]),
+	            in_read_per_chunk=READS_PER_CHUNK
+            }
         }
 
-        scatter (gam_chunk_file in splitGAM.gam_chunk_files) {
-            call lite.surjectGAMtoSortedBAM {
+        Array[File] chunk_files = select_first([splitGAM.gam_chunk_files, splitGAF.gaf_chunk_files])
+        
+        scatter (gam_chunk_file in chunk_files) {
+            call gautils.surjectGAMtoSortedBAM as surjectGAMtoSortedBAM_chunk {
                 input:
                 in_gam_file=gam_chunk_file,
                 in_xg_file=XG_FILE,
                 in_path_list_file=pipeline_path_list_file,
                 in_sample_name=SAMPLE_NAME,
+                input_is_gaf=defined(INPUT_GAF),
                 in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-                in_vg_container=VG_CONTAINER,
                 in_map_cores=VG_CORES,
                 in_map_mem=VG_MEM
             }
@@ -120,26 +128,28 @@ workflow vgMultiMap {
         call lite.mergeAlignmentBAMChunks {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=surjectGAMtoSortedBAM.output_bam_file,
+            in_alignment_bam_chunk_files=surjectGAMtoSortedBAM_chunk.output_bam_file,
             in_map_cores=16
         }
     }
     if (!SPLIT_AND_SURJECT){
-        call surjectGAMtoSortedIndexedBAM {
+        File ga_file = select_first([INPUT_GAM, INPUT_GAF])
+        call gautils.surjectGAMtoSortedBAM as surjectGAMtoSortedBAM_whole {
             input:
-            in_gam_file=INPUT_GAM,
+            in_gam_file=ga_file,
             in_xg_file=XG_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_vg_container=VG_CONTAINER,
+            make_bam_index=true,
+            input_is_gaf=defined(INPUT_GAF),
             in_map_cores=VG_CORES,
             in_map_mem=VG_MEM
         }
     }
 
-    File merged_bam = select_first([mergeAlignmentBAMChunks.merged_bam_file, surjectGAMtoSortedIndexedBAM.output_bam_file])
-    File merged_bam_index = select_first([mergeAlignmentBAMChunks.merged_bam_file_index, surjectGAMtoSortedIndexedBAM.output_bam_index_file])
+    File merged_bam = select_first([mergeAlignmentBAMChunks.merged_bam_file, surjectGAMtoSortedBAM_whole.output_bam_file])
+    File merged_bam_index = select_first([mergeAlignmentBAMChunks.merged_bam_file_index, surjectGAMtoSortedBAM_whole.output_bam_index_file])
     
     # Split merged alignment by contigs list
     call lite.splitBAMbyPath { 
@@ -190,7 +200,7 @@ workflow vgMultiMap {
         File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, current_bam])
         File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, current_bam_index])
         ## DeepVariant calling
-        call lite.runDeepVariantMakeExamples {
+        call deepvariant.runDeepVariantMakeExamples {
             input:
                 in_dv_container=DV_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
@@ -204,7 +214,7 @@ workflow vgMultiMap {
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
         }
-        call lite.runDeepVariantCallVariants {
+        call deepvariant.runDeepVariantCallVariants {
             input:
                 in_dv_gpu_container=DV_GPU_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
@@ -251,44 +261,6 @@ workflow vgMultiMap {
 ########################
 ### TASK DEFINITIONS ###
 ########################
-
-task splitGAM {
-    input {
-        File in_gam_file
-	Int in_read_per_chunk
-        String in_sample_name
-        Int in_mem
-        Int in_cores
-        String in_vg_container
-    }
-    Int disk_size = 3 * round(size(in_gam_file, 'G')) + 20
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        vg chunk -t ~{in_cores} -a ~{in_gam_file} -b chunk -m ~{in_read_per_chunk}
-    >>>
-    output {
-        Array[File] gam_chunk_files = glob("chunk*.gam")
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: in_mem + " GB"
-        cpu: in_cores
-        disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:ci-252-fd123d040bb469f6409cb9e570531b9f71627ae9"
-    }
-}
 
 task surjectGAMtoSortedIndexedBAM {
     input {

@@ -5,7 +5,7 @@ version 1.0
 ## Description: Core VG Giraffe mapping and DeepVariant calling workflow for single sample datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-workflow vgMultiMap {
+workflow GiraffeDeepVariant {
     input {
         File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
         File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz

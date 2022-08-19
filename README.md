@@ -89,6 +89,14 @@ Please be considerate and support a positive environment.
 To test the workflow locally, e.g. on the [small simulated dataset](tests/small_sim_graph):
 
 ```
+## Giraffe-DV starting from two FASTQ files or a CRAM file
+java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant.json
+java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant_cram.json
+
+## Giraffe-DV starting from a GAM/GAF file
+java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant_fromGAM.wdl -i params/giraffe_and_deepvariant_gam.json
+java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant_fromGAM.wdl -i params/giraffe_and_deepvariant_gaf.json
+
 ## GAM/GAF sorting
 java -jar $CROMWELL_JAR run workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_aligned_reads.gam.json
 java -jar $CROMWELL_JAR run workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_aligned_reads.gaf.json
