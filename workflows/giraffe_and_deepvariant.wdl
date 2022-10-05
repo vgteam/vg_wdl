@@ -1131,6 +1131,8 @@ task runAbraRealigner {
         File in_reference_file
         File in_reference_index_file
         Int in_call_disk
+        Int memoryGb = 40
+        Int threadCount = 16
     }
 
     command <<<
@@ -1154,13 +1156,13 @@ task runAbraRealigner {
         ln -f -s ~{in_reference_file} reference.fa
         ln -f -s ~{in_reference_index_file} reference.fa.fai
 
-        java -Xmx20G -jar /opt/abra2/abra2.jar \
+        java -Xmx~{memoryGb}G -jar /opt/abra2/abra2.jar \
           --targets ~{in_target_bed_file} \
           --in input_bam_file.bam \
           --out ~{in_sample_name}.${CONTIG_ID}.indel_realigned.bam \
           --ref reference.fa \
           --index \
-          --threads 32
+          --threads ~{threadCount}
     >>>
     output {
         File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")[0]
@@ -1169,8 +1171,8 @@ task runAbraRealigner {
     runtime {
         preemptible: 2
         time: 180
-        memory: 20 + " GB"
-        cpu: 16
+        memory: memoryGb + " GB"
+        cpu: threadCount
         disks: "local-disk " + in_call_disk + " SSD"
         # This used to be docker: "dceoy/abra2:latest" but they moved the tag
         # and it stopped working. A known good version has been rehosted on
