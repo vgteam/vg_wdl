@@ -1,0 +1,8 @@
+{
+  "GiraffeDeepVariantFromGAM.INPUT_GAM": "tests/small_sim_graph/reads.gam",
+  "GiraffeDeepVariantFromGAM.XG_FILE": "tests/small_sim_graph/graph.xg",
+  "GiraffeDeepVariantFromGAM.SAMPLE_NAME": "s0",
+  "GiraffeDeepVariantFromGAM.PAIRED_END": false,
+  "GiraffeDeepVariantFromGAM.DV_GPU_CONTAINER": "google/deepvariant:1.3.0"
+}
+

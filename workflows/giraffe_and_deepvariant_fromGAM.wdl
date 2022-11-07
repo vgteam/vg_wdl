@@ -15,6 +15,7 @@ workflow GiraffeDeepVariantFromGAM {
         File? INPUT_GAM                                 # Input GAM
         File? INPUT_GAF                                 # Input GAF
         String SAMPLE_NAME                              # The sample name
+        Boolean PAIRED_END = true                    # Whether the reads are paired-end.
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 100000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
@@ -119,6 +120,7 @@ workflow GiraffeDeepVariantFromGAM {
                 in_path_list_file=pipeline_path_list_file,
                 in_sample_name=SAMPLE_NAME,
                 input_is_gaf=defined(INPUT_GAF),
+                in_is_paired_end=PAIRED_END,
                 in_max_fragment_length=MAX_FRAGMENT_LENGTH,
                 in_map_cores=VG_CORES,
                 in_map_mem=VG_MEM
@@ -140,6 +142,7 @@ workflow GiraffeDeepVariantFromGAM {
             in_xg_file=XG_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
+            in_is_paired_end=PAIRED_END,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
             make_bam_index=true,
             input_is_gaf=defined(INPUT_GAF),

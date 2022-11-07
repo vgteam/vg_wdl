@@ -95,6 +95,7 @@ java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant.wdl -i params/gira
 
 ## Giraffe-DV starting from a GAM/GAF file
 java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant_fromGAM.wdl -i params/giraffe_and_deepvariant_gam.json
+java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant_fromGAM.wdl -i params/giraffe_and_deepvariant_gam_single_end.json
 java -jar $CROMWELL_JAR run workflows/giraffe_and_deepvariant_fromGAM.wdl -i params/giraffe_and_deepvariant_gaf.json
 
 ## GAM/GAF sorting

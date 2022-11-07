@@ -137,6 +137,7 @@ task surjectGAMtoSortedBAM {
         File in_xg_file
         File in_path_list_file
         String in_sample_name
+        Boolean in_is_paired_end = true
         Int in_max_fragment_length = 3000
         Boolean make_bam_index = false
         Boolean input_is_gaf = false
@@ -158,6 +159,12 @@ task surjectGAMtoSortedBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
+        PAIR_ARGS=""
+        if [ ~{in_is_paired_end} == true ]
+        then
+            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+        fi
+        
         vg surject \
           -F ~{in_path_list_file} \
           -x ~{in_xg_file} \
@@ -165,8 +172,7 @@ task surjectGAMtoSortedBAM {
           --bam-output ~{true="--gaf-input" false="" input_is_gaf} \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx \
-          --interleaved --max-frag-len ~{in_max_fragment_length} \
+          --prune-low-cplx $PAIR_ARGS \
           ~{in_gam_file} | samtools sort --threads ~{half_cores} \
                                     -O BAM > ~{out_prefix}.bam
 
