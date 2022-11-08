@@ -884,7 +884,7 @@ task fixBAMContigNaming {
         File in_ref_dict
         String in_prefix_to_strip
         Int in_map_cores
-        Int in_map_disk
+        Int in_map_disk = 5 * round(size(in_bam_file, 'G'))
         String in_map_mem
     }
 
@@ -905,13 +905,18 @@ task fixBAMContigNaming {
         grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
         samtools view -H ~{in_bam_file}  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
 
+        OUTBAM=($(basename ~{in_bam_file} | sed "s/~{in_prefix_to_strip}//g"))
+        mkdir fixed
         # insert the new header, and strip all instances of the prefix
         cat <(cat new_header.sam) <(samtools view ~{in_bam_file}) | \
-          sed -e "s/~{in_prefix_to_strip}//g" | \
-          samtools view --threads ~{in_map_cores} -O BAM > fixed.bam
+            sed -e "s/~{in_prefix_to_strip}//g" | \
+            samtools view --threads ~{in_map_cores} -O BAM > fixed/$OUTBAM
+        
+        samtools index fixed/$OUTBAM
     >>>
     output {
-        File fixed_bam_file = "fixed.bam"
+        File fixed_bam_file = glob("fixed/*bam")[0]
+        File fixed_bam_index_file = glob("fixed/*bai")[0]
     }
     runtime {
         preemptible: 2

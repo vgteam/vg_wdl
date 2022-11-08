@@ -21,6 +21,7 @@ workflow GiraffeDeepVariantFromGAM {
         Int READS_PER_CHUNK = 100000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
+        String REFERENCE_PREFIX = ""                    # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
         File XG_FILE                                    # Path to .xg index file
         File? DV_MODEL_META                             # .meta file for a custom DeepVariant calling model
         File? DV_MODEL_INDEX                            # .index file for a custom DeepVariant calling model
@@ -73,9 +74,10 @@ workflow GiraffeDeepVariantFromGAM {
     if (!defined(REFERENCE_FILE)) {
         call lite.extractReference {
             input:
-                in_xg_file=XG_FILE,
-                in_path_list_file=pipeline_path_list_file,
-                in_extract_mem=VG_MEM
+            in_xg_file=XG_FILE,
+            in_path_list_file=pipeline_path_list_file,
+            in_prefix_to_strip=REFERENCE_PREFIX,
+            in_extract_mem=VG_MEM
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
@@ -163,22 +165,41 @@ workflow GiraffeDeepVariantFromGAM {
             in_path_list_file=pipeline_path_list_file,
             in_map_cores=VG_CORES
     }
-    
+
     ##
     ## Call variants with DeepVariant in each contig
     ##
     scatter (deepvariant_caller_input_files in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
+        if (REFERENCE_PREFIX != "") {
+            # use samtools to replace the header contigs with those from our dict.
+            # this allows the header to contain contigs that are not in the graph,
+            # which is more general and lets CHM13-based graphs be used to call on GRCh38
+            # also, strip out contig prefixes in the BAM body
+            call main.fixBAMContigNaming {
+                input:
+                in_bam_file=deepvariant_caller_input_files.left,
+                in_ref_dict=reference_dict_file,
+                in_prefix_to_strip=REFERENCE_PREFIX,
+                in_map_cores=VG_CORES,
+                in_map_mem=VG_MEM
+            }
+        }
+        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, deepvariant_caller_input_files.left]) 
+        File properly_named_bam_index_file = select_first([fixBAMContigNaming.fixed_bam_index_file, deepvariant_caller_input_files.right]) 
+
         ## Eventually shift and realign reads
         if (LEFTALIGN_BAM){
             call lite.leftShiftBAMFile {
                 input:
-                in_bam_file=deepvariant_caller_input_files.left,
+                in_bam_file=properly_named_bam_file,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file
             }
         }
-        File current_bam = select_first([leftShiftBAMFile.output_bam_file, deepvariant_caller_input_files.left])
-        File current_bam_index = select_first([leftShiftBAMFile.output_bam_index_file, deepvariant_caller_input_files.right])
+        
+        File current_bam = select_first([leftShiftBAMFile.output_bam_file, properly_named_bam_file])
+        File current_bam_index = select_first([leftShiftBAMFile.output_bam_index_file, properly_named_bam_index_file])
+        
         if (REALIGN_INDELS) {
             call lite.prepareRealignTargets {
                 input:

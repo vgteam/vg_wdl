@@ -357,6 +357,7 @@ task extractReference {
     input {
         File in_xg_file
         File in_path_list_file
+        String in_prefix_to_strip = ""
         Int in_extract_mem
     }
     Int disk_size = round(3 * size(in_xg_file, 'G')) + 20
@@ -369,6 +370,12 @@ task extractReference {
            --extract-fasta \
            -p ${in_path_list_file} \
            --xg ${in_xg_file} > ref.fa
+
+        if [ ~{in_prefix_to_strip} != "" ]
+        then
+            mv ref.fa ref.prefix.fa
+            sed -e "s/~{in_prefix_to_strip}//g" ref.prefix.fa > ref.fa
+        fi
     }
     output {
         File reference_file = "ref.fa"
