@@ -884,7 +884,7 @@ task fixBAMContigNaming {
         File in_ref_dict
         String in_prefix_to_strip
         Int in_map_cores
-        Int in_map_disk = 5 * round(size(in_bam_file, 'G'))
+        Int in_map_disk = 5 * round(size(in_bam_file, 'G')) + 20
         String in_map_mem
     }
 
