@@ -30,13 +30,9 @@ workflow GiraffeDeepVariantFromGAM {
         Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
         Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
-        # DeepVariant tontainer to use for CPU steps
-        String DV_CONTAINER = "google/deepvariant:1.3.0"
-        # DeepVariant container to use for GPU steps
-        String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
-        Boolean SPLIT_AND_SURJECT = true
+        Boolean SPLIT_AND_SURJECT = false
         Int CALL_CORES = 8
         Int CALL_MEM = 50
         Int VG_CORES = 20                               # cores used by vg commands
@@ -226,7 +222,6 @@ workflow GiraffeDeepVariantFromGAM {
         ## DeepVariant calling
         call deepvariant.runDeepVariantMakeExamples {
             input:
-                in_dv_container=DV_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_bam_file=calling_bam,
                 in_bam_file_index=calling_bam_index,
@@ -240,7 +235,6 @@ workflow GiraffeDeepVariantFromGAM {
         }
         call deepvariant.runDeepVariantCallVariants {
             input:
-                in_dv_gpu_container=DV_GPU_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,

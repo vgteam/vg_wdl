@@ -2,7 +2,6 @@ version 1.0
 
 task runDeepVariantMakeExamples {
     input {
-        String in_dv_container
         String in_sample_name
         File in_bam_file
         File in_bam_file_index
@@ -11,8 +10,10 @@ task runDeepVariantMakeExamples {
         Int in_min_mapq
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
+        String in_other_makeexamples_arg = ""
         Int in_call_cores
         Int in_call_mem
+        String in_dv_container = "google/deepvariant:1.3.0"
     }
     Int disk_size = round(2 * size(in_bam_file, 'G')) + 20
     command <<<
@@ -57,7 +58,7 @@ task runDeepVariantMakeExamples {
         --sample_name ~{in_sample_name} \
         --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
         --min_mapping_quality ~{in_min_mapq} \
-        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} \
+        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg}\
         --regions ${CONTIG_ID} \
         --task {}
         ls | grep 'make_examples.tfrecord-' | tar -czf 'make_examples.tfrecord.tar.gz' -T -
@@ -79,7 +80,6 @@ task runDeepVariantMakeExamples {
 
 task runDeepVariantCallVariants {
     input {
-        String in_dv_gpu_container
         String in_sample_name
         File in_reference_file
         File in_reference_index_file
@@ -90,6 +90,7 @@ task runDeepVariantCallVariants {
         File? in_model_data_file
         Int in_call_cores
         Int in_call_mem
+        String in_dv_gpu_container = "google/deepvariant:1.3.0-gpu"
     }
     Int disk_size = 3 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 20    
     command <<<

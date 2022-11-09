@@ -1,3 +1,5 @@
+version 1.0
+
 task shard_fastq {
     File fastq1
     File fastq2

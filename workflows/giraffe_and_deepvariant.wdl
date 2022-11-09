@@ -5,6 +5,10 @@ version 1.0
 ## Description: Core VG Giraffe mapping and DeepVariant calling workflow for single sample datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
+import "../tasks/variant_evaluation.wdl" as eval
+import "../tasks/bioinfo_utils.wdl" as utils
+import "../tasks/deepvariant.wdl" as dv
+
 workflow GiraffeDeepVariant {
     input {
         File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
@@ -35,10 +39,6 @@ workflow GiraffeDeepVariant {
         Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
         Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
-        # DeepVariant tontainer to use for CPU steps
-        String DV_CONTAINER = "google/deepvariant:1.3.0"
-        # DeepVariant container to use for GPU steps
-        String DV_GPU_CONTAINER = "google/deepvariant:1.3.0-gpu"
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
         String OTHER_MAKEEXAMPLES_ARG = ""              # Additional arguments for the make_examples step of DeepVariant
@@ -128,7 +128,7 @@ workflow GiraffeDeepVariant {
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
     
     if (!defined(REFERENCE_INDEX_FILE)) {
-        call indexReference {
+        call utils.indexReference {
             input:
                 in_reference_file=reference_file,
                 in_index_disk=MAP_DISK,
@@ -303,9 +303,8 @@ workflow GiraffeDeepVariant {
         File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.left_shifted_bam, deepvariant_caller_input_files.left])
         File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, indexBAMFile.bam_index, deepvariant_caller_input_files.right])
         ## DeepVariant calling
-        call runDeepVariantMakeExamples {
+        call dv.runDeepVariantMakeExamples {
             input:
-                in_dv_container=DV_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_bam_file=calling_bam,
                 in_bam_file_index=calling_bam_index,
@@ -316,12 +315,10 @@ workflow GiraffeDeepVariant {
                 in_norm_reads=DV_NORM_READS,
                 in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
                 in_call_cores=CALL_CORES,
-                in_call_disk=CALL_DISK,
                 in_call_mem=CALL_MEM
         }
-        call runDeepVariantCallVariants {
+        call dv.runDeepVariantCallVariants {
             input:
-                in_dv_gpu_container=DV_GPU_CONTAINER,
                 in_sample_name=SAMPLE_NAME,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
@@ -331,7 +328,6 @@ workflow GiraffeDeepVariant {
                 in_model_index_file=DV_MODEL_INDEX,
                 in_model_data_file=DV_MODEL_DATA,
                 in_call_cores=CALL_CORES,
-                in_call_disk=CALL_DISK,
                 in_call_mem=CALL_MEM
         }
     }
@@ -347,13 +343,13 @@ workflow GiraffeDeepVariant {
     if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
     
         # To evaluate the VCF we need a template of the reference
-        call buildReferenceTemplate {
+        call eval.buildReferenceTemplate {
             input:
                 in_reference_file=reference_file
         }
         
         # Direct vcfeval comparison makes an archive with FP and FN VCFs
-        call compareCalls {
+        call eval.compareCalls {
             input:
                 in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
                 in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
@@ -361,12 +357,12 @@ workflow GiraffeDeepVariant {
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_template_archive=buildReferenceTemplate.output_template_archive,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_call_disk=CALL_DISK,
-                in_call_mem=CALL_MEM
+                in_disk=CALL_DISK,
+                in_mem=CALL_MEM
         }
         
         # Hap.py comparison makes accuracy results stratified by SNPs and indels
-        call compareCallsHappy {
+        call eval.compareCallsHappy {
             input:
                 in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
                 in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
@@ -375,8 +371,8 @@ workflow GiraffeDeepVariant {
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_call_disk=CALL_DISK,
-                in_call_mem=CALL_MEM
+                in_disk=CALL_DISK,
+                in_mem=CALL_MEM
         }
     }
 
@@ -555,38 +551,6 @@ task extractReference {
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
         docker: in_vg_container
-    }
-}
-
-task indexReference {
-    input {
-        File in_reference_file
-        Int in_index_mem
-        Int in_index_disk
-    }
-
-    command <<<
-        set -eux -o pipefail
-        
-        ln -s ~{in_reference_file} ref.fa
-                
-        # Index the subset reference
-        samtools faidx ref.fa 
-        
-        # Save a reference copy by making the dict now
-        java -jar /usr/picard/picard.jar CreateSequenceDictionary \
-          R=ref.fa \
-          O=ref.dict
-    >>>
-    output {
-        File reference_index_file = "ref.fa.fai"
-        File reference_dict_file = "ref.dict"
-    }
-    runtime {
-        preemptible: 2
-        memory: in_index_mem + " GB"
-        disks: "local-disk " + in_index_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
     }
 }
 
@@ -1233,162 +1197,6 @@ task leftShiftBAMFile {
     }
 }
 
-
-task runDeepVariantMakeExamples {
-    input {
-        String in_dv_container
-        String in_sample_name
-        File in_bam_file
-        File in_bam_file_index
-        File in_reference_file
-        File in_reference_index_file
-        Int in_min_mapq
-        Boolean in_keep_legacy_ac
-        Boolean in_norm_reads
-        String in_other_makeexamples_arg
-        Int in_call_cores
-        Int in_call_disk
-        Int in_call_mem
-    }
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        ln -s ~{in_bam_file} input_bam_file.bam
-        ln -s ~{in_bam_file_index} input_bam_file.bam.bai
-        # Files may or may not be indel realigned or left shifted in the names.
-        # TODO: move tracking of contig ID to WDL variables!
-        CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g | sed s/.indel_realigned$//g | sed s/.left_shifted$//g))
-        # Reference and its index must be adjacent and not at arbitrary paths
-        # the runner gives.
-        ln -f -s ~{in_reference_file} reference.fa
-        ln -f -s ~{in_reference_index_file} reference.fa.fai
-        
-        NORM_READS_ARG=""
-        if [ ~{in_norm_reads} == true ] ; then
-          NORM_READS_ARG="--normalize_reads"
-        fi
-        
-        KEEP_LEGACY_AC_ARG=""
-        if [ ~{in_keep_legacy_ac} == true ] ; then
-          KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
-        fi
-        
-        seq 0 $((~{in_call_cores}-1)) | \
-        parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
-        --mode calling \
-        --ref reference.fa \
-        --reads input_bam_file.bam \
-        --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
-        --sample_name ~{in_sample_name} \
-        --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
-        --min_mapping_quality ~{in_min_mapq} \
-        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg} \
-        --regions ${CONTIG_ID} \
-        --task {}
-        ls | grep 'make_examples.tfrecord-' | tar -czf 'make_examples.tfrecord.tar.gz' -T -
-        ls | grep 'gvcf.tfrecord-' | tar -czf 'gvcf.tfrecord.tar.gz' -T -
-    >>>
-    output {
-        File examples_file = "make_examples.tfrecord.tar.gz"
-        File nonvariant_site_tf_file = "gvcf.tfrecord.tar.gz"
-    }
-    runtime {
-        preemptible: 5
-        maxRetries: 1
-        memory: in_call_mem + " GB"
-        cpu: in_call_cores
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: in_dv_container
-    }
-}
-
-task runDeepVariantCallVariants {
-    input {
-        String in_dv_gpu_container
-        String in_sample_name
-        File in_reference_file
-        File in_reference_index_file
-        File in_examples_file
-        File in_nonvariant_site_tf_file
-        File? in_model_meta_file
-        File? in_model_index_file
-        File? in_model_data_file
-        Int in_call_cores
-        Int in_call_disk
-        Int in_call_mem
-    }
-    
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        tar -xzf ~{in_examples_file}
-        tar -xzf ~{in_nonvariant_site_tf_file}
-        
-        # Reference and its index must be adjacent and not at arbitrary paths
-        # the runner gives.
-        ln -f -s ~{in_reference_file} reference.fa
-        ln -f -s ~{in_reference_index_file} reference.fa.fai
-
-        # We should use an array here, but that doesn't seem to work the way I
-        # usually do them (because of a set -u maybe?)
-        if [[ ! -z "~{in_model_meta_file}" ]] ; then
-            # Model files must be adjacent and not at arbitrary paths
-            ln -f -s "~{in_model_meta_file}" model.meta
-            ln -f -s "~{in_model_index_file}" model.index
-            ln -f -s "~{in_model_data_file}" model.data-00000-of-00001
-        else
-            # use default WGS models
-            ln -f -s "/opt/models/wgs/model.ckpt.meta" model.meta
-            ln -f -s "/opt/models/wgs/model.ckpt.index" model.index
-            ln -f -s "/opt/models/wgs/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
-        fi
-        
-        /opt/deepvariant/bin/call_variants \
-        --outfile call_variants_output.tfrecord.gz \
-        --examples "make_examples.tfrecord@~{in_call_cores}.gz" \
-        --checkpoint model && \
-        /opt/deepvariant/bin/postprocess_variants \
-        --ref reference.fa \
-        --infile call_variants_output.tfrecord.gz \
-        --nonvariant_site_tfrecord_path "gvcf.tfrecord@~{in_call_cores}.gz" \
-        --outfile "~{in_sample_name}_deepvariant.vcf.gz" \
-        --gvcf_outfile "~{in_sample_name}_deepvariant.g.vcf.gz"
-    >>>
-    output {
-        File output_vcf_file = "~{in_sample_name}_deepvariant.vcf.gz"
-        File output_gvcf_file = "~{in_sample_name}_deepvariant.g.vcf.gz"
-    }
-    runtime {
-        preemptible: 5
-        maxRetries: 5
-        memory: in_call_mem + " GB"
-        cpu: in_call_cores
-        gpuType: "nvidia-tesla-t4"
-        gpuCount: 1
-        nvidiaDriverVersion: "418.87.00"
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: in_dv_gpu_container
-    }
-}
-
 task concatClippedVCFChunks {
     input {
         String in_sample_name
@@ -1422,124 +1230,6 @@ task concatClippedVCFChunks {
         memory: in_call_mem + " GB"
         disks: "local-disk " + in_call_disk + " SSD"
         docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
-    }
-}
-
-task buildReferenceTemplate {
-    input {
-        File in_reference_file
-    }
-    command <<<
-        set -eux -o pipefail
-    
-        rtg format -o template.sdf "~{in_reference_file}"
-        tar -czf template.sdf.tar.gz template.sdf/
-    >>>
-    output {
-        File output_template_archive = "template.sdf.tar.gz"
-    }
-    runtime {
-        preemptible: 2
-        docker: "realtimegenomics/rtg-tools:3.12.1"
-        memory: 4 + " GB"
-        cpu: 1
-        disks: "local-disk " + 10 + " SSD" 
-    }
-}
-
-task compareCalls {
-    input {
-        File in_sample_vcf_file
-        File in_sample_vcf_index_file
-        File in_truth_vcf_file
-        File in_truth_vcf_index_file
-        File in_template_archive
-        File? in_evaluation_regions_file
-        Int in_call_disk
-        Int in_call_mem
-    }
-    command <<<
-        set -eux -o pipefail
-    
-        # Put sample and truth near their indexes
-        ln -s "~{in_sample_vcf_file}" sample.vcf.gz
-        ln -s "~{in_sample_vcf_index_file}" sample.vcf.gz.tbi
-        ln -s "~{in_truth_vcf_file}" truth.vcf.gz
-        ln -s "~{in_truth_vcf_index_file}" truth.vcf.gz.tbi
-        
-        # Set up template; we assume it drops a "template.sdf"
-        tar -xf "~{in_template_archive}"
-    
-        rtg vcfeval \
-            --baseline truth.vcf.gz \
-            --calls sample.vcf.gz \
-            ~{"--evaluation-regions=" + in_evaluation_regions_file} \
-            --template template.sdf \
-            --threads 32 \
-            --output vcfeval_results
-            
-        tar -czf vcfeval_results.tar.gz vcfeval_results/
-    >>>
-    output {
-        File output_evaluation_archive = "vcfeval_results.tar.gz"
-    }
-    runtime {
-        preemptible: 2
-        docker: "realtimegenomics/rtg-tools:3.12.1"
-        cpu: 32
-        disks: "local-disk " + in_call_disk + " SSD"
-        memory: in_call_mem + " GB"
-    }
-}
-
-task compareCallsHappy {
-    input {
-        File in_sample_vcf_file
-        File in_sample_vcf_index_file
-        File in_truth_vcf_file
-        File in_truth_vcf_index_file
-        File in_reference_file
-        File in_reference_index_file
-        File? in_evaluation_regions_file
-        Int in_call_disk
-        Int in_call_mem
-    }
-    command <<<
-        set -eux -o pipefail
-    
-        # Put sample and truth near their indexes
-        ln -s "~{in_sample_vcf_file}" sample.vcf.gz
-        ln -s "~{in_sample_vcf_index_file}" sample.vcf.gz.tbi
-        ln -s "~{in_truth_vcf_file}" truth.vcf.gz
-        ln -s "~{in_truth_vcf_index_file}" truth.vcf.gz.tbi
-        
-        # Reference and its index must be adjacent and not at arbitrary paths
-        # the runner gives.
-        ln -f -s "~{in_reference_file}" reference.fa
-        ln -f -s "~{in_reference_index_file}" reference.fa.fai
-        
-        mkdir happy_results
-   
-        /opt/hap.py/bin/hap.py \
-            truth.vcf.gz \
-            sample.vcf.gz \
-            ~{"-f " + in_evaluation_regions_file} \
-            --reference reference.fa \
-            --threads 32 \
-            --engine=vcfeval \
-            -o happy_results/eval
-    
-        tar -czf happy_results.tar.gz happy_results/
-    >>>
-    output {
-        File output_evaluation_archive = "happy_results.tar.gz"
-    }
-    runtime {
-        preemptible: 2
-        docker: "jmcdani20/hap.py:v0.3.12"
-        cpu: 32
-        disks: "local-disk " + in_call_disk + " SSD"
-        memory: in_call_mem + " GB"
     }
 }
 

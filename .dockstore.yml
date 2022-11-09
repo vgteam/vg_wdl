@@ -76,4 +76,16 @@ workflows:
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
+  - name: HappyEvaluation
+    subclass: WDL
+    description: Evaluate small variants using hap.py
+    primaryDescriptorPath: /workflows/happy_evaluation.wdl
+    testParameterFiles:
+      - /params/happy_evaluation.json
+    branches:
+      - master
+      - giraffedv
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
       

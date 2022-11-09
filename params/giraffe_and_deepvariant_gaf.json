@@ -3,6 +3,6 @@
   "GiraffeDeepVariantFromGAM.XG_FILE": "tests/small_sim_graph/graph.xg",
   "GiraffeDeepVariantFromGAM.SAMPLE_NAME": "s0",
   "GiraffeDeepVariantFromGAM.VG_CONTAINER": "quay.io/vgteam/vg:v1.42.0",
-  "GiraffeDeepVariantFromGAM.DV_GPU_CONTAINER": "google/deepvariant:1.3.0"
+  "GiraffeDeepVariantFromGAM.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.3.0"
 }
 
