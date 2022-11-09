@@ -4,7 +4,7 @@ task indexReference {
     input {
         File in_reference_file
         Int in_index_mem = 4
-        Int in_index_disk = 2 * round(size(in_reference_file)) + 10
+        Int in_index_disk = 2 * round(size(in_reference_file, "G")) + 10
     }
 
     command <<<
@@ -36,7 +36,7 @@ task indexVcf {
     input {
         File in_vcf
         Int in_index_mem = 4
-        Int in_index_disk = 2 * round(size(in_vcf)) + 10
+        Int in_index_disk = 2 * round(size(in_vcf, "G")) + 10
     }
 
     command <<<
