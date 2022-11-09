@@ -31,7 +31,7 @@ task compareCalls {
         File in_template_archive
         File? in_evaluation_regions_file
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G")) + 20
-        Int in_mem = 8
+        Int in_mem = 16
         Int in_cores = 8
     }
     command <<<
@@ -51,7 +51,7 @@ task compareCalls {
             --calls sample.vcf.gz \
             ~{"--evaluation-regions=" + in_evaluation_regions_file} \
             --template template.sdf \
-            --threads 32 \
+            --threads ~{in_cores} \
             --output vcfeval_results
             
         tar -czf vcfeval_results.tar.gz vcfeval_results/
@@ -79,7 +79,7 @@ task compareCallsHappy {
         File in_reference_index_file
         File? in_evaluation_regions_file
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G") + size(in_reference_file, "G")) + 20
-        Int in_mem = 8
+        Int in_mem = 16
         Int in_cores = 8
     }
     command <<<
@@ -103,7 +103,7 @@ task compareCallsHappy {
             sample.vcf.gz \
             ~{"-f " + in_evaluation_regions_file} \
             --reference reference.fa \
-            --threads 32 \
+            --threads ~{in_cores} \
             --engine=vcfeval \
             -o happy_results/eval
     
