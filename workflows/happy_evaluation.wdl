@@ -18,6 +18,7 @@ workflow HappyEvaluation {
         REFERENCE_FILE: "Use this FASTA reference."
         EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
         REFERENCE_INDEX_FILE: "If specified, use this .fai index instead of indexing the reference file."
+        REFERENCE_PREFIX: "Remove this off the beginning of sequence names in the VCF"
     }
     
     input {
@@ -28,6 +29,7 @@ workflow HappyEvaluation {
         File? EVALUATION_REGIONS_BED
         File REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
+        String REFERENCE_PREFIX = ""
     }
     
     # To evaluate the VCF we need a template of the reference
@@ -44,12 +46,25 @@ workflow HappyEvaluation {
         }
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
-
+    
+    if (REFERENCE_PREFIX != "") {
+        # use samtools to replace the header contigs with those from our dict.
+        # this allows the header to contain contigs that are not in the graph,
+        # which is more general and lets CHM13-based graphs be used to call on GRCh38
+        # also, strip out contig prefixes in the BAM body
+        call utils.fixVCFContigNaming {
+            input:
+            in_vcf=VCF,
+            in_prefix_to_strip=REFERENCE_PREFIX
+        }
+    }
+    File vcf_file = select_first([fixVCFContigNaming.vcf, VCF]) 
+    
     ## index the call VCF if needed
-    if (!defined(VCF_INDEX)) {
+    if (!defined(VCF_INDEX) || REFERENCE_PREFIX != "") {
         call utils.indexVcf {
             input:
-            in_vcf=VCF
+            in_vcf=vcf_file
         }
     }
     File vcf_index = select_first([VCF_INDEX, indexVcf.vcf_index_file])
@@ -66,7 +81,7 @@ workflow HappyEvaluation {
     # Direct vcfeval comparison makes an archive with FP and FN VCFs
     call eval.compareCalls {
         input:
-        in_sample_vcf_file=VCF,
+        in_sample_vcf_file=vcf_file,
         in_sample_vcf_index_file=vcf_index,
         in_truth_vcf_file=TRUTH_VCF,
         in_truth_vcf_index_file=truth_vcf_index,
@@ -77,7 +92,7 @@ workflow HappyEvaluation {
     # Hap.py comparison makes accuracy results stratified by SNPs and indels
     call eval.compareCallsHappy {
         input:
-        in_sample_vcf_file=VCF,
+        in_sample_vcf_file=vcf_file,
         in_sample_vcf_index_file=vcf_index,
         in_truth_vcf_file=TRUTH_VCF,
         in_truth_vcf_index_file=truth_vcf_index,

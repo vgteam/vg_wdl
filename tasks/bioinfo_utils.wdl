@@ -53,3 +53,30 @@ task indexVcf {
         docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
+
+task fixVCFContigNaming {
+    input {
+        File in_vcf
+        String in_prefix_to_strip = "GRCh38."
+        Int in_index_mem = 4
+        Int in_index_disk = 2 * round(size(in_vcf, "G")) + 10
+    }
+
+    command <<<
+    set -eux -o pipefail
+
+    bcftools view -h ~{in_vcf} | grep contig | awk -v PREF="~{in_prefix_to_strip}" '{split($0, a, ","); gsub("##contig=<ID=", "", a[1]); chr=a[1]; gsub(PREF, "", a[1]); print chr"\t"a[1]}' > chrsrename.txt
+    
+    bcftools annotate --rename-chrs chrsrename.txt -o variants.vcf.gz -Oz ~{in_vcf}
+    >>>
+    output {
+        File vcf = "variants.vcf.gz"
+    }
+    runtime {
+        preemptible: 2
+        memory: in_index_mem + " GB"
+        disks: "local-disk " + in_index_disk + " SSD"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+    }
+}
+
