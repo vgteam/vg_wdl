@@ -67,7 +67,7 @@ workflow HappyEvaluation {
             in_vcf=vcf_file
         }
     }
-    File vcf_index = select_first([VCF_INDEX, indexVcf.vcf_index_file])
+    File vcf_index = select_first([indexVcf.vcf_index_file, VCF_INDEX])
 
     ## index the truth VCF if needed
     if (!defined(TRUTH_VCF_INDEX)) {
