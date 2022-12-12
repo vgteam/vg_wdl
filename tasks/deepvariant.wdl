@@ -58,7 +58,7 @@ task runDeepVariantMakeExamples {
         --sample_name ~{in_sample_name} \
         --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
         --min_mapping_quality ~{in_min_mapq} \
-        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg}\
+        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg} \
         --regions ${CONTIG_ID} \
         --task {}
         ls | grep 'make_examples.tfrecord-' | tar -czf 'make_examples.tfrecord.tar.gz' -T -
