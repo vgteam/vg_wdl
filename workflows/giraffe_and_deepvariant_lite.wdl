@@ -476,9 +476,9 @@ task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
-        Int in_map_cores
+        Int in_map_cores = 16
+        Int disk_size = round(3 * size(in_alignment_bam_chunk_files, 'G')) + 20
     }
-    Int disk_size = round(3 * size(in_alignment_bam_chunk_files, 'G')) + 20
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit

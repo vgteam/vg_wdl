@@ -33,6 +33,7 @@ workflow GiraffeDeepVariantFromGAM {
         Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
         Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
         Boolean SPLIT_AND_SURJECT = false
+        Boolean OUTPUT_BAM = false
         Int CALL_CORES = 8
         Int CALL_MEM = 50
         Int VG_CORES = 20                               # cores used by vg commands
@@ -267,12 +268,22 @@ workflow GiraffeDeepVariantFromGAM {
             in_call_disk=gvcf_disk_size,
             in_call_mem=10
     }
+
+    if(OUTPUT_BAM){
+        call lite.mergeAlignmentBAMChunks as mergeOutputBAM {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_alignment_bam_chunk_files=calling_bam
+        }
+    }
     
     output {
         File output_vcf = concatClippedVCFChunks.output_merged_vcf
         File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
         File output_gvcf = concatClippedGVCFChunks.output_merged_vcf
         File output_gvcf_index = concatClippedGVCFChunks.output_merged_vcf_index
+        File? output_bam = mergeOutputBAM.merged_bam_file
+        File? output_bam_index = mergeOutputBAM.merged_bam_file_index
     }   
 }
 
