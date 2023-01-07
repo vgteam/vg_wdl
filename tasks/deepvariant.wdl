@@ -92,7 +92,7 @@ task runDeepVariantCallVariants {
         Int in_call_mem
         String in_dv_gpu_container = "google/deepvariant:1.3.0-gpu"
     }
-    Int disk_size = 3 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 20    
+    Int disk_size = 5 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 50
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
