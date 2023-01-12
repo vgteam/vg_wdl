@@ -18,7 +18,7 @@ workflow GiraffeDeepVariant {
         File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.44.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String GIRAFFE_OPTIONS = ""                     # (OPTIONAL) extra command line options for Giraffe mapper
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.

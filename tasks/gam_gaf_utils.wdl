@@ -24,7 +24,7 @@ task mergeGAMandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.37.0"
+        docker: "quay.io/vgteam/vg:v1.44.0"
     }
 }
 
@@ -55,7 +55,7 @@ task mergeGAFandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.37.0"
+        docker: "quay.io/vgteam/vg:v1.44.0"
     }
 }
 
@@ -91,7 +91,7 @@ task splitGAM {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.37.0"
+        docker: "quay.io/vgteam/vg:v1.44.0"
     }
 }
 
@@ -127,7 +127,7 @@ task splitGAF {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.37.0"
+        docker: "quay.io/vgteam/vg:v1.44.0"
     }
 }
 
@@ -190,7 +190,7 @@ task surjectGAMtoSortedBAM {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.37.0"
+        docker: "quay.io/vgteam/vg:v1.44.0"
     }
 }
 

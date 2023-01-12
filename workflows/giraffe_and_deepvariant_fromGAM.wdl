@@ -17,7 +17,6 @@ workflow GiraffeDeepVariantFromGAM {
         String SAMPLE_NAME                              # The sample name
         Boolean PAIRED_END = true                    # Whether the reads are paired-end.
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.37.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 100000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
@@ -285,62 +284,4 @@ workflow GiraffeDeepVariantFromGAM {
         File? output_bam = mergeOutputBAM.merged_bam_file
         File? output_bam_index = mergeOutputBAM.merged_bam_file_index
     }   
-}
-
-########################
-### TASK DEFINITIONS ###
-########################
-
-task surjectGAMtoSortedIndexedBAM {
-    input {
-        File in_gam_file
-        File in_xg_file
-        File in_path_list_file
-        String in_sample_name
-        Int in_max_fragment_length
-        String in_vg_container
-        Int in_map_cores
-        String in_map_mem
-    }
-    String out_prefix = basename(in_gam_file, ".gam")
-    Int half_cores = in_map_cores / 2
-    Int disk_size = 3 * round(size(in_xg_file, 'G') + size(in_gam_file, 'G')) + 20
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        vg surject \
-          -F ~{in_path_list_file} \
-          -x ~{in_xg_file} \
-          -t ~{half_cores} \
-          --bam-output \
-          --sample ~{in_sample_name} \
-          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx \
-          --interleaved --max-frag-len ~{in_max_fragment_length} \
-          ~{in_gam_file} | samtools sort --threads ~{half_cores} \
-                                    -O BAM > ~{out_prefix}.bam \
-            && samtools index ~{out_prefix}.bam
-    >>>
-    output {
-        File output_bam_file = "~{out_prefix}.bam"
-        File output_bam_index_file = "~{out_prefix}.bam.bai"
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + disk_size + " SSD"
-        docker: in_vg_container
-    }
-
 }
