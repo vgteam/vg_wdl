@@ -1,14 +1,11 @@
 version 1.0
 
-### giraffe_and_deepvariant.wdl ###
-## Author: Charles Markello
-## Description: Core VG Giraffe mapping and DeepVariant calling workflow for single sample datasets.
+### giraffe.wdl ###
+## Author: Charles Markello, Jean Monlong, Adam Novak
+## Description: Core VG Giraffe mapping, usable for DeepVariant.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "../tasks/variant_evaluation.wdl" as eval
 import "../tasks/bioinfo_utils.wdl" as utils
-import "../tasks/deepvariant.wdl" as dv
-# TODO: Share tasks with giraffe.wdl and giraffe_and_deepvariant_lite.wdl!
 
 workflow GiraffeDeepVariant {
     input {
@@ -30,29 +27,19 @@ workflow GiraffeDeepVariant {
         File GGBWT_FILE                                 # Path to .gg index file
         File DIST_FILE                                  # Path to .dist index file
         File MIN_FILE                                   # Path to .min index file
-        File? TRUTH_VCF                                 # Path to .vcf.gz to compare against
-        File? TRUTH_VCF_INDEX                           # Path to Tabix index for TRUTH_VCF
-        File? EVALUATION_REGIONS_BED                    # BED to restrict comparison against TRUTH_VCF to
-        File? DV_MODEL_META                             # .meta file for a custom DeepVariant calling model
-        File? DV_MODEL_INDEX                            # .index file for a custom DeepVariant calling model
-        File? DV_MODEL_DATA                             # .data-00000-of-00001 file for a custom DeepVariant calling model
         Boolean LEFTALIGN_BAM = true                    # Whether or not to left-align reads in the BAM before DV
         Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
         Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
-        Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
-        Boolean DV_NORM_READS = false                   # Should DV normalize reads itself?
-        String OTHER_MAKEEXAMPLES_ARG = ""              # Additional arguments for the make_examples step of DeepVariant
-        Boolean OUTPUT_GAF = false                       # Should a GAF file with the aligned reads be saved?
+        Boolean OUTPUT_SINGLE_BAM = true                # Should a single merged BAM file be saved?
+        Boolean OUTPUT_CALLING_BAMS = false             # Should individual contig BAMs be saved?
+        Boolean OUTPUT_GAF = false                      # Should a GAF file with the aligned reads be saved?
         Boolean OUTPUT_GAM = true                       # Should a GAM file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 60
         Int MAP_CORES = 16
         Int MAP_DISK = 200
         Int MAP_MEM = 120
-        Int CALL_CORES = 8
-        Int CALL_DISK = 40
-        Int CALL_MEM = 50
         File? REFERENCE_FILE                            # (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.
         File? REFERENCE_INDEX_FILE                      # (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
         File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
@@ -242,16 +229,16 @@ workflow GiraffeDeepVariant {
     }
 
     ##
-    ## Call variants with DeepVariant in each contig
+    ## Prepare each BAM
     ##
-    scatter (deepvariant_caller_input_files in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
+    scatter (bam_and_index_for_path in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
         ## Evantually shift and realign reads
         if (LEFTALIGN_BAM){
             # Just left-shift each read individually
             call leftShiftBAMFile {
                 input:
                 in_sample_name=SAMPLE_NAME,
-                in_bam_file=deepvariant_caller_input_files.left,
+                in_bam_file=bam_and_index_for_path.left,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_call_disk=CALL_DISK
@@ -266,8 +253,8 @@ workflow GiraffeDeepVariant {
             }
         }
         if (REALIGN_INDELS) {
-            File forrealign_bam = select_first([leftShiftBAMFile.left_shifted_bam, deepvariant_caller_input_files.left])
-            File forrealign_index = select_first([indexBAMFile.bam_index, deepvariant_caller_input_files.right])
+            File forrealign_bam = select_first([leftShiftBAMFile.left_shifted_bam, bam_and_index_for_path.left])
+            File forrealign_index = select_first([indexBAMFile.bam_index, bam_and_index_for_path.right])
             # Do indel realignment
             call runGATKRealignerTargetCreator {
                 input:
@@ -301,82 +288,26 @@ workflow GiraffeDeepVariant {
                     in_call_disk=CALL_DISK
             }
         }
-        File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.left_shifted_bam, deepvariant_caller_input_files.left])
-        File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, indexBAMFile.bam_index, deepvariant_caller_input_files.right])
-        ## DeepVariant calling
-        call dv.runDeepVariantMakeExamples {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_bam_file=calling_bam,
-                in_bam_file_index=calling_bam_index,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_min_mapq=MIN_MAPQ,
-                in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                in_norm_reads=DV_NORM_READS,
-                in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
-                in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
-        }
-        call dv.runDeepVariantCallVariants {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_examples_file=runDeepVariantMakeExamples.examples_file,
-                in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
-                in_model_meta_file=DV_MODEL_META,
-                in_model_index_file=DV_MODEL_INDEX,
-                in_model_data_file=DV_MODEL_DATA,
-                in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
-        }
-    }
-    # Merge distributed variant called VCFs
-    call concatClippedVCFChunks {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_vcf_file,
-            in_call_disk=CALL_DISK,
-            in_call_mem=CALL_MEM
+        File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.left_shifted_bam, bam_and_index_for_path.left])
+        File processed_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, indexBAMFile.bam_index, bam_and_index_for_path.right])
     }
     
-    if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
-    
-        # To evaluate the VCF we need a template of the reference
-        call eval.buildReferenceTemplate {
+    if (OUTPUT_SINGLE_BAM){
+        call mergeAlignmentBAMChunks as mergeBAM {
             input:
-                in_reference_file=reference_file
-        }
-        
-        # Direct vcfeval comparison makes an archive with FP and FN VCFs
-        call eval.compareCalls {
-            input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_template_archive=buildReferenceTemplate.output_template_archive,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_disk=CALL_DISK,
-                in_mem=CALL_MEM
-        }
-        
-        # Hap.py comparison makes accuracy results stratified by SNPs and indels
-        call eval.compareCallsHappy {
-            input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_disk=CALL_DISK,
-                in_mem=CALL_MEM
+                in_sample_name=SAMPLE_NAME,
+                in_alignment_bam_chunk_files=processed_bam,
+                in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
+                in_map_mem=MAP_MEM
         }
     }
-
+    
+    if (OUTPUT_CALLING_BAMS){
+        Array[File] calling_bams = processed_bam
+        Array[File] calling_bam_indexes = processed_bam_index
+    }
+    
     if (OUTPUT_GAF){
         scatter (gam_chunk_file in runVGGIRAFFE.chunk_gam_file) {
             call convertGAMtoGAF {
@@ -413,10 +344,12 @@ workflow GiraffeDeepVariant {
         File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
         File output_vcf = concatClippedVCFChunks.output_merged_vcf
         File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
+        File? output_bam = mergeBAM.merged_bam_file
+        File? output_bam_index = mergeBAM.merged_bam_file_index
         File? output_gaf = mergeGAF.output_merged_gaf
         File? output_gam = mergeGAM.output_merged_gam
-        Array[File] output_calling_bams = calling_bam
-        Array[File] output_calling_bam_indexes = calling_bam_index
+        Array[File] output_calling_bams = calling_bams
+        Array[File] output_calling_bam_indexes = calling_bam_indexes
     }   
 }
 
