@@ -7,6 +7,8 @@
   "Giraffe.GGBWT_FILE": "tests/small_sim_graph/graph.gg",
   "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
   "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
-  "Giraffe.OUTPUT_GAF": true
+  "Giraffe.OUTPUT_GAF": true,
+  "Giraffe.OUTPUT_GAM": true,
+  "Giraffe.OUTPUT_SINGLE_BAM": true
 }
 

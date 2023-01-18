@@ -7,7 +7,7 @@ version 1.0
 
 import "../tasks/bioinfo_utils.wdl" as utils
 
-workflow GiraffeDeepVariant {
+workflow Giraffe {
     input {
         File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
         File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz
@@ -40,6 +40,7 @@ workflow GiraffeDeepVariant {
         Int MAP_CORES = 16
         Int MAP_DISK = 200
         Int MAP_MEM = 120
+        Int POSTPROCESS_DISK = 40
         File? REFERENCE_FILE                            # (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.
         File? REFERENCE_INDEX_FILE                      # (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
         File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
@@ -241,7 +242,7 @@ workflow GiraffeDeepVariant {
                 in_bam_file=bam_and_index_for_path.left,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
-                in_call_disk=CALL_DISK
+                in_call_disk=POSTPROCESS_DISK
             }
             # This tool can't make an index itself so we need to re-index the BAM
             call indexBAMFile {
@@ -264,7 +265,7 @@ workflow GiraffeDeepVariant {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_reference_dict_file=reference_dict_file,
-                    in_call_disk=CALL_DISK
+                    in_call_disk=POSTPROCESS_DISK
             }
             if (REALIGNMENT_EXPANSION_BASES != 0) {
                 # We want the realignment targets to be wider
@@ -273,7 +274,7 @@ workflow GiraffeDeepVariant {
                         in_target_bed_file=runGATKRealignerTargetCreator.realigner_target_bed,
                         in_reference_index_file=reference_index_file,
                         in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
-                        in_call_disk=CALL_DISK
+                        in_call_disk=POSTPROCESS_DISK
                 }
             }
             File target_bed_file = select_first([widenRealignmentTargets.output_target_bed_file, runGATKRealignerTargetCreator.realigner_target_bed])
@@ -285,7 +286,7 @@ workflow GiraffeDeepVariant {
                     in_target_bed_file=target_bed_file,
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
-                    in_call_disk=CALL_DISK
+                    in_call_disk=POSTPROCESS_DISK
             }
         }
         File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.left_shifted_bam, bam_and_index_for_path.left])
@@ -340,16 +341,12 @@ workflow GiraffeDeepVariant {
     }
     
     output {
-        File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
-        File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
-        File output_vcf = concatClippedVCFChunks.output_merged_vcf
-        File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
         File? output_bam = mergeBAM.merged_bam_file
         File? output_bam_index = mergeBAM.merged_bam_file_index
         File? output_gaf = mergeGAF.output_merged_gaf
         File? output_gam = mergeGAM.output_merged_gam
-        Array[File] output_calling_bams = calling_bams
-        Array[File] output_calling_bam_indexes = calling_bam_indexes
+        Array[File]? output_calling_bams = calling_bams
+        Array[File]? output_calling_bam_indexes = calling_bam_indexes
     }   
 }
 
