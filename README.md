@@ -32,6 +32,8 @@ Workflow Description Language (WDL) scripts for common vg workflows
 - Two other flavors of this workflow are also available:
     1. [GiraffeDeepVariantLite](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantLite:master?tab=info) defined by [giraffe_and_deepvariant_lite.wdl](workflows/giraffe_and_deepvariant_lite.wdl) is the slightly more optimized workflow that we used to analyze the 1000 Genomes Project dataset with the HPRC pangenome.
     1. [GiraffeDeepVariantFromGAM](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAM:master?tab=info) defined by [giraffe_and_deepvariant_fromGAM.wdl](workflows/giraffe_and_deepvariant_fromGAM.wdl) starts from already aligned reads in the GAM format
+    1. [Giraffe](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/Giraffe:master?tab=info) defined by [giraffe.wdl](workflows/giraffe.wdl) produces aligned reads in GAF, GAM and/or BAM format.
+    
 
 
 ## Usage
@@ -86,7 +88,7 @@ Please be considerate and support a positive environment.
 
 ## Testing locally
 
-To test the workflow locally, e.g. on the [small simulated dataset](tests/small_sim_graph):
+To test the workflow locally, e.g. on the [small simulated dataset](tests/small_sim_graph), you can run it with Cromwell. First fetch a current Cromwell JAR file from [the latest Cromwell release](https://github.com/broadinstitute/cromwell/releases/latest/). Then set `CROMWELL_JAR=/path/to/cromwell-<whatever>.jar` in your shell. Then you can run:
 
 ```
 ## Giraffe-DV starting from two FASTQ files or a CRAM file
@@ -105,4 +107,7 @@ java -jar $CROMWELL_JAR run workflows/sort_graph_aligned_reads.wdl -i params/sor
 
 ## Hap.py evaluation
 java -jar $CROMWELL_JAR run workflows/happy_evaluation.wdl -i params/happy_evaluation.json
+
+# Giraffe only
+java -jar $CROMWELL_JAR run workflows/giraffe.wdl -i params/giraffe.json
 ```
