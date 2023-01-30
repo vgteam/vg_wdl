@@ -16,15 +16,13 @@ workflow Giraffe {
         File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.43.0" # VG Container used in the pipeline
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.44.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String GIRAFFE_OPTIONS = ""                     # (OPTIONAL) extra command line options for Giraffe mapper
-        Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
-        File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
+        Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.
+        File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths.
         String REFERENCE_PREFIX = ""                    # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
-        File XG_FILE                                    # Path to .xg index file
-        File GBWT_FILE                                  # Path to .gbwt index file
-        File GGBWT_FILE                                 # Path to .gg index file
+        File GBZ_FILE                                   # Path to .gbz index file
         File DIST_FILE                                  # Path to .dist index file
         File MIN_FILE                                   # Path to .min index file
         Boolean LEFTALIGN_BAM = true                    # Whether or not to left-align reads in the BAM before DV
@@ -34,7 +32,6 @@ workflow Giraffe {
         Boolean OUTPUT_SINGLE_BAM = true                # Should a single merged BAM file be saved?
         Boolean OUTPUT_CALLING_BAMS = false             # Should individual contig BAMs be saved?
         Boolean OUTPUT_GAF = false                      # Should a GAF file with the aligned reads be saved?
-        Boolean OUTPUT_GAM = true                       # Should a GAM file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 60
         Int MAP_CORES = 16
@@ -80,14 +77,14 @@ workflow Giraffe {
     # Which path names to work on?
     if (!defined(CONTIGS)) {
         if (!defined(PATH_LIST_FILE)) {
-            # Extract path names to call against from xg file if PATH_LIST_FILE input not provided
+            # Extract path names to call against from GBZ file if PATH_LIST_FILE input not provided
             # Filter down to major paths, because GRCh38 includes thousands of
             # decoys and unplaced/unlocalized contigs, and we can't efficiently
             # scatter across them, nor do we care about accuracy on them, and also
             # calling on the decoys is semantically meaningless.
             call extractSubsetPathNames {
                 input:
-                    in_xg_file=XG_FILE,
+                    in_gbz_file=GBZ_FILE,
                     in_vg_container=VG_CONTAINER,
                     in_extract_disk=MAP_DISK,
                     in_extract_mem=MAP_MEM
@@ -107,7 +104,7 @@ workflow Giraffe {
     if (!defined(REFERENCE_FILE)) {
         call extractReference {
             input:
-                in_xg_file=XG_FILE,
+                in_gbz_file=GBZ_FILE,
                 in_path_list_file=pipeline_path_list_file,
                 in_vg_container=VG_CONTAINER,
                 in_extract_disk=MAP_DISK,
@@ -138,9 +135,7 @@ workflow Giraffe {
                 in_right_read_pair_chunk_file=read_pair_chunk_files.right,
                 in_vg_container=VG_CONTAINER,
                 in_giraffe_options=GIRAFFE_OPTIONS,
-                in_xg_file=XG_FILE,
-                in_gbwt_file=GBWT_FILE,
-                in_ggbwt_file=GGBWT_FILE,
+                in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
                 in_min_file=MIN_FILE,
                 # We always need to pass a full dict file here, with lengths,
@@ -158,10 +153,10 @@ workflow Giraffe {
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
         }
-        call surjectGAMtoBAM {
+        call surjectGAFtoBAM {
                 input:
-                in_gam_file=runVGGIRAFFE.chunk_gam_file,
-                in_xg_file=XG_FILE,
+                in_gaf_file=runVGGIRAFFE.chunk_gaf_file,
+                in_gbz_file=GBZ_FILE,
                 in_path_list_file=pipeline_path_list_file,
                 in_sample_name=SAMPLE_NAME,
                 in_max_fragment_length=MAX_FRAGMENT_LENGTH,
@@ -177,7 +172,7 @@ workflow Giraffe {
             # also, strip out contig prefixes in the BAM body
             call fixBAMContigNaming {
                 input:
-                    in_bam_file=surjectGAMtoBAM.chunk_bam_file,
+                    in_bam_file=surjectGAFtoBAM.chunk_bam_file,
                     in_ref_dict=reference_dict_file,
                     in_prefix_to_strip=REFERENCE_PREFIX,
                     in_map_cores=MAP_CORES,
@@ -185,7 +180,7 @@ workflow Giraffe {
                     in_map_mem=MAP_MEM
             }
         }
-        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAMtoBAM.chunk_bam_file]) 
+        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoBAM.chunk_bam_file]) 
         call sortBAMFile {
             input:
                 in_sample_name=SAMPLE_NAME,
@@ -310,31 +305,10 @@ workflow Giraffe {
     }
     
     if (OUTPUT_GAF){
-        scatter (gam_chunk_file in runVGGIRAFFE.chunk_gam_file) {
-            call convertGAMtoGAF {
-                input:
-                in_xg_file=XG_FILE,
-                in_gam_file= gam_chunk_file,
-                in_vg_container=VG_CONTAINER,
-                in_cores=MAP_CORES,
-                in_disk=MAP_DISK,
-                in_mem=MAP_MEM
-            }
-        }
         call mergeGAF {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=convertGAMtoGAF.output_gaf,
-            in_vg_container=VG_CONTAINER,
-            in_disk=2*MAP_DISK
-        }
-    }
-
-    if (OUTPUT_GAM){
-        call mergeGAM {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_gam_chunk_files=runVGGIRAFFE.chunk_gam_file,
+            in_gaf_chunk_files=runVGGIRAFFE.chunk_gaf_file,
             in_vg_container=VG_CONTAINER,
             in_disk=2*MAP_DISK
         }
@@ -344,7 +318,6 @@ workflow Giraffe {
         File? output_bam = mergeBAM.merged_bam_file
         File? output_bam_index = mergeBAM.merged_bam_file_index
         File? output_gaf = mergeGAF.output_merged_gaf
-        File? output_gam = mergeGAM.output_merged_gam
         Array[File]? output_calling_bams = calling_bams
         Array[File]? output_calling_bam_indexes = calling_bam_indexes
     }   
@@ -429,7 +402,7 @@ task splitReads {
 
 task extractSubsetPathNames {
     input {
-        File in_xg_file
+        File in_gbz_file
         String in_vg_container
         Int in_extract_disk
         Int in_extract_mem
@@ -438,9 +411,7 @@ task extractSubsetPathNames {
     command {
         set -eux -o pipefail
 
-        vg paths \
-            --list \
-            --xg ${in_xg_file} > path_list.txt
+        vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
 
         grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM > path_list.sub.txt
     }
@@ -457,7 +428,7 @@ task extractSubsetPathNames {
 
 task extractReference {
     input {
-        File in_xg_file
+        File in_gbz_file
         File in_path_list_file
         String in_vg_container
         Int in_extract_disk
@@ -472,7 +443,7 @@ task extractReference {
         vg paths \
            --extract-fasta \
            -p ${in_path_list_file} \
-           --xg ${in_xg_file} > ref.fa
+           --xg ${in_gbz_file} > ref.fa
     }
     output {
         File reference_file = "ref.fa"
@@ -489,9 +460,7 @@ task runVGGIRAFFE {
     input {
         File in_left_read_pair_chunk_file
         File in_right_read_pair_chunk_file
-        File in_xg_file
-        File in_gbwt_file
-        File in_ggbwt_file
+        File in_gbz_file
         File in_dist_file
         File in_min_file
         String in_vg_container
@@ -520,17 +489,15 @@ task runVGGIRAFFE {
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
           ~{in_giraffe_options} \
-          --output-format gam \
+          --output-format gaf \
           -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-          -x ~{in_xg_file} \
-          -H ~{in_gbwt_file} \
-          -g ~{in_ggbwt_file} \
+          -Z ~{in_gbz_file} \
           -d ~{in_dist_file} \
           -m ~{in_min_file} \
-          -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
+          -t ~{in_map_cores} | gzip > ~{in_sample_name}.${READ_CHUNK_ID}.gaf.gz
     >>>
     output {
-        File chunk_gam_file = glob("*gam")[0]
+        File chunk_gaf_file = glob("*gaf.gz")[0]
     }
     runtime {
         preemptible: 2
@@ -542,10 +509,10 @@ task runVGGIRAFFE {
     }
 }
 
-task surjectGAMtoBAM {
+task surjectGAFtoBAM {
     input {
-        File in_gam_file
-        File in_xg_file
+        File in_gaf_file
+        File in_gbz_file
         File in_path_list_file
         String in_sample_name
         Int in_max_fragment_length
@@ -554,7 +521,7 @@ task surjectGAMtoBAM {
         Int in_map_disk
         String in_map_mem
     }
-    String out_prefix = basename(in_gam_file, ".gam") 
+    String out_prefix = basename(in_gaf_file, ".gaf") 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -567,16 +534,20 @@ task surjectGAMtoBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
+        echo `date` - Converting GBZ to XG
+        vg convert -x -t ~{in_map_cores} ~{in_gbz_file} > graph.xg
+        
+        echo `date` - Surjecting reads
         vg surject \
           -F ~{in_path_list_file} \
-          -x ~{in_xg_file} \
-          -t ~{in_map_cores} \
+          -x graph.xg \
+          -t ~{in_map_cores}  \
           --bam-output \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --prune-low-cplx \
           --interleaved --max-frag-len ~{in_max_fragment_length} \
-          ~{in_gam_file} > ~{out_prefix}.bam
+          -G ~{in_gaf_file} > ~{out_prefix}.bam
     >>>
     output {
         File chunk_bam_file = "~{out_prefix}.bam"
@@ -590,43 +561,6 @@ task surjectGAMtoBAM {
         docker: in_vg_container
     }
 
-}
-
-task convertGAMtoGAF {
-    input {
-        File in_xg_file
-        File in_gam_file
-        String in_vg_container
-        Int in_cores
-        Int in_disk
-        String in_mem
-    }
-    String out_prefix = basename(in_gam_file, ".gam") 
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        vg convert -G ~{in_gam_file} ~{in_xg_file} | gzip > ~{out_prefix}.gaf.gz
-    >>>
-    output {
-        File output_gaf = "~{out_prefix}.gaf.gz"
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: in_mem + " GB"
-        cpu: in_cores
-        disks: "local-disk " + in_disk + " SSD"
-        docker: in_vg_container
-    }
 }
 
 task mergeGAF {
@@ -652,40 +586,6 @@ task mergeGAF {
     >>>
     output {
         File output_merged_gaf = "~{in_sample_name}.gaf.gz"
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: "6GB"
-        cpu: 1
-        disks: "local-disk " + in_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task mergeGAM {
-    input {
-        String in_sample_name
-        Array[File] in_gam_chunk_files
-        String in_vg_container
-        Int in_disk
-    }
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        cat ~{sep=" " in_gam_chunk_files} > ~{in_sample_name}.gam
-    >>>
-    output {
-        File output_merged_gam = "~{in_sample_name}.gam"
     }
     runtime {
         preemptible: 2

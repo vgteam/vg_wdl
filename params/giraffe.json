@@ -1,14 +1,11 @@
 {
   "Giraffe.INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
   "Giraffe.INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz",
-  "Giraffe.XG_FILE": "tests/small_sim_graph/graph.xg",
+  "Giraffe.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
   "Giraffe.SAMPLE_NAME": "s0",
-  "Giraffe.GBWT_FILE": "tests/small_sim_graph/graph.gbwt",
-  "Giraffe.GGBWT_FILE": "tests/small_sim_graph/graph.gg",
   "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
   "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
   "Giraffe.OUTPUT_GAF": true,
-  "Giraffe.OUTPUT_GAM": true,
   "Giraffe.OUTPUT_SINGLE_BAM": true
 }
 
