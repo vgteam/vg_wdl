@@ -534,13 +534,9 @@ task surjectGAFtoBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        echo `date` - Converting GBZ to XG
-        vg convert -x -t ~{in_map_cores} ~{in_gbz_file} > graph.xg
-        
-        echo `date` - Surjecting reads
         vg surject \
           -F ~{in_path_list_file} \
-          -x graph.xg \
+          -x ~{in_gbz_file} \
           -t ~{in_map_cores}  \
           --bam-output \
           --sample ~{in_sample_name} \
