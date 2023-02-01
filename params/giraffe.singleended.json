@@ -1,0 +1,11 @@
+{
+  "Giraffe.INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
+  "Giraffe.PAIRED_READS": false,
+  "Giraffe.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
+  "Giraffe.SAMPLE_NAME": "s0",
+  "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
+  "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
+  "Giraffe.OUTPUT_GAF": true,
+  "Giraffe.OUTPUT_SINGLE_BAM": true
+}
+

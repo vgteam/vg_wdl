@@ -15,6 +15,7 @@ workflow Giraffe {
         File? CRAM_REF                                  # Genome fasta file associated with the CRAM file
         File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
         String SAMPLE_NAME                              # The sample name
+        Boolean PAIRED_READS = true
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
         String VG_CONTAINER = "quay.io/vgteam/vg:v1.44.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
@@ -44,17 +45,17 @@ workflow Giraffe {
     }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
-	call convertCRAMtoFASTQ {
+	    call convertCRAMtoFASTQ {
             input:
             in_cram_file=INPUT_CRAM_FILE,
             in_ref_file=CRAM_REF,
             in_ref_index_file=CRAM_REF_INDEX,
+            in_paired_reads=PAIRED_READS,
             in_cores=SPLIT_READ_CORES
-	}
+	    }
     }
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
-    File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
     
     # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
@@ -65,15 +66,7 @@ workflow Giraffe {
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
     }
-    call splitReads as secondReadPair {
-        input:
-            in_read_file=read_2_file,
-            in_pair_id="2",
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES,
-            in_split_read_disk=SPLIT_READ_DISK
-    }
-
+    
     # Which path names to work on?
     if (!defined(CONTIGS)) {
         if (!defined(PATH_LIST_FILE)) {
@@ -123,14 +116,24 @@ workflow Giraffe {
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
     File reference_dict_file = select_first([REFERENCE_DICT_FILE, indexReference.reference_dict_file])
-
+    
     ################################################################
     # Distribute vg mapping operation over each chunked read pair #
     ################################################################
-    Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
-    scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-        call runVGGIRAFFE {
+    if(PAIRED_READS){
+        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
+        call splitReads as secondReadPair {
             input:
+            in_read_file=read_2_file,
+            in_pair_id="2",
+            in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK
+        }
+        Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
+        scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
+            call runVGGIRAFFE as runVGGIRAFFEpe {
+                input:
                 in_left_read_pair_chunk_file=read_pair_chunk_files.left,
                 in_right_read_pair_chunk_file=read_pair_chunk_files.right,
                 in_vg_container=VG_CONTAINER,
@@ -138,6 +141,7 @@ workflow Giraffe {
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
                 in_min_file=MIN_FILE,
+                in_paired_reads=PAIRED_READS,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -152,19 +156,53 @@ workflow Giraffe {
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
+            }
         }
-        call surjectGAFtoBAM {
+    }
+    if (!PAIRED_READS) {
+        scatter (read_pair_chunk_file in firstReadPair.output_read_chunks) {
+            call runVGGIRAFFE as runVGGIRAFFEse {
                 input:
-                in_gaf_file=runVGGIRAFFE.chunk_gaf_file,
-                in_gbz_file=GBZ_FILE,
-                in_path_list_file=pipeline_path_list_file,
-                in_sample_name=SAMPLE_NAME,
-                in_max_fragment_length=MAX_FRAGMENT_LENGTH,
+                in_left_read_pair_chunk_file=read_pair_chunk_file,
                 in_vg_container=VG_CONTAINER,
+                in_giraffe_options=GIRAFFE_OPTIONS,
+                in_gbz_file=GBZ_FILE,
+                in_dist_file=DIST_FILE,
+                in_min_file=MIN_FILE,
+                in_paired_reads=PAIRED_READS,
+                # We always need to pass a full dict file here, with lengths,
+                # because if we pass just path lists and the paths are not
+                # completely contained in the graph (like if we're working on
+                # GRCh38 paths in a CHM13-based graph), giraffe won't be able
+                # to get the path lengths and will crash.
+                # TODO: Somehow this problem is supposed to go away if we pull
+                # any GRCh38. prefix off the path names by setting
+                # REFERENCE_PREFIX and making sure the prefix isn't in the
+                # truth set.
+                # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
+                in_sample_name=SAMPLE_NAME,
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
             }
+        }
+    }
+
+    Array[File] gaf_chunks = select_first([runVGGIRAFFEpe.chunk_gaf_file, runVGGIRAFFEse.chunk_gaf_file])
+    scatter (gaf_file in gaf_chunks) {
+        call surjectGAFtoBAM {
+            input:
+            in_gaf_file=gaf_file,
+            in_gbz_file=GBZ_FILE,
+            in_path_list_file=pipeline_path_list_file,
+            in_sample_name=SAMPLE_NAME,
+            in_max_fragment_length=MAX_FRAGMENT_LENGTH,
+            in_paired_reads=PAIRED_READS,
+            in_vg_container=VG_CONTAINER,
+            in_map_cores=MAP_CORES,
+            in_map_disk=MAP_DISK,
+            in_map_mem=MAP_MEM
+        }
         if (REFERENCE_PREFIX != "") {
             # use samtools to replace the header contigs with those from our dict.
             # this allows the header to contain contigs that are not in the graph,
@@ -172,22 +210,22 @@ workflow Giraffe {
             # also, strip out contig prefixes in the BAM body
             call fixBAMContigNaming {
                 input:
-                    in_bam_file=surjectGAFtoBAM.chunk_bam_file,
-                    in_ref_dict=reference_dict_file,
-                    in_prefix_to_strip=REFERENCE_PREFIX,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
+                in_bam_file=surjectGAFtoBAM.chunk_bam_file,
+                in_ref_dict=reference_dict_file,
+                in_prefix_to_strip=REFERENCE_PREFIX,
+                in_map_cores=MAP_CORES,
+                in_map_disk=MAP_DISK,
+                in_map_mem=MAP_MEM
             }
         }
         File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoBAM.chunk_bam_file]) 
         call sortBAMFile {
             input:
-                in_sample_name=SAMPLE_NAME,
-                in_bam_chunk_file=properly_named_bam_file,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+            in_sample_name=SAMPLE_NAME,
+            in_bam_chunk_file=properly_named_bam_file,
+            in_map_cores=MAP_CORES,
+            in_map_disk=MAP_DISK,
+            in_map_mem=MAP_MEM
         }
     }
     Array[File] alignment_chunk_bam_files = select_all(sortBAMFile.sorted_chunk_bam)
@@ -308,7 +346,7 @@ workflow Giraffe {
         call mergeGAF {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=runVGGIRAFFE.chunk_gaf_file,
+            in_gaf_chunk_files=gaf_chunks,
             in_vg_container=VG_CONTAINER,
             in_disk=2*MAP_DISK
         }
@@ -329,10 +367,11 @@ workflow Giraffe {
 
 task convertCRAMtoFASTQ {
     input {
-	File? in_cram_file
+	    File? in_cram_file
         File? in_ref_file
         File? in_ref_index_file
-	Int in_cores
+        Boolean in_paired_reads = true
+	    Int in_cores
     }
     Int half_cores = in_cores / 2
     Int disk_size = round(5 * size(in_cram_file, 'G')) + 50
@@ -347,12 +386,16 @@ task convertCRAMtoFASTQ {
     # echo each line of the script to stdout so we can see what is happening
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
-    
-    samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+
+    if [ ~{in_paired_reads} == true ]
+    then
+        samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+    else
+        samtools fastq -@ ~{in_cores} -o reads.R1.fastq.gz -c 1 --reference ~{in_ref_file} ~{in_cram_file}
     >>>
     output {
         File output_fastq_1_file = "reads.R1.fastq.gz"
-        File output_fastq_2_file = "reads.R2.fastq.gz"
+        File? output_fastq_2_file = "reads.R2.fastq.gz"
     }
     runtime {
         preemptible: 2
@@ -459,10 +502,11 @@ task extractReference {
 task runVGGIRAFFE {
     input {
         File in_left_read_pair_chunk_file
-        File in_right_read_pair_chunk_file
+        File? in_right_read_pair_chunk_file
         File in_gbz_file
         File in_dist_file
         File in_min_file
+        Boolean in_paired_reads
         String in_vg_container
         String in_giraffe_options
         String in_sample_name
@@ -484,13 +528,20 @@ task runVGGIRAFFE {
         #to turn off echo do 'set +o xtrace'
 
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
+
+        PAIR_ARGS=""
+        if [ ~{in_paired_reads} == true ]
+        then
+            PAIR_ARGS="-f ~{in_right_read_pair_chunk_file}"
+        fi
+        
         vg giraffe \
           --progress \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
           --sample "~{in_sample_name}" \
           ~{in_giraffe_options} \
           --output-format gaf \
-          -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
+          -f ~{in_left_read_pair_chunk_file} $PAIR_ARGS \
           -Z ~{in_gbz_file} \
           -d ~{in_dist_file} \
           -m ~{in_min_file} \
@@ -516,6 +567,7 @@ task surjectGAFtoBAM {
         File in_path_list_file
         String in_sample_name
         Int in_max_fragment_length
+        Boolean in_paired_reads
         String in_vg_container
         Int in_map_cores
         Int in_map_disk
@@ -534,6 +586,12 @@ task surjectGAFtoBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
+        PAIR_ARGS=""
+        if [ ~{in_paired_reads} == true ]
+        then
+            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+        fi
+
         vg surject \
           -F ~{in_path_list_file} \
           -x ~{in_gbz_file} \
@@ -541,8 +599,7 @@ task surjectGAFtoBAM {
           --bam-output \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx \
-          --interleaved --max-frag-len ~{in_max_fragment_length} \
+          --prune-low-cplx $PAIR_ARGS \
           -G ~{in_gaf_file} > ~{out_prefix}.bam
     >>>
     output {
