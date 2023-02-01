@@ -392,6 +392,7 @@ task convertCRAMtoFASTQ {
         samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
     else
         samtools fastq -@ ~{in_cores} -o reads.R1.fastq.gz -c 1 --reference ~{in_ref_file} ~{in_cram_file}
+    fi
     >>>
     output {
         File output_fastq_1_file = "reads.R1.fastq.gz"

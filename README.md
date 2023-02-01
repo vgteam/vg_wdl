@@ -111,4 +111,5 @@ java -jar $CROMWELL_JAR run workflows/happy_evaluation.wdl -i params/happy_evalu
 # Giraffe only
 java -jar $CROMWELL_JAR run workflows/giraffe.wdl -i params/giraffe.json
 java -jar $CROMWELL_JAR run workflows/giraffe.wdl -i params/giraffe.singleended.json
+java -jar $CROMWELL_JAR run workflows/giraffe.wdl -i params/giraffe.singleended.cram.json
 ```
