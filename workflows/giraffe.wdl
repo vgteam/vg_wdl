@@ -6,6 +6,8 @@ version 1.0
 ## Reference: https://github.com/vgteam/vg/wiki
 
 import "../tasks/bioinfo_utils.wdl" as utils
+import "../tasks/gam_gaf_utils.wdl" as gautils
+import "../tasks/vg_map_hts.wdl" as map
 
 workflow Giraffe {
     input {
@@ -17,7 +19,6 @@ workflow Giraffe {
         String SAMPLE_NAME                              # The sample name
         Boolean PAIRED_READS = true
         Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.44.0" # VG Container used in the pipeline
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String GIRAFFE_OPTIONS = ""                     # (OPTIONAL) extra command line options for Giraffe mapper
         Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.
@@ -29,23 +30,19 @@ workflow Giraffe {
         Boolean LEFTALIGN_BAM = true                    # Whether or not to left-align reads in the BAM before DV
         Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
-        Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
         Boolean OUTPUT_SINGLE_BAM = true                # Should a single merged BAM file be saved?
         Boolean OUTPUT_CALLING_BAMS = false             # Should individual contig BAMs be saved?
         Boolean OUTPUT_GAF = false                      # Should a GAF file with the aligned reads be saved?
         Int SPLIT_READ_CORES = 8
-        Int SPLIT_READ_DISK = 60
         Int MAP_CORES = 16
-        Int MAP_DISK = 200
         Int MAP_MEM = 120
-        Int POSTPROCESS_DISK = 40
         File? REFERENCE_FILE                            # (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.
         File? REFERENCE_INDEX_FILE                      # (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
         File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
     }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
-	    call convertCRAMtoFASTQ {
+	    call utils.convertCRAMtoFASTQ {
             input:
             in_cram_file=INPUT_CRAM_FILE,
             in_ref_file=CRAM_REF,
@@ -58,13 +55,12 @@ workflow Giraffe {
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
     
     # Split input reads into chunks for parallelized mapping
-    call splitReads as firstReadPair {
+    call utils.splitReads as firstReadPair {
         input:
             in_read_file=read_1_file,
             in_pair_id="1",
             in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES,
-            in_split_read_disk=SPLIT_READ_DISK
+            in_split_read_cores=SPLIT_READ_CORES
     }
     
     # Which path names to work on?
@@ -75,11 +71,9 @@ workflow Giraffe {
             # decoys and unplaced/unlocalized contigs, and we can't efficiently
             # scatter across them, nor do we care about accuracy on them, and also
             # calling on the decoys is semantically meaningless.
-            call extractSubsetPathNames {
+            call map.extractSubsetPathNames {
                 input:
                     in_gbz_file=GBZ_FILE,
-                    in_vg_container=VG_CONTAINER,
-                    in_extract_disk=MAP_DISK,
                     in_extract_mem=MAP_MEM
             }
         }
@@ -95,13 +89,12 @@ workflow Giraffe {
     # To make sure that we have a FASTA reference with a contig set that
     # exactly matches the graph, we generate it ourselves, from the graph.
     if (!defined(REFERENCE_FILE)) {
-        call extractReference {
+        call map.extractReference {
             input:
-                in_gbz_file=GBZ_FILE,
-                in_path_list_file=pipeline_path_list_file,
-                in_vg_container=VG_CONTAINER,
-                in_extract_disk=MAP_DISK,
-                in_extract_mem=MAP_MEM
+            in_gbz_file=GBZ_FILE,
+            in_path_list_file=pipeline_path_list_file,
+            in_prefix_to_strip=REFERENCE_PREFIX,
+            in_extract_mem=MAP_MEM
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
@@ -109,9 +102,7 @@ workflow Giraffe {
     if (!defined(REFERENCE_INDEX_FILE)) {
         call utils.indexReference {
             input:
-                in_reference_file=reference_file,
-                in_index_disk=MAP_DISK,
-                in_index_mem=MAP_MEM
+                in_reference_file=reference_file
         }
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
@@ -122,26 +113,23 @@ workflow Giraffe {
     ################################################################
     if(PAIRED_READS){
         File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
-        call splitReads as secondReadPair {
+        call utils.splitReads as secondReadPair {
             input:
             in_read_file=read_2_file,
             in_pair_id="2",
             in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES,
-            in_split_read_disk=SPLIT_READ_DISK
+            in_split_read_cores=SPLIT_READ_CORES
         }
         Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
         scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-            call runVGGIRAFFE as runVGGIRAFFEpe {
+            call map.runVGGIRAFFE as runVGGIRAFFEpe {
                 input:
-                in_left_read_pair_chunk_file=read_pair_chunk_files.left,
-                in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-                in_vg_container=VG_CONTAINER,
+                fastq_file_1=read_pair_chunk_files.left,
+                fastq_file_2=read_pair_chunk_files.right,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
                 in_min_file=MIN_FILE,
-                in_paired_reads=PAIRED_READS,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -153,23 +141,20 @@ workflow Giraffe {
                 # truth set.
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
                 in_sample_name=SAMPLE_NAME,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                nb_cores=MAP_CORES,
+                mem_gb=MAP_MEM
             }
         }
     }
     if (!PAIRED_READS) {
         scatter (read_pair_chunk_file in firstReadPair.output_read_chunks) {
-            call runVGGIRAFFE as runVGGIRAFFEse {
+            call map.runVGGIRAFFE as runVGGIRAFFEse {
                 input:
-                in_left_read_pair_chunk_file=read_pair_chunk_file,
-                in_vg_container=VG_CONTAINER,
+                fastq_file_1=read_pair_chunk_file,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
                 in_min_file=MIN_FILE,
-                in_paired_reads=PAIRED_READS,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -181,68 +166,48 @@ workflow Giraffe {
                 # truth set.
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
                 in_sample_name=SAMPLE_NAME,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                nb_cores=MAP_CORES,
+                mem_gb=MAP_MEM
             }
         }
     }
 
     Array[File] gaf_chunks = select_first([runVGGIRAFFEpe.chunk_gaf_file, runVGGIRAFFEse.chunk_gaf_file])
     scatter (gaf_file in gaf_chunks) {
-        call surjectGAFtoBAM {
+        call gautils.surjectGAFtoSortedBAM {
             input:
             in_gaf_file=gaf_file,
             in_gbz_file=GBZ_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_paired_reads=PAIRED_READS,
-            in_vg_container=VG_CONTAINER,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
+            in_paired_reads=PAIRED_READS
         }
         if (REFERENCE_PREFIX != "") {
             # use samtools to replace the header contigs with those from our dict.
             # this allows the header to contain contigs that are not in the graph,
             # which is more general and lets CHM13-based graphs be used to call on GRCh38
             # also, strip out contig prefixes in the BAM body
-            call fixBAMContigNaming {
+            call map.fixBAMContigNaming {
                 input:
-                in_bam_file=surjectGAFtoBAM.chunk_bam_file,
+                in_bam_file=surjectGAFtoSortedBAM.output_bam_file,
                 in_ref_dict=reference_dict_file,
-                in_prefix_to_strip=REFERENCE_PREFIX,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                in_prefix_to_strip=REFERENCE_PREFIX
             }
         }
-        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoBAM.chunk_bam_file]) 
-        call sortBAMFile {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_bam_chunk_file=properly_named_bam_file,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
-        }
+        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoSortedBAM.output_bam_file]) 
     }
-    Array[File] alignment_chunk_bam_files = select_all(sortBAMFile.sorted_chunk_bam)
 
-    call mergeAlignmentBAMChunks {
+    call utils.mergeAlignmentBAMChunks {
         input:
-            in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=alignment_chunk_bam_files,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
+        in_sample_name=SAMPLE_NAME,
+        in_alignment_bam_chunk_files=properly_named_bam_file
     }
     
     if (REFERENCE_PREFIX != "") {
         # strip all the GRCh38's off our path list file.  we need them for surject as they are in the path
         # but fixBAMContigNaming above stripped them, so we don't need them downstream
-        call fixPathNames {
+        call map.fixPathNames {
             input:
                 in_path_file=pipeline_path_list_file,
                 in_prefix_to_strip=REFERENCE_PREFIX,
@@ -251,15 +216,12 @@ workflow Giraffe {
     File properly_named_path_list_file = select_first([fixPathNames.fixed_path_list_file, pipeline_path_list_file])
              
     # Split merged alignment by contigs list
-    call splitBAMbyPath { 
+    call utils.splitBAMbyPath { 
         input:
-            in_sample_name=SAMPLE_NAME,
-            in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-            in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
-            in_path_list_file=properly_named_path_list_file,
-            in_map_cores=MAP_CORES,
-            in_map_disk=MAP_DISK,
-            in_map_mem=MAP_MEM
+    in_sample_name=SAMPLE_NAME,
+    in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
+    in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
+    in_path_list_file=properly_named_path_list_file
     }
 
     ##
@@ -269,71 +231,44 @@ workflow Giraffe {
         ## Evantually shift and realign reads
         if (LEFTALIGN_BAM){
             # Just left-shift each read individually
-            call leftShiftBAMFile {
+            call utils.leftShiftBAMFile {
                 input:
-                in_sample_name=SAMPLE_NAME,
                 in_bam_file=bam_and_index_for_path.left,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
-                in_call_disk=POSTPROCESS_DISK
-            }
-            # This tool can't make an index itself so we need to re-index the BAM
-            call indexBAMFile {
-                input:
-                in_sample_name=SAMPLE_NAME,
-                in_bam_file=leftShiftBAMFile.left_shifted_bam,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
             }
         }
         if (REALIGN_INDELS) {
-            File forrealign_bam = select_first([leftShiftBAMFile.left_shifted_bam, bam_and_index_for_path.left])
-            File forrealign_index = select_first([indexBAMFile.bam_index, bam_and_index_for_path.right])
+            File forrealign_bam = select_first([leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
+            File forrealign_index = select_first([leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
             # Do indel realignment
-            call runGATKRealignerTargetCreator {
+            call utils.prepareRealignTargets {
                 input:
-                    in_sample_name=SAMPLE_NAME,
+                in_bam_file=forrealign_bam,
+                in_bam_index_file=forrealign_index,
+                in_reference_file=reference_file,
+                in_reference_index_file=reference_index_file,
+                in_reference_dict_file=reference_dict_file,
+                in_expansion_bases=REALIGNMENT_EXPANSION_BASES
+            }
+            call utils.runAbraRealigner {
+                input:
                     in_bam_file=forrealign_bam,
                     in_bam_index_file=forrealign_index,
+                    in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                     in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    in_reference_dict_file=reference_dict_file,
-                    in_call_disk=POSTPROCESS_DISK
-            }
-            if (REALIGNMENT_EXPANSION_BASES != 0) {
-                # We want the realignment targets to be wider
-                call widenRealignmentTargets {
-                    input:
-                        in_target_bed_file=runGATKRealignerTargetCreator.realigner_target_bed,
-                        in_reference_index_file=reference_index_file,
-                        in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
-                        in_call_disk=POSTPROCESS_DISK
-                }
-            }
-            File target_bed_file = select_first([widenRealignmentTargets.output_target_bed_file, runGATKRealignerTargetCreator.realigner_target_bed])
-            call runAbraRealigner {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_file=forrealign_bam,
-                    in_bam_index_file=forrealign_index,
-                    in_target_bed_file=target_bed_file,
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    in_call_disk=POSTPROCESS_DISK
+                    in_reference_index_file=reference_index_file
             }
         }
-        File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.left_shifted_bam, bam_and_index_for_path.left])
-        File processed_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, indexBAMFile.bam_index, bam_and_index_for_path.right])
+        File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
+        File processed_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
     }
     
     if (OUTPUT_SINGLE_BAM){
-        call mergeAlignmentBAMChunks as mergeBAM {
+        call utils.mergeAlignmentBAMChunks as mergeBAM {
             input:
-                in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=processed_bam,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+            in_sample_name=SAMPLE_NAME,
+            in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]]))
         }
     }
     
@@ -343,12 +278,10 @@ workflow Giraffe {
     }
     
     if (OUTPUT_GAF){
-        call mergeGAF {
+        call gautils.mergeGAF {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=gaf_chunks,
-            in_vg_container=VG_CONTAINER,
-            in_disk=2*MAP_DISK
+            in_gaf_chunk_files=gaf_chunks
         }
     }
     
@@ -359,762 +292,5 @@ workflow Giraffe {
         Array[File]? output_calling_bams = calling_bams
         Array[File]? output_calling_bam_indexes = calling_bam_indexes
     }   
-}
-
-########################
-### TASK DEFINITIONS ###
-########################
-
-task convertCRAMtoFASTQ {
-    input {
-	    File? in_cram_file
-        File? in_ref_file
-        File? in_ref_index_file
-        Boolean in_paired_reads = true
-	    Int in_cores
-    }
-    Int half_cores = in_cores / 2
-    Int disk_size = round(5 * size(in_cram_file, 'G')) + 50
-    command <<<
-    # Set the exit code of a pipeline to that of the rightmost command
-    # to exit with a non-zero status, or zero if all commands of the pipeline exit
-    set -o pipefail
-    # cause a bash script to exit immediately when a command fails
-    set -e
-    # cause the bash shell to treat unset variables as an error and exit immediately
-    set -u
-    # echo each line of the script to stdout so we can see what is happening
-    set -o xtrace
-    #to turn off echo do 'set +o xtrace'
-
-    if [ ~{in_paired_reads} == true ]
-    then
-        samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
-    else
-        samtools fastq -@ ~{in_cores} -o reads.R1.fastq.gz -c 1 --reference ~{in_ref_file} ~{in_cram_file}
-    fi
-    >>>
-    output {
-        File output_fastq_1_file = "reads.R1.fastq.gz"
-        File? output_fastq_2_file = "reads.R2.fastq.gz"
-    }
-    runtime {
-        preemptible: 2
-        cpu: in_cores
-        memory: "50 GB"
-        disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/biocontainers/samtools:1.14--hb421002_0"
-    }    
-}
-
-task splitReads {
-    input {
-        File in_read_file
-        String in_pair_id
-        Int in_reads_per_chunk
-        Int in_split_read_cores
-        Int in_split_read_disk
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
-    >>>
-    output {
-        Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
-    }
-    runtime {
-        preemptible: 2
-        time: 120
-        cpu: in_split_read_cores
-        memory: "2 GB"
-        disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: "quay.io/glennhickey/pigz:2.3.1"
-    }
-}
-
-task extractSubsetPathNames {
-    input {
-        File in_gbz_file
-        String in_vg_container
-        Int in_extract_disk
-        Int in_extract_mem
-    }
-
-    command {
-        set -eux -o pipefail
-
-        vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
-
-        grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM > path_list.sub.txt
-    }
-    output {
-        File output_path_list_file = "path_list.sub.txt"
-    }
-    runtime {
-        preemptible: 2
-        memory: in_extract_mem + " GB"
-        disks: "local-disk " + in_extract_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task extractReference {
-    input {
-        File in_gbz_file
-        File in_path_list_file
-        String in_vg_container
-        Int in_extract_disk
-        Int in_extract_mem
-    }
-
-    command {
-        set -eux -o pipefail
-
-        # Subset to just the paths we care about (may be the whole file) so we
-        # get a good dict with just those paths later
-        vg paths \
-           --extract-fasta \
-           -p ${in_path_list_file} \
-           --xg ${in_gbz_file} > ref.fa
-    }
-    output {
-        File reference_file = "ref.fa"
-    }
-    runtime {
-        preemptible: 2
-        memory: in_extract_mem + " GB"
-        disks: "local-disk " + in_extract_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task runVGGIRAFFE {
-    input {
-        File in_left_read_pair_chunk_file
-        File? in_right_read_pair_chunk_file
-        File in_gbz_file
-        File in_dist_file
-        File in_min_file
-        Boolean in_paired_reads
-        String in_vg_container
-        String in_giraffe_options
-        String in_sample_name
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
-
-        PAIR_ARGS=""
-        if [ ~{in_paired_reads} == true ]
-        then
-            PAIR_ARGS="-f ~{in_right_read_pair_chunk_file}"
-        fi
-        
-        vg giraffe \
-          --progress \
-          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --sample "~{in_sample_name}" \
-          ~{in_giraffe_options} \
-          --output-format gaf \
-          -f ~{in_left_read_pair_chunk_file} $PAIR_ARGS \
-          -Z ~{in_gbz_file} \
-          -d ~{in_dist_file} \
-          -m ~{in_min_file} \
-          -t ~{in_map_cores} | gzip > ~{in_sample_name}.${READ_CHUNK_ID}.gaf.gz
-    >>>
-    output {
-        File chunk_gaf_file = glob("*gaf.gz")[0]
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task surjectGAFtoBAM {
-    input {
-        File in_gaf_file
-        File in_gbz_file
-        File in_path_list_file
-        String in_sample_name
-        Int in_max_fragment_length
-        Boolean in_paired_reads
-        String in_vg_container
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-    String out_prefix = basename(in_gaf_file, ".gaf") 
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        PAIR_ARGS=""
-        if [ ~{in_paired_reads} == true ]
-        then
-            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
-        fi
-
-        vg surject \
-          -F ~{in_path_list_file} \
-          -x ~{in_gbz_file} \
-          -t ~{in_map_cores}  \
-          --bam-output \
-          --sample ~{in_sample_name} \
-          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx $PAIR_ARGS \
-          -G ~{in_gaf_file} > ~{out_prefix}.bam
-    >>>
-    output {
-        File chunk_bam_file = "~{out_prefix}.bam"
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
-    }
-
-}
-
-task mergeGAF {
-    input {
-        String in_sample_name
-        Array[File] in_gaf_chunk_files
-        String in_vg_container
-        Int in_disk
-    }
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        cat ~{sep=" " in_gaf_chunk_files} > ~{in_sample_name}.gaf.gz
-    >>>
-    output {
-        File output_merged_gaf = "~{in_sample_name}.gaf.gz"
-    }
-    runtime {
-        preemptible: 2
-        time: 300
-        memory: "6GB"
-        cpu: 1
-        disks: "local-disk " + in_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task sortBAMFile {
-    input {
-        String in_sample_name
-        File in_bam_chunk_file
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools sort \
-          --threads ~{in_map_cores} \
-          ~{in_bam_chunk_file} \
-          -O BAM > ~{in_sample_name}.positionsorted.bam
-    >>>
-    output {
-        File sorted_chunk_bam = "~{in_sample_name}.positionsorted.bam"
-    }
-    runtime {
-        preemptible: 2
-        time: 90
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
-    }
-}
-
-task indexBAMFile {
-    input {
-        String in_sample_name
-        File in_bam_file
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        # Never use Samtools 1.4.1 here! See https://github.com/samtools/samtools/issues/687
-        samtools index \
-          ~{in_bam_file} \
-          index.bai
-    >>>
-    output {
-        File bam_index = "index.bai"
-    }
-    runtime {
-        preemptible: 2
-        time: 90
-        memory: in_map_mem + " GB"
-        cpu: 1
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
-    }
-}
-
-task fixBAMContigNaming {
-    input {
-        File in_bam_file
-        File in_ref_dict
-        String in_prefix_to_strip
-        Int in_map_cores
-        Int in_map_disk = 5 * round(size(in_bam_file, 'G')) + 20
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        # patch the SQ fields from the dict into a new header
-        samtools view -H ~{in_bam_file} | grep ^@HD > new_header.sam
-        grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
-        samtools view -H ~{in_bam_file}  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
-
-        OUTBAM=($(basename ~{in_bam_file} | sed "s/~{in_prefix_to_strip}//g"))
-        mkdir fixed
-        # insert the new header, and strip all instances of the prefix
-        cat <(cat new_header.sam) <(samtools view ~{in_bam_file}) | \
-            sed -e "s/~{in_prefix_to_strip}//g" | \
-            samtools view --threads ~{in_map_cores} -O BAM > fixed/$OUTBAM
-        
-        samtools index fixed/$OUTBAM
-    >>>
-    output {
-        File fixed_bam_file = glob("fixed/*bam")[0]
-        File fixed_bam_index_file = glob("fixed/*bai")[0]
-    }
-    runtime {
-        preemptible: 2
-        time: 90
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
-    }
-}
-
-task fixPathNames {
-    input {
-        File in_path_file
-        String in_prefix_to_strip
-     }
-
-     command <<<
-        sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_file}  > "fixed_names_file"
-     >>>
-    output {
-        File fixed_path_list_file = "fixed_names_file"
-    }
-    runtime {
-        preemptible: 2
-        time: 90
-        memory: 2 + " GB"
-        cpu: 1
-        disks: "local-disk " + 32 + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
-    }
-}
-
-task mergeAlignmentBAMChunks {
-    input {
-        String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools merge \
-          -f -p -c --threads ~{in_map_cores} \
-          ~{in_sample_name}_merged.positionsorted.bam \
-          ~{sep=" " in_alignment_bam_chunk_files} \
-        && samtools index \
-          ~{in_sample_name}_merged.positionsorted.bam
-    >>>
-    output {
-        File merged_bam_file = "~{in_sample_name}_merged.positionsorted.bam"
-        File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
-    }
-    runtime {
-        preemptible: 2
-        time: 240
-        memory: 5 + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
-    }
-}
-
-task splitBAMbyPath {
-    input {
-        String in_sample_name
-        File in_merged_bam_file
-        File in_merged_bam_file_index
-        File in_path_list_file
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        set -eux -o pipefail
-
-        ln -s ~{in_merged_bam_file} input_bam_file.bam
-        ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
-
-        while read -r contig; do
-            samtools view \
-              -@ ~{in_map_cores} \
-              -h -O BAM \
-              input_bam_file.bam ${contig} \
-              -o ~{in_sample_name}.${contig}.bam \
-            && samtools index \
-              ~{in_sample_name}.${contig}.bam
-        done < "~{in_path_list_file}"
-    >>>
-    output {
-        Array[File] bam_contig_files = glob("~{in_sample_name}.*.bam")
-        Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai")
-    }
-    runtime {
-        preemptible: 2
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
-    }
-}
-
-task runGATKRealignerTargetCreator {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_bam_index_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-        Int in_call_disk
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command 
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit 
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails 
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately 
-        set -u
-        # echo each line of the script to stdout so we can see what is happening 
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace' 
-
-        ln -f -s ~{in_bam_file} input_bam_file.bam
-        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai
-        CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g | sed s/.indel_realigned$//g | sed s/.left_shifted$//g))
-
-        # Reference and its index must be adjacent and not at arbitrary paths
-        # the runner gives.
-        ln -f -s "~{in_reference_file}" reference.fa
-        ln -f -s "~{in_reference_index_file}" reference.fa.fai
-        # And the dict must be adjacent to both
-        ln -f -s "~{in_reference_dict_file}" reference.dict
-
-        java -jar /usr/GenomeAnalysisTK.jar -T RealignerTargetCreator \
-          --remove_program_records \
-          -drf DuplicateRead \
-          --disable_bam_indexing \
-          -nt "32" \
-          -R reference.fa \
-          -L ${CONTIG_ID} \
-          -I input_bam_file.bam \
-          --out forIndelRealigner.intervals
-
-        awk -F '[:-]' 'BEGIN { OFS = "\t" } { if( $3 == "") { print $1, $2-1, $2 } else { print $1, $2-1, $3}}' forIndelRealigner.intervals > ~{in_sample_name}.${CONTIG_ID}.intervals.bed
-    >>>
-    output {
-        File realigner_target_bed = glob("*.bed")[0]
-    }
-    runtime {
-        preemptible: 2
-        time: 180
-        memory: 20 + " GB"
-        cpu: 16
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: "broadinstitute/gatk3@sha256:5ecb139965b86daa9aa85bc531937415d9e98fa8a6b331cb2b05168ac29bc76b"
-    }
-}
-
-task widenRealignmentTargets {
-    input {
-        File in_target_bed_file
-        File in_reference_index_file
-        Int in_expansion_bases
-        Int in_call_disk
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        
-        BASE_NAME=($(ls ~{in_target_bed_file} | rev | cut -f1 -d'/' | rev | sed s/.bed$//g))
-
-        # Widen the BED regions, but don't escape the chromosomes
-        bedtools slop -i "~{in_target_bed_file}" -g "~{in_reference_index_file}" -b "~{in_expansion_bases}" > "${BASE_NAME}.widened.bed"
-    >>>
-    output {
-        File output_target_bed_file = glob("*.widened.bed")[0]
-    }
-    runtime {
-        preemptible: 2
-        memory: 4 + " GB"
-        cpu: 1
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: "biocontainers/bedtools:v2.27.1dfsg-4-deb_cv1"
-    }
-}
-
-task runAbraRealigner {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_bam_index_file
-        File in_target_bed_file
-        File in_reference_file
-        File in_reference_index_file
-        Int in_call_disk
-        Int memoryGb = 40
-        Int threadCount = 16
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        ln -f -s ~{in_bam_file} input_bam_file.bam
-        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai
-        CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g | sed s/.indel_realigned$//g | sed s/.left_shifted$//g))
-
-        # Reference and its index must be adjacent and not at arbitrary paths
-        # the runner gives.
-        ln -f -s ~{in_reference_file} reference.fa
-        ln -f -s ~{in_reference_index_file} reference.fa.fai
-
-        java -Xmx~{memoryGb}G -jar /opt/abra2/abra2.jar \
-          --targets ~{in_target_bed_file} \
-          --in input_bam_file.bam \
-          --out ~{in_sample_name}.${CONTIG_ID}.indel_realigned.bam \
-          --ref reference.fa \
-          --index \
-          --threads ~{threadCount}
-    >>>
-    output {
-        File indel_realigned_bam = glob("~{in_sample_name}.*.indel_realigned.bam")[0]
-        File indel_realigned_bam_index = glob("~{in_sample_name}.*.indel_realigned*bai")[0]
-    }
-    runtime {
-        preemptible: 2
-        time: 180
-        memory: memoryGb + " GB"
-        cpu: threadCount
-        disks: "local-disk " + in_call_disk + " SSD"
-        # This used to be docker: "dceoy/abra2:latest" but they moved the tag
-        # and it stopped working. A known good version has been rehosted on
-        # Quay in case Docker Hub deletes it.
-        docker: "quay.io/adamnovak/dceoy-abra2@sha256:43d09d1c10220cfeab09e2763c2c5257884fa4457bcaa224f4e3796a28a24bba"
-    }
-}
-
-task leftShiftBAMFile {
-    input {
-        String in_sample_name
-        File in_bam_file
-        File in_reference_file
-        File in_reference_index_file
-        Int in_call_disk
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        CONTIG_ID=($(ls ~{in_bam_file} | rev | cut -f1 -d'/' | rev | sed s/^~{in_sample_name}.//g | sed s/.bam$//g | sed s/.indel_realigned$//g | sed s/.left_shifted$//g))
-
-        # Reference and its index must be adjacent and not at arbitrary paths
-        # the runner gives.
-        ln -f -s ~{in_reference_file} reference.fa
-        ln -f -s ~{in_reference_index_file} reference.fa.fai
-        
-        bamleftalign \
-            <~{in_bam_file} \
-            >~{in_sample_name}.${CONTIG_ID}.left_shifted.bam \
-            --fasta-reference reference.fa \
-            --compressed
-    >>>
-    output {
-        File left_shifted_bam = glob("~{in_sample_name}.*.left_shifted.bam")[0]
-    }
-    runtime {
-        preemptible: 2
-        time: 180
-        memory: 20 + " GB"
-        cpu: 1
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: "biocontainers/freebayes:v1.2.0-2-deb_cv1"
-    }
-}
-
-task concatClippedVCFChunks {
-    input {
-        String in_sample_name
-        Array[File] in_clipped_vcf_chunk_files
-        Int in_call_disk
-        Int in_call_mem
-    }
-
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        mkdir bcftools.tmp
-        bcftools concat -n ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort -T bcftools.tmp -O z -o ${in_sample_name}.vcf.gz - && bcftools index -t -o ${in_sample_name}.vcf.gz.tbi ${in_sample_name}.vcf.gz
-    }
-    output {
-        File output_merged_vcf = "${in_sample_name}.vcf.gz"
-        File output_merged_vcf_index = "${in_sample_name}.vcf.gz.tbi"
-    }
-    runtime {
-        preemptible: 2
-        time: 60
-        memory: in_call_mem + " GB"
-        disks: "local-disk " + in_call_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
-    }
 }
 

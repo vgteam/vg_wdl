@@ -588,8 +588,8 @@ task splitBAMbyPath {
         File in_merged_bam_file_index
         File in_path_list_file
         Int in_map_cores
+        Int disk_size = round(3 * size(in_merged_bam_file, 'G')) + 20
     }
-    Int disk_size = round(3 * size(in_merged_bam_file, 'G')) + 20
     command <<<
         set -eux -o pipefail
 
