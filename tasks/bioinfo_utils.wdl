@@ -155,6 +155,58 @@ task concatClippedVCFChunks {
     }
 }
 
+task sortBAM {
+    input {
+        File in_bam_file
+        File? in_ref_dict
+        String in_prefix_to_strip = ""
+        Int nb_cores = 16
+        Int disk_size = 5 * round(size(in_bam_file, "G")) + 20
+        String mem_gb = 16
+    }
+
+    String out_prefix = basename(in_bam_file, ".bam")
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        if [ ~{in_prefix_to_strip} != "" ]
+        then
+            # patch the SQ fields from the dict into a new header
+            samtools view -H ~{in_bam_file} | grep ^@HD > new_header.sam
+            grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
+            samtools view -H ~{in_bam_file}  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
+            
+            cat <(cat new_header.sam) <(samtools view ~{in_bam_file}) | \
+                sed -e "s/~{in_prefix_to_strip}//g" | \
+                samtools sort --threads ~{nb_cores} -O BAM > ~{out_prefix}.positionsorted.bam
+        else
+            samtools sort --threads ~{nb_cores} ~{in_bam_file} \
+                     -O BAM > ~{out_prefix}.positionsorted.bam
+            
+        fi
+    >>>
+    output {
+        File sorted_bam = "~{out_prefix}.positionsorted.bam"
+    }
+    runtime {
+        preemptible: 2
+        time: 90
+        memory: mem_gb + " GB"
+        cpu: nb_cores
+        disks: "local-disk " + disk_size + " SSD"
+        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+    }
+}
+
 task leftShiftBAMFile {
     input {
         File in_bam_file
@@ -331,6 +383,7 @@ task splitBAMbyPath {
         File in_merged_bam_file
         File in_merged_bam_file_index
         File in_path_list_file
+        String in_prefix_to_strip = ""
         Int thread_count = 16
         Int disk_size = round(3 * size(in_merged_bam_file, 'G')) + 20
         Int mem_gb = 20
@@ -342,6 +395,13 @@ task splitBAMbyPath {
         ln -s ~{in_merged_bam_file} input_bam_file.bam
         ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
 
+        if [ ~{in_prefix_to_strip} != "" ]
+        then
+            sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_list_file} > paths.txt
+        else
+            cp ~{in_path_list_file} paths.txt
+        fi
+        
         while read -r contig; do
             samtools view \
               -@ ~{thread_count} \
@@ -350,7 +410,7 @@ task splitBAMbyPath {
               -o ~{in_sample_name}.${contig}.bam \
             && samtools index \
               ~{in_sample_name}.${contig}.bam
-        done < "~{in_path_list_file}"
+        done < paths.txt
 
         ## get unmapped reads
         mkdir unmapped

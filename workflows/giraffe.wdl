@@ -1,44 +1,72 @@
 version 1.0
 
-### giraffe.wdl ###
-## Author: Charles Markello, Jean Monlong, Adam Novak
-## Description: Core VG Giraffe mapping, usable for DeepVariant.
-## Reference: https://github.com/vgteam/vg/wiki
-
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
 
 workflow Giraffe {
+    meta {
+        description: "## Giraffe workflow \n Core VG Giraffe mapping, usable for DeepVariant. Reads are mapped to a pangenome with vg giraffe and pre-processed (e.g. indel realignment). More information at [https://github.com/vgteam/vg_wdl/tree/gbz#giraffe-workflow](https://github.com/vgteam/vg_wdl/tree/gbz#giraffe-workflow) ."
+    }
+    parameter_meta {
+        INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
+        INPUT_READ_FILE_2: "Input sample 2nd read pair fastq.gz"
+        INPUT_CRAM_FILE: "Input CRAM file"
+        CRAM_REF: "Genome fasta file associated with the CRAM file"
+        CRAM_REF_INDEX: "Index of the fasta file associated with the CRAM file"
+        GBZ_FILE: "Path to .gbz index file"
+        DIST_FILE: "Path to .dist index file"
+        MIN_FILE: "Path to .min index file"
+        SAMPLE_NAME: "The sample name"
+        OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? Default is 'true'."
+        OUTPUT_CALLING_BAMS: "Should individual contig BAMs be saved? Default is 'false'."
+        OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'false'."
+        PAIRED_READS: "Are the reads paired? Default is 'true'."
+        READS_PER_CHUNK: "Number of reads contained in each mapping chunk. Default 20 000 000."
+        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
+        CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index."
+        REFERENCE_PREFIX: "Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)"
+        REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
+        REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
+        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE i"
+        LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
+        REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
+        REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
+        MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
+        GIRAFFE_OPTIONS: "(OPTIONAL) extra command line options for Giraffe mapper"
+        SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
+        MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
+        MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+    }
     input {
-        File? INPUT_READ_FILE_1                         # Input sample 1st read pair fastq.gz
-        File? INPUT_READ_FILE_2                         # Input sample 2nd read pair fastq.gz
-        File? INPUT_CRAM_FILE                           # Input CRAM file
-        File? CRAM_REF                                  # Genome fasta file associated with the CRAM file
-        File? CRAM_REF_INDEX                            # Index of the fasta file associated with the CRAM file
-        String SAMPLE_NAME                              # The sample name
+        File? INPUT_READ_FILE_1
+        File? INPUT_READ_FILE_2
+        File? INPUT_CRAM_FILE
+        File? CRAM_REF
+        File? CRAM_REF_INDEX
+        File GBZ_FILE
+        File DIST_FILE
+        File MIN_FILE
+        String SAMPLE_NAME
+        Boolean OUTPUT_SINGLE_BAM = true
+        Boolean OUTPUT_CALLING_BAMS = false
+        Boolean OUTPUT_GAF = false
         Boolean PAIRED_READS = true
-        Int MAX_FRAGMENT_LENGTH = 3000                  # Maximum distance at which to mark paired reads properly paired
-        Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
-        String GIRAFFE_OPTIONS = ""                     # (OPTIONAL) extra command line options for Giraffe mapper
-        Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.
-        File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths.
-        String REFERENCE_PREFIX = ""                    # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
-        File GBZ_FILE                                   # Path to .gbz index file
-        File DIST_FILE                                  # Path to .dist index file
-        File MIN_FILE                                   # Path to .min index file
-        Boolean LEFTALIGN_BAM = true                    # Whether or not to left-align reads in the BAM before DV
-        Boolean REALIGN_INDELS = true                   # Whether or not to realign reads near indels before DV
-        Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
-        Boolean OUTPUT_SINGLE_BAM = true                # Should a single merged BAM file be saved?
-        Boolean OUTPUT_CALLING_BAMS = false             # Should individual contig BAMs be saved?
-        Boolean OUTPUT_GAF = false                      # Should a GAF file with the aligned reads be saved?
+        Int READS_PER_CHUNK = 20000000
+        File? PATH_LIST_FILE
+        Array[String]+? CONTIGS
+        String REFERENCE_PREFIX = ""
+        File? REFERENCE_FILE
+        File? REFERENCE_INDEX_FILE
+        File? REFERENCE_DICT_FILE
+        Boolean LEFTALIGN_BAM = true
+        Boolean REALIGN_INDELS = true
+        Int REALIGNMENT_EXPANSION_BASES = 160
+        Int MAX_FRAGMENT_LENGTH = 3000
+        String GIRAFFE_OPTIONS = ""
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
         Int MAP_MEM = 120
-        File? REFERENCE_FILE                            # (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.
-        File? REFERENCE_INDEX_FILE                      # (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
-        File? REFERENCE_DICT_FILE                       # (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. 
     }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
@@ -174,7 +202,7 @@ workflow Giraffe {
 
     Array[File] gaf_chunks = select_first([runVGGIRAFFEpe.chunk_gaf_file, runVGGIRAFFEse.chunk_gaf_file])
     scatter (gaf_file in gaf_chunks) {
-        call gautils.surjectGAFtoSortedBAM {
+        call gautils.surjectGAFtoBAM {
             input:
             in_gaf_file=gaf_file,
             in_gbz_file=GBZ_FILE,
@@ -183,45 +211,29 @@ workflow Giraffe {
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
             in_paired_reads=PAIRED_READS
         }
-        if (REFERENCE_PREFIX != "") {
-            # use samtools to replace the header contigs with those from our dict.
-            # this allows the header to contain contigs that are not in the graph,
-            # which is more general and lets CHM13-based graphs be used to call on GRCh38
-            # also, strip out contig prefixes in the BAM body
-            call map.fixBAMContigNaming {
-                input:
-                in_bam_file=surjectGAFtoSortedBAM.output_bam_file,
-                in_ref_dict=reference_dict_file,
-                in_prefix_to_strip=REFERENCE_PREFIX
-            }
+
+        call utils.sortBAM {
+            input:
+            in_bam_file=surjectGAFtoBAM.output_bam_file,
+            in_ref_dict=reference_dict_file,
+            in_prefix_to_strip=REFERENCE_PREFIX
         }
-        File properly_named_bam_file = select_first([fixBAMContigNaming.fixed_bam_file, surjectGAFtoSortedBAM.output_bam_file]) 
     }
 
     call utils.mergeAlignmentBAMChunks {
         input:
         in_sample_name=SAMPLE_NAME,
-        in_alignment_bam_chunk_files=properly_named_bam_file
+        in_alignment_bam_chunk_files=sortBAM.sorted_bam
     }
-    
-    if (REFERENCE_PREFIX != "") {
-        # strip all the GRCh38's off our path list file.  we need them for surject as they are in the path
-        # but fixBAMContigNaming above stripped them, so we don't need them downstream
-        call map.fixPathNames {
-            input:
-                in_path_file=pipeline_path_list_file,
-                in_prefix_to_strip=REFERENCE_PREFIX,
-        }
-    }
-    File properly_named_path_list_file = select_first([fixPathNames.fixed_path_list_file, pipeline_path_list_file])
-             
+
     # Split merged alignment by contigs list
-    call utils.splitBAMbyPath { 
+    call utils.splitBAMbyPath {
         input:
-    in_sample_name=SAMPLE_NAME,
-    in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-    in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
-    in_path_list_file=properly_named_path_list_file
+        in_sample_name=SAMPLE_NAME,
+        in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
+        in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
+        in_path_list_file=pipeline_path_list_file,
+        in_prefix_to_strip=REFERENCE_PREFIX
     }
 
     ##
@@ -235,7 +247,7 @@ workflow Giraffe {
                 input:
                 in_bam_file=bam_and_index_for_path.left,
                 in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
+                in_reference_index_file=reference_index_file
             }
         }
         if (REALIGN_INDELS) {

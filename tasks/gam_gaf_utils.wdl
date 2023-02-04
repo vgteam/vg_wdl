@@ -228,3 +228,58 @@ task surjectGAFtoSortedBAM {
     }
 }
 
+task surjectGAFtoBAM {
+    input {
+        File in_gaf_file
+        File in_gbz_file
+        File in_path_list_file
+        String in_sample_name
+        Boolean in_paired_reads = true
+        Int in_max_fragment_length = 3000
+        Boolean input_is_gam = false
+        Int nb_cores = 16
+        String mem_gb = 120
+        Int disk_size = 5 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 50
+    }
+    String out_prefix = sub(sub(sub(basename(in_gaf_file), "\\.gz$", ""), "\\.gaf$", ""), "\\.gam$", "")
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        PAIR_ARGS=""
+        if [ ~{in_paired_reads} == true ]
+        then
+            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+        fi
+        
+        vg surject \
+          -F ~{in_path_list_file} \
+          -x ~{in_gbz_file} \
+          -t ~{nb_cores} \
+          --bam-output ~{true="" false="--gaf-input" input_is_gam} \
+          --sample ~{in_sample_name} \
+          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+          --prune-low-cplx $PAIR_ARGS \
+          ~{in_gaf_file} > ~{out_prefix}.bam
+    >>>
+    output {
+        File output_bam_file = "~{out_prefix}.bam"
+    }
+    runtime {
+        preemptible: 2
+        time: 300
+        memory: mem_gb + " GB"
+        cpu: nb_cores
+        disks: "local-disk " + disk_size + " SSD"
+        docker: "quay.io/vgteam/vg:v1.44.0"
+    }
+}
+

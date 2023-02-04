@@ -135,7 +135,7 @@ task extractReference {
         if [ ~{in_prefix_to_strip} != "" ]
         then
             mv ref.fa ref.prefix.fa
-            sed -e "s/~{in_prefix_to_strip}//g" ref.prefix.fa > ref.fa
+            sed -e "s/>~{in_prefix_to_strip}/>/g" ref.prefix.fa > ref.fa
         fi
     }
     output {
@@ -146,74 +146,5 @@ task extractReference {
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
         docker: "quay.io/vgteam/vg:v1.44.0"
-    }
-}
-
-task fixBAMContigNaming {
-    input {
-        File in_bam_file
-        File in_ref_dict
-        String in_prefix_to_strip
-        Int nb_cores = 8
-        Int disk_size = 5 * round(size(in_bam_file, 'G')) + 20
-        String mem_gb = 8
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        # patch the SQ fields from the dict into a new header
-        samtools view -H ~{in_bam_file} | grep ^@HD > new_header.sam
-        grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
-        samtools view -H ~{in_bam_file}  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
-
-        OUTBAM=($(basename ~{in_bam_file} | sed "s/~{in_prefix_to_strip}//g"))
-        mkdir fixed
-        # insert the new header, and strip all instances of the prefix
-        cat <(cat new_header.sam) <(samtools view ~{in_bam_file}) | \
-            sed -e "s/~{in_prefix_to_strip}//g" | \
-            samtools view --threads ~{nb_cores} -O BAM > fixed/$OUTBAM
-    >>>
-    output {
-        File fixed_bam_file = glob("fixed/*bam")[0]
-    }
-    runtime {
-        preemptible: 2
-        time: 90
-        memory: mem_gb + " GB"
-        cpu: nb_cores
-        disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
-    }
-}
-
-task fixPathNames {
-    input {
-        File in_path_file
-        String in_prefix_to_strip
-     }
-
-     command <<<
-        sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_file}  > "fixed_names_file"
-     >>>
-    output {
-        File fixed_path_list_file = "fixed_names_file"
-    }
-    runtime {
-        preemptible: 2
-        time: 90
-        memory: 2 + " GB"
-        cpu: 1
-        disks: "local-disk " + 32 + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
     }
 }
