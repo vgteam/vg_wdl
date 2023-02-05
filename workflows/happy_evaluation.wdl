@@ -7,18 +7,18 @@ workflow HappyEvaluation {
     meta {
 	    author: "Jean Monlong"
         email: "jmonlong@ucsc.edu"
-        description: "Evaluate small variants using hap.py"
+        description: "Evaluate small variants using hap.py. More information at [https://github.com/vgteam/vg_wdl/tree/gbz#happy-workflow](https://github.com/vgteam/vg_wdl/tree/gbz#happy-workflow)."
     }
 
     parameter_meta {
         VCF: "bgzipped VCF with variant calls"
-        VCF_INDEX: "If specified, use this tabix index for the VCF instead of indexing it"
+        VCF_INDEX: "(Optional) If specified, use this tabix index for the VCF instead of indexing it"
         TRUTH_VCF: "bgzipped VCF with truthset"
-        TRUTH_VCF_INDEX: "Tabix index for the truth VCF"
+        TRUTH_VCF_INDEX: "(Optional) If specified, use this index for the truth VCF instead of indexing it"
         REFERENCE_FILE: "Use this FASTA reference."
-        EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
-        REFERENCE_INDEX_FILE: "If specified, use this .fai index instead of indexing the reference file."
-        REFERENCE_PREFIX: "Remove this off the beginning of sequence names in the VCF"
+        REFERENCE_INDEX_FILE: "(Optional) If specified, use this .fai index instead of indexing the reference file."
+        EVALUATION_REGIONS_BED: "(Optional) BED to restrict comparison against TRUTH_VCF to"
+        REFERENCE_PREFIX: "(Optional) Remove this off the beginning of sequence names in the VCF"
     }
     
     input {
@@ -26,9 +26,9 @@ workflow HappyEvaluation {
         File? VCF_INDEX
         File TRUTH_VCF
         File? TRUTH_VCF_INDEX
-        File? EVALUATION_REGIONS_BED
         File REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
+        File? EVALUATION_REGIONS_BED
         String REFERENCE_PREFIX = ""
     }
     
