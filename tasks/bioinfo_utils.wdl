@@ -123,8 +123,8 @@ task concatClippedVCFChunks {
     input {
         String in_sample_name
         Array[File] in_clipped_vcf_chunk_files
-        Int in_call_disk
-        Int in_call_mem
+        Int mem_gb = 8
+        Int disk_size = 30 * round(size(in_clipped_vcf_chunk_files, "G")) + 50
     }
 
     command {
@@ -149,8 +149,9 @@ task concatClippedVCFChunks {
     runtime {
         preemptible: 2
         time: 60
-        memory: in_call_mem + " GB"
-        disks: "local-disk " + in_call_disk + " SSD"
+        memory: mem_gb + " GB"
+        cpu: 1
+        disks: "local-disk " + disk_size + " SSD"
         docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
     }
 }
@@ -193,9 +194,12 @@ task sortBAM {
                      -O BAM > ~{out_prefix}.positionsorted.bam
             
         fi
+
+        samtools index -b ~{out_prefix}.positionsorted.bam ~{out_prefix}.positionsorted.bam.bai
     >>>
     output {
         File sorted_bam = "~{out_prefix}.positionsorted.bam"
+        File sorted_bam_index = "~{out_prefix}.positionsorted.bam.bai"
     }
     runtime {
         preemptible: 2
@@ -326,7 +330,7 @@ task prepareRealignTargets {
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command 
         # to exit with a non-zero status, or zero if all commands of the pipeline exit 
-        # set -o pipefail
+        set -o pipefail
         # cause a bash script to exit immediately when a command fails 
         set -e
         # cause the bash shell to treat unset variables as an error and exit immediately 
@@ -338,7 +342,7 @@ task prepareRealignTargets {
         ln -f -s ~{in_bam_file} input_bam_file.bam
         ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai
 
-        CONTIG_ID=`samtools view input_bam_file.bam | head -1 | cut -f3`
+        CONTIG_ID=`head -1 < <(samtools view input_bam_file.bam) | cut -f3`
         
         # Reference and its index must be adjacent and not at arbitrary paths
         # the runner gives.

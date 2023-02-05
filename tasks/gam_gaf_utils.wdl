@@ -30,18 +30,19 @@ task mergeGAMandSort {
 
 task mergeGAFandSort {
     input {
-        Array[File] in_gaf_files
-        File in_xg_file
+        File in_gaf_file
+        File in_gbz_file
         String in_sample_name = "sample"
         Int in_cores = 16
         Int in_mem = 120
+        Int disk_size = 4 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 20
     }
-    Int disk_size = 4 * round(size(in_xg_file, 'G') + size(in_gaf_files, 'G')) + 20
+
     Int half_cores = if in_cores > 1 then floor(in_cores/2) else 1
     command <<<
         set -eux -o pipefail
 
-        zcat ~{sep=" " in_gaf_files} | vg convert -t ~{half_cores} -F - ~{in_xg_file} | \
+        vg convert -t ~{half_cores} -F ~{in_gaf_file} ~{in_gbz_file} | \
             vg gamsort -p -i ~{in_sample_name}.sorted.gam.gai \
                -t ~{half_cores} - > ~{in_sample_name}.sorted.gam
     >>>
