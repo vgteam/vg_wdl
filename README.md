@@ -7,9 +7,9 @@ MIT License, 2023
 
 - [Workflows](#Workflows)
 - [Usage](#usage)
-- [Contributing, Help, Bugs and Requests](#Contributing-Help-Bugs-and-Requests)
 - [Testing locally](#Testing-locally)
 - [Citation](#citation)
+- [Contributing, Help, Bugs and Requests](#Contributing-Help-Bugs-and-Requests)
 
 ## Workflows
 
@@ -21,8 +21,10 @@ Either the full Giraffe-DeepVariant workflow, or parts of it are available:
 - [Happy workflow](#happy-workflow) to evaluate small variants against a truthset using [hap.py](https://github.com/Illumina/hap.py)/[vcfeval](https://github.com/RealTimeGenomics/rtg-tools).
 - [GAF to sorted GAM workflow](#gaf-to-sorted-gam-workflow) to convert a GAF into a sorted and indexed GAM. E.g. to use with the [sequenceTubeMap](https://github.com/vgteam/sequenceTubeMap).
 - [Giraffe SV workflow](#Giraffe-SV-workflow) to map short reads to a pangenome and genotype SVs with [vg](https://github.com/vgteam/vg).
-- [Map-call workflow](#Map-call-workflow) to map reads and call small variants [vg](https://github.com/vgteam/vg) (legacy?), DeepVariant and GATK (legacy?).
+- [Map-call workflow](#Map-call-workflow) to map reads and call small variants [vg](https://github.com/vgteam/vg), DeepVariant and GATK (legacy?).
 - [Map-call Pedigree workflow](#Map-call-Pedigree-workflow) to map reads and call variants in a pedigree with [vg](https://github.com/vgteam/vg) (legacy?).
+
+See also the [Going further](#Going-further) section for more details on some aspects and HOW-TOs.
 
 ### Giraffe-DeepVariant workflow
 
@@ -74,6 +76,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.
 - *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.
 
+Related topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
+
 [Test locally](#testing-locally) with:
 
 ```sh
@@ -122,6 +126,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
 
+Related topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
+
 [Test locally](#testing-locally) with:
 
 ```sh
@@ -166,6 +172,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *VG_MEM*: Memory, in GB, to use when projecting the reads. Default is 120.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.
 - *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.
+
+Related topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
 
 [Test locally](#testing-locally) with:
 
@@ -212,6 +220,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *GBZ_FILE*: the GBZ index of the graph
 - *SAMPLE_NAME*: (Optional) a sample name
 
+Related topics: [HPRC pangenomes](#HPRC-pangenomes).
+
 [Test locally](#testing-locally) with:
 
 ```
@@ -240,6 +250,8 @@ Workflow for mapping short reads and genotyping the structural variants in a pan
 - If you use this workflow, please cite the [Pedigree-VG article](#Cite-Pedigree-VG).
 
 ### Going further
+
+See below more information about: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
 
 #### Read realignment
 
@@ -396,20 +408,14 @@ java -jar $CROMWELL_JAR run /path/to/vg_wdl/workflows/WORKFLOW.wdl -i inputs.jso
 ### Docker Containers
 
 WDL needs the runtime Docker image to be present online (e.g. Dockerhub). 
-[Cromwell](#using-cromwell)/[miniwdl]](#using-miniwdl) will pull those images automatically.
-VG images are available at [quay.io](https://quay.io/repository/vgteam/vg?tab=tags)and can be pulled with: 
+[Cromwell](#using-cromwell)/[miniwdl](#using-miniwdl) will pull those images automatically.
+VG images are available at [quay.io](https://quay.io/repository/vgteam/vg?tab=tags) and can be pulled with: 
 
 ```
 docker pull quay.io/vgteam/vg:v1.44.0
 ```
 
 Specific versions can be specified like above for version `v1.44.0`.
-
-## Contributing, Help, Bugs and Requests
-
-Please open an Issue on [GitHub](https://github.com/vgteam/vg_wdl/issues) for help, bug reports, or feature requests.
-When doing so, please remember that vg\_wdl is open-source software made by a community of developers. 
-Please be considerate and support a positive environment.
 
 ## Testing locally
 
@@ -449,3 +455,9 @@ If you use the pedigree-based workflow for rare variant discovery, please cite [
 ```
 Markello et al. A Complete Pedigree-Based Graph Workflow for Rare Candidate Variant Analysis. Genome Research, Apr. 2022; doi: https://doi.org/10.1101/gr.276387.121.
 ```
+
+## Contributing, Help, Bugs and Requests
+
+Please open an Issue on [GitHub](https://github.com/vgteam/vg_wdl/issues) for help, bug reports, or feature requests.
+When doing so, please remember that vg\_wdl is open-source software made by a community of developers. 
+Please be considerate and support a positive environment.
