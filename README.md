@@ -13,11 +13,10 @@ MIT License, 2023
 
 ## Workflows
 
-Either the full Giraffe-DeepVariant workflow, or parts of it are available:
-
-- [Giraffe-DeepVariant workflow](#giraffe-deepvariant-workflow) to perform the full workflow: starting from FASTQs/CRAM, align reads to a pangenome and run [DeepVariant](https://github.com/google/deepvariant).
-- [Giraffe workflow](#giraffe-workflow) to map reads and produce BAMs ready to use by [DeepVariant](https://github.com/google/deepvariant).
-- [Giraffe-DeepVariant from GAF workflow](#giraffe-deepvariant-from-gaf-workflow) to project reads aligned to a pangenome (GAF), prepare them and run [DeepVariant](https://github.com/google/deepvariant).
+- **Giraffe-DeepVariant workflows**. Either the full Giraffe-DeepVariant workflow, or parts of it are available:
+    - [Giraffe-DeepVariant workflow](#giraffe-deepvariant-workflow) to perform the full workflow: starting from FASTQs/CRAM, align reads to a pangenome and run [DeepVariant](https://github.com/google/deepvariant).
+    - [Giraffe workflow](#giraffe-workflow) to map reads and produce BAMs ready to use by [DeepVariant](https://github.com/google/deepvariant).
+    - [Giraffe-DeepVariant from GAF workflow](#giraffe-deepvariant-from-gaf-workflow) to project reads aligned to a pangenome (GAF), prepare them and run [DeepVariant](https://github.com/google/deepvariant).
 - [Happy workflow](#happy-workflow) to evaluate small variants against a truthset using [hap.py](https://github.com/Illumina/hap.py)/[vcfeval](https://github.com/RealTimeGenomics/rtg-tools).
 - [GAF to sorted GAM workflow](#gaf-to-sorted-gam-workflow) to convert a GAF into a sorted and indexed GAM. E.g. to use with the [sequenceTubeMap](https://github.com/vgteam/sequenceTubeMap).
 - [Giraffe SV workflow](#Giraffe-SV-workflow) to map short reads to a pangenome and genotype SVs with [vg](https://github.com/vgteam/vg).
