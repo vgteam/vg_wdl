@@ -342,7 +342,7 @@ It contains both the CHM13 and GRCh38 reference paths.
 
 Use the following indexes for the pangenome:
 
-- `GBZ_FILE`: [TODO]()
+- `GBZ_FILE`: [hprc-v1.0-mc-chm13-minaf.0.1.gbz](https://storage.googleapis.com/hprc-pangenomes/hprc-v1.0-mc-chm13-minaf.0.1.gbz)
     - GBZ with the pangenome and haplotypes.
 - `MIN_FILE`: [hprc-v1.0-mc-chm13-minaf.0.1.min](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/filtered/hprc-v1.0-mc-chm13-minaf.0.1.min)
     - Minimizer index.
@@ -352,18 +352,18 @@ Use the following indexes for the pangenome:
 To project reads and call variants relative to the GRCh38 reference:
 
 - `REFERENCE_PREFIX="GRCh38."`
-- `PATH_LIST_FILE` containing *GRCh38.chr1*, *GRCh38.chr2*, etc. File available at [TODO]()
-- `REFERENCE_FILE`: [TODO]()
-- `REFERENCE_INDEX_FILE`: [TODO](). Optional, the workflow will create it if necessary (for a small extra cost/time).
-- `REFERENCE_DICT_FILE`: [TODO](). Optional, the workflow will create it if necessary (for a small extra cost/time).
+- `PATH_LIST_FILE` containing *GRCh38.chr1*, *GRCh38.chr2*, etc. File available at [GRCh38.path_list.txt](https://storage.googleapis.com/hprc-pangenomes/GRCh38.path_list.txt)
+- `REFERENCE_FILE`: [hg38.fa](https://storage.googleapis.com/hprc-pangenomes/hg38.fa)
+- `REFERENCE_INDEX_FILE`: [hg38.fa.fai](https://storage.googleapis.com/hprc-pangenomes/hg38.fa.fai). Optional, the workflow will create it if necessary (for a small extra cost/time).
+- `REFERENCE_DICT_FILE`: [hg38.dict](https://storage.googleapis.com/hprc-pangenomes/hg38.dict). Optional, the workflow will create it if necessary (for a small extra cost/time).
 
 To project reads and call variants relative to the CHM13 reference:
 
 - `REFERENCE_PREFIX="CHM13."`
-- `PATH_LIST_FILE` containing *CHM13.chr1*, *CHM13.chr2*, etc. File available at [TODO]()
-- `REFERENCE_FILE`: [TODO]()
-- `REFERENCE_INDEX_FILE`: [TODO](). Optional, the workflow will create it if necessary (for a small extra cost/time).
-- `REFERENCE_DICT_FILE`: [TODO](). Optional, the workflow will create it if necessary (for a small extra cost/time).
+- `PATH_LIST_FILE` containing *CHM13.chr1*, *CHM13.chr2*, etc. File available at [CHM13.path_list.txt](https://storage.googleapis.com/hprc-pangenomes/CHM13.path_list.txt)
+- `REFERENCE_FILE`: [chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa](https://storage.googleapis.com/hprc-pangenomes/chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa)
+- `REFERENCE_INDEX_FILE`: [chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa.fai](https://storage.googleapis.com/hprc-pangenomes/chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa.fai). Optional, the workflow will create it if necessary (for a small extra cost/time).
+- `REFERENCE_DICT_FILE`: [chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.dict](https://storage.googleapis.com/hprc-pangenomes/chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.dict). Optional, the workflow will create it if necessary (for a small extra cost/time).
 
 ## Usage
 ### Dockstore
