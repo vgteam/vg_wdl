@@ -24,7 +24,7 @@ task mergeGAMandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.43.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -56,7 +56,7 @@ task mergeGAFandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.43.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -92,7 +92,7 @@ task splitGAM {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.43.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -128,7 +128,7 @@ task splitGAF {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.43.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -161,7 +161,7 @@ task mergeGAF {
         memory: "6GB"
         cpu: 1
         disks: "local-disk " + in_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.44.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -225,7 +225,7 @@ task surjectGAFtoSortedBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.44.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -280,7 +280,7 @@ task surjectGAFtoBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.44.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 

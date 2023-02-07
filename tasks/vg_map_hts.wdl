@@ -84,7 +84,7 @@ task runVGGIRAFFE {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.44.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -109,7 +109,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.44.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
 
@@ -145,6 +145,6 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.44.0"
+        docker: "quay.io/jmonlong/vg:d213c29"
     }
 }
