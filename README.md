@@ -23,7 +23,16 @@ MIT License, 2023
 - [Map-call workflow](#Map-call-workflow) to map reads and call small variants [vg](https://github.com/vgteam/vg), DeepVariant and GATK (legacy?).
 - [Map-call Pedigree workflow](#Map-call-Pedigree-workflow) to map reads and call variants in a pedigree with [vg](https://github.com/vgteam/vg) (legacy?).
 
-See also the [Going further](#Going-further) section for more details on some aspects and HOW-TOs.
+See also the [Going further](#Going-further) section for more details on some aspects and HOW-TOs:
+
+- [Path list](#Path-list)
+- [Read realignment](#Read-realignment)
+- [Using the HPRC pangenomes](#HPRC-pangenomes)
+- [Reference prefix removal](#Reference-prefix-removal)
+- [CRAM input](#CRAM-input)
+- [Single-end reads](#Single-end-reads)
+- [Unmapped reads](#Unmapped-reads)
+- [Reads chunking](#Reads-chunking)
 
 ### Giraffe-DeepVariant workflow
 
