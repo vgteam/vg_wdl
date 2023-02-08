@@ -39,7 +39,7 @@ See also the [Going further](#Going-further) section for more details on some as
 The full workflow to go from sequencing reads (FASTQs, CRAM) to small variant calls (VCF).
 
 - workflow file: [workflows/giraffe_and_deepvariant.wdl](workflows/giraffe_and_deepvariant.wdl)
-- Dockstore page: [TODO]()
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariant:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
 Parameters (semi-auto-generated from the *parameter_meta* section):
@@ -100,7 +100,7 @@ Core VG Giraffe mapping, usable for [DeepVariant](https://github.com/google/deep
 Reads are mapped to a pangenome with [vg giraffe](https://github.com/vgteam/vg) and pre-processed (e.g. indel realignment). 
 
 - workflow file: [workflows/giraffe.wdl](workflows/giraffe.wdl)
-- Dockstore page: [TODO]()
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/Giraffe:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
 Parameters (semi-auto-generated from the *parameter_meta* section):
@@ -149,7 +149,7 @@ miniwdl run --as-me --copy-input-files workflows/giraffe.wdl -i params/giraffe.s
 Surject a GAF and prepare the BAMs (e.g. fix names, indel realign), and call small variants with [DeepVariant](https://github.com/google/deepvariant).
 
 - workflow file: [workflows/giraffe_and_deepvariant_fromGAF.wdl](workflows/giraffe_and_deepvariant_fromGAF.wdl)
-- Dockstore page: [TODO]()
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAF:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
 Parameters (semi-auto-generated from the *parameter_meta* section):
@@ -195,7 +195,7 @@ miniwdl run --as-me --copy-input-files workflows/giraffe_and_deepvariant_fromGAF
 Evaluation of the small variant calls using [hap.py](https://github.com/Illumina/hap.py).
 
 - workflow file: [workflows/happy_evaluation.wdl](workflows/happy_evaluation.wdl)
-- Dockstore page: [TODO]()
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/HappyEvaluation:gbz?tab=info)
 
 Parameters (semi-auto-generated from the *parameter_meta* section):
 
@@ -220,7 +220,7 @@ Currently, only GAM file can be sorted and indexed, for example to extract and s
 This workflow converts reads aligned to a pangenome in a GAF file to a sorted and indexed GAM file.
 
 - workflow file: [workflows/sort_graph_aligned_reads.wdl](workflows/sort_graph_aligned_reads.wdl)
-- Dockstore page: [TODO]()
+- [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/sortGraphAlignedReads:gbz?tab=info)
 
 Parameters (semi-auto-generated from the *parameter_meta* section):
 
