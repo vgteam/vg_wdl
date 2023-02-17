@@ -82,6 +82,29 @@ task fixVCFContigNaming {
     }
 }
 
+task removeHomRefs {
+    input {
+        File in_vcf
+        Int in_index_mem = 4
+        Int in_index_disk = 2 * round(size(in_vcf, "G")) + 10
+    }
+
+    command <<<
+    set -eux -o pipefail
+
+    bcftools view -c 1 -o variants.vcf.gz -O z ~{in_vcf}
+    >>>
+    output {
+        File vcf = "variants.vcf.gz"
+    }
+    runtime {
+        preemptible: 2
+        memory: in_index_mem + " GB"
+        disks: "local-disk " + in_index_disk + " SSD"
+        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+    }
+}
+
 task splitReads {
     input {
         File in_read_file

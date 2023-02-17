@@ -19,6 +19,7 @@ workflow HappyEvaluation {
         REFERENCE_INDEX_FILE: "(Optional) If specified, use this .fai index instead of indexing the reference file."
         EVALUATION_REGIONS_BED: "(Optional) BED to restrict comparison against TRUTH_VCF to"
         REFERENCE_PREFIX: "(Optional) Remove this off the beginning of sequence names in the VCF"
+        REMOVE_HOM_REFS: "(Optional) Should homozygous ref calls be removed? (might help if hap.py segfaults). Default 'false'."
     }
     
     input {
@@ -30,6 +31,7 @@ workflow HappyEvaluation {
         File? REFERENCE_INDEX_FILE
         File? EVALUATION_REGIONS_BED
         String REFERENCE_PREFIX = ""
+        Boolean REMOVE_HOM_REFS = false
     }
     
     # To evaluate the VCF we need a template of the reference
@@ -58,10 +60,20 @@ workflow HappyEvaluation {
             in_prefix_to_strip=REFERENCE_PREFIX
         }
     }
-    File vcf_file = select_first([fixVCFContigNaming.vcf, VCF]) 
+    File fixed_vcf_file = select_first([fixVCFContigNaming.vcf, VCF]) 
+    
+    if (REMOVE_HOM_REFS) {
+        # sometimes blocks of homozygous variants make hap.py segfault
+        # removing them is safer
+        call utils.removeHomRefs {
+            input:
+            in_vcf=fixed_vcf_file
+        }
+    }
+    File vcf_file = select_first([removeHomRefs.vcf, fixed_vcf_file]) 
     
     ## index the call VCF if needed
-    if (!defined(VCF_INDEX) || REFERENCE_PREFIX != "") {
+    if (!defined(VCF_INDEX) || REFERENCE_PREFIX != "" || REMOVE_HOM_REFS) {
         call utils.indexVcf {
             input:
             in_vcf=vcf_file
