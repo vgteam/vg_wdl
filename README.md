@@ -89,9 +89,9 @@ Related topics: [read realignment](#Read-realignment), [reference prefix removal
 [Test locally](#testing-locally) with:
 
 ```sh
-miniwdl run --as-me --copy-input-files workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant.json
-miniwdl run --as-me --copy-input-files workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant_single_end.json
-miniwdl run --as-me --copy-input-files workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant_cram.json
+miniwdl run --as-me workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant.json
+miniwdl run --as-me workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant_single_end.json
+miniwdl run --as-me workflows/giraffe_and_deepvariant.wdl -i params/giraffe_and_deepvariant_cram.json
 ```
 
 ### Giraffe workflow
@@ -139,9 +139,9 @@ Related topics: [read realignment](#Read-realignment), [reference prefix removal
 [Test locally](#testing-locally) with:
 
 ```sh
-miniwdl run --as-me --copy-input-files workflows/giraffe.wdl -i params/giraffe.json
-miniwdl run --as-me --copy-input-files workflows/giraffe.wdl -i params/giraffe.singleended.json
-miniwdl run --as-me --copy-input-files workflows/giraffe.wdl -i params/giraffe.singleended.cram.json
+miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe.json
+miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe.singleended.json
+miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe.singleended.cram.json
 ```
 
 ### Giraffe-DeepVariant from GAF workflow
@@ -186,8 +186,8 @@ Related topics: [read realignment](#Read-realignment), [reference prefix removal
 [Test locally](#testing-locally) with:
 
 ```sh
-miniwdl run --as-me --copy-input-files workflows/giraffe_and_deepvariant_fromGAF.wdl -i params/giraffe_and_deepvariant_gaf.json
-miniwdl run --as-me --copy-input-files workflows/giraffe_and_deepvariant_fromGAF.wdl -i params/giraffe_and_deepvariant_gaf_single_end.json
+miniwdl run --as-me workflows/giraffe_and_deepvariant_fromGAF.wdl -i params/giraffe_and_deepvariant_gaf.json
+miniwdl run --as-me workflows/giraffe_and_deepvariant_fromGAF.wdl -i params/giraffe_and_deepvariant_gaf_single_end.json
 ```
 
 ### Happy workflow
@@ -211,7 +211,7 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 [Test locally](#testing-locally) with:
 
 ```sh
-miniwdl run --as-me --copy-input-files workflows/happy_evaluation.wdl -i params/happy_evaluation.json
+miniwdl run --as-me workflows/happy_evaluation.wdl -i params/happy_evaluation.json
 ```
 
 ### GAF to sorted GAM workflow
@@ -233,7 +233,7 @@ Related topics: [HPRC pangenomes](#HPRC-pangenomes).
 [Test locally](#testing-locally) with:
 
 ```
-miniwdl run --as-me --copy-input-files workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_aligned_reads.gaf.json
+miniwdl run --as-me workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_aligned_reads.gaf.json
 ```
 
 ### Giraffe SV workflow
@@ -433,7 +433,7 @@ So, from the root of this repo, run something like:
 ```sh
 java -jar $CROMWELL_JAR run workflows/WORKFLOW.wdl -i params/INPUTS.json
 ## or
-miniwdl run --as-me --copy-input-files workflows/WORKFLOW.wdl -i params/INPUTS.json
+miniwdl run --as-me workflows/WORKFLOW.wdl -i params/INPUTS.json
 ```
 
 [Miniwdl](#using-miniwdl) might be slightly more useful when developing/testing a WDL because is catches errors in WDL syntax faster, and is a bit more explicit about them.
