@@ -210,7 +210,7 @@ workflow Giraffe {
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
             in_paired_reads=PAIRED_READS,
-	    mem_gb=MAP_MEM
+            mem_gb=MAP_MEM
         }
 
         call utils.sortBAM {

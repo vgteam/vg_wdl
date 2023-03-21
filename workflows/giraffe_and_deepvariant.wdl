@@ -236,7 +236,8 @@ workflow GiraffeDeepVariant {
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_paired_reads=PAIRED_READS
+            in_paired_reads=PAIRED_READS,
+            mem_gb=MAP_MEM
         }
 
         call utils.sortBAM {
