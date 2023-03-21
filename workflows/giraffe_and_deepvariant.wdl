@@ -297,7 +297,9 @@ workflow GiraffeDeepVariant {
                     in_bam_index_file=forrealign_index,
                     in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                     in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file
+                    in_reference_index_file=reference_index_file,
+                    # If the user has set a very low memory for mapping, don't use more for realignment
+                    memoryGB=min(MAP_MEM, 40)
             }
         }
         File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
