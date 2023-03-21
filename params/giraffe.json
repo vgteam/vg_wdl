@@ -8,6 +8,7 @@
   "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
   "Giraffe.OUTPUT_GAF": true,
   "Giraffe.OUTPUT_CALLING_BAMS": true,
-  "Giraffe.OUTPUT_SINGLE_BAM": true
+  "Giraffe.OUTPUT_SINGLE_BAM": true,
+  "Giraffe.MAP_MEM": 8
 }
 
