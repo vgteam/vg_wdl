@@ -299,7 +299,7 @@ workflow GiraffeDeepVariant {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     # If the user has set a very low memory for mapping, don't use more for realignment
-                    memoryGb=min(MAP_MEM, 40)
+                    memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
             }
         }
         File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
