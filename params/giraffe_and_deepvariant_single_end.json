@@ -1,8 +1,9 @@
 {
   "GiraffeDeepVariant.INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
-  "GiraffeDeepVariant.INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz",
   "GiraffeDeepVariant.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
   "GiraffeDeepVariant.SAMPLE_NAME": "s0",
+  "GiraffeDeepVariant.PAIRED_READS": false,
+  "GiraffeDeepVariant.OUTPUT_SINGLE_BAM": true,
   "GiraffeDeepVariant.MIN_FILE": "tests/small_sim_graph/graph.min",
   "GiraffeDeepVariant.DIST_FILE": "tests/small_sim_graph/graph.dist",
   "GiraffeDeepVariant.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.5.0"

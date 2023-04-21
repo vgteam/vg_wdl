@@ -1,0 +1,6 @@
+{
+  "HappyEvaluation.VCF": "tests/small_sim_graph/s0.vcf.gz",
+  "HappyEvaluation.TRUTH_VCF": "tests/small_sim_graph/s0.vcf.gz",
+  "HappyEvaluation.REFERENCE_FILE": "tests/small_sim_graph/ref.fa",
+  "HappyEvaluation.REMOVE_HOM_REFS": true
+}

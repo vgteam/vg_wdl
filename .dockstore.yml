@@ -21,8 +21,6 @@ workflows:
     primaryDescriptorPath: /workflows/giraffe_and_deepvariant.wdl
     testParameterFiles:
       - /params/giraffe_and_deepvariant.json
-    branches:
-      - master
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
@@ -30,14 +28,12 @@ workflows:
         email: anovak@soe.ucsc.edu
       - name: Charles Markello
         email: cmarkell@ucsc.edu
-  - name: GiraffeDeepVariantLite
+  - name: GiraffeDeepVariantFromGAF
     subclass: WDL
-    description: More optimized workflow to map short reads from a pair of FASTQs or a CRAM file on a pangenome with vg Giraffe and call variants with DeepVariant.
-    primaryDescriptorPath: /workflows/giraffe_and_deepvariant_lite.wdl
+    description: Starts from an aligned GAF file, surject to a linear genome and call variants with DeepVariant.
+    primaryDescriptorPath: /workflows/giraffe_and_deepvariant_fromGAF.wdl
     testParameterFiles:
-      - /params/giraffe_and_deepvariant_cram.json
-    branches:
-      - master
+      - /params/giraffe_and_deepvariant_gaf.json
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
@@ -45,14 +41,12 @@ workflows:
         email: anovak@soe.ucsc.edu
       - name: Charles Markello
         email: cmarkell@ucsc.edu
-  - name: GiraffeDeepVariantFromGAM
+  - name: Giraffe
     subclass: WDL
-    description: More optimized workflow that starts from aligned GAM, surject to a linear genome and call variants with DeepVariant.
-    primaryDescriptorPath: /workflows/giraffe_and_deepvariant_fromGAM.wdl
+    description: Maps raw short reads from a pair of FASTQs or a CRAM file on a pangenome with vg Giraffe.
+    primaryDescriptorPath: /workflows/giraffe.wdl
     testParameterFiles:
-      - /params/giraffe_and_deepvariant_gam.json
-    branches:
-      - master
+      - /params/giraffe.json
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu
@@ -60,4 +54,22 @@ workflows:
         email: anovak@soe.ucsc.edu
       - name: Charles Markello
         email: cmarkell@ucsc.edu
+  - name: sortGraphAlignedReads
+    subclass: WDL
+    description: Sort a GAF file
+    primaryDescriptorPath: /workflows/sort_graph_aligned_reads.wdl
+    testParameterFiles:
+      - /params/sort_graph_aligned_reads.gaf.json
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
+  - name: HappyEvaluation
+    subclass: WDL
+    description: Evaluate small variants using hap.py
+    primaryDescriptorPath: /workflows/happy_evaluation.wdl
+    testParameterFiles:
+      - /params/happy_evaluation.json
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
       

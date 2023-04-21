@@ -1,0 +1,13 @@
+{
+  "Giraffe.INPUT_CRAM_FILE": "tests/small_sim_graph/reads.cram",
+  "Giraffe.CRAM_REF": "tests/small_sim_graph/ref.fa",
+  "Giraffe.CRAM_REF_INDEX": "tests/small_sim_graph/ref.fa.fai",
+  "Giraffe.PAIRED_READS": false,
+  "Giraffe.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
+  "Giraffe.SAMPLE_NAME": "s0",
+  "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
+  "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
+  "Giraffe.OUTPUT_GAF": true,
+  "Giraffe.OUTPUT_SINGLE_BAM": true
+}
+
