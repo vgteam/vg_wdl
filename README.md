@@ -69,14 +69,14 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *MIN_MAPQ*: Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1
 - *MAX_FRAGMENT_LENGTH*: Maximum distance at which to mark paired reads properly paired. Default is 3000.
 - *GIRAFFE_OPTIONS*: (OPTIONAL) extra command line options for Giraffe mapper
-- *TRUTH_VCF*: Path to .vcf.gz to compare against
-- *TRUTH_VCF_INDEX*: Path to Tabix index for TRUTH_VCF
-- *EVALUATION_REGIONS_BED*: BED to restrict comparison against TRUTH_VCF to
-- *DV_MODEL_META*: .meta file for a custom DeepVariant calling model
-- *DV_MODEL_INDEX*: .index file for a custom DeepVariant calling model
-- *DV_MODEL_DATA*: .data-00000-of-00001 file for a custom DeepVariant calling model
+- *TRUTH_VCF*: (OPTIONAL) Path to .vcf.gz to compare against
+- *TRUTH_VCF_INDEX*: (OPTIONAL) Path to Tabix index for TRUTH_VCF
+- *EVALUATION_REGIONS_BED*: (OPTIONAL) BED to restrict comparison against TRUTH_VCF to
+- *DV_MODEL_META*: (OPTIONAL) .meta file for a custom DeepVariant calling model
+- *DV_MODEL_INDEX*: (OPTIONAL) .index file for a custom DeepVariant calling model
+- *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
 - *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'.
-- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'fasle'.
+- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'false'.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
 - *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
@@ -170,9 +170,9 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *REALIGNMENT_EXPANSION_BASES*: Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160.
 - *MIN_MAPQ*: Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1
 - *MAX_FRAGMENT_LENGTH*: Maximum distance at which to mark paired reads properly paired. Default is 3000.
-- *DV_MODEL_META*: .meta file for a custom DeepVariant calling model
-- *DV_MODEL_INDEX*: .index file for a custom DeepVariant calling model
-- *DV_MODEL_DATA*: .data-00000-of-00001 file for a custom DeepVariant calling model
+- *DV_MODEL_META*: (OPTIONAL) .meta file for a custom DeepVariant calling model
+- *DV_MODEL_INDEX*: (OPTIONAL) .index file for a custom DeepVariant calling model
+- *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
 - *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'.
 - *DV_NORM_READS*: Should DV normalize reads itself? Default is 'fasle'.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
@@ -373,6 +373,11 @@ To project reads and call variants relative to the CHM13 reference:
 - `REFERENCE_FILE`: [chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa](https://storage.googleapis.com/hprc-pangenomes/chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa)
 - `REFERENCE_INDEX_FILE`: [chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa.fai](https://storage.googleapis.com/hprc-pangenomes/chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.fa.fai). Optional, the workflow will create it if necessary (for a small extra cost/time).
 - `REFERENCE_DICT_FILE`: [chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.dict](https://storage.googleapis.com/hprc-pangenomes/chm13v2.0.plus_hs38d1_analysis_set.compact_decoys.dict). Optional, the workflow will create it if necessary (for a small extra cost/time).
+
+For earlier versions of DeepVariant (<1.5), models were retrained using reads aligned to the HPRC pangenomes. 
+The corresponding model files were deposited at: [https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=publications/PANGENOME_2022/DeepVariant/models/DEEPVARIANT_MC_Y1/](https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=publications/PANGENOME_2022/DeepVariant/models/DEEPVARIANT_MC_Y1/).
+They can be passed to the workflows using the `DV_MODEL_META`, `DV_MODEL_INDEX`, and `DV_MODEL_DATA`.
+Note that **it is not necessary to use custom models in the latest version of the workflows** as DeepVariant v1.5 includes default models suited for analyzing reads mapped to pangenomes (and projected back to a linear reference). 
 
 ## Usage
 ### Dockstore

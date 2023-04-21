@@ -5,6 +5,6 @@
   "GiraffeDeepVariant.SAMPLE_NAME": "s0",
   "GiraffeDeepVariant.MIN_FILE": "tests/small_sim_graph/graph.min",
   "GiraffeDeepVariant.DIST_FILE": "tests/small_sim_graph/graph.dist",
-  "GiraffeDeepVariant.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.3.0"
+  "GiraffeDeepVariant.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.5.0"
 }
 
