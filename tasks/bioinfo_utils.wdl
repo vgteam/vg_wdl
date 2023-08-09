@@ -572,8 +572,8 @@ task kmerCountingKMC {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
-    echo ${input_read_file_1} > scratch_file.txt
-    ~{if defined(input_read_file_2) then "echo ${input_read_file_2} >> scratch_file.txt" else ""}
+    echo ~{input_read_file_1} > scratch_file.txt
+    ~{if defined(input_read_file_2) then "echo ~{input_read_file_2} >> scratch_file.txt" else ""}
 
     kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt ~{working_directory}/~{output_file_name} ~{working_directory}
     >>>
