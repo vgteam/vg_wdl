@@ -160,16 +160,7 @@ task createDistanceIndex {
     String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
 
     command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
+        set -eux -o pipefail
 
         vg index -j ~{out_prefix_name}.dist ~{in_gbz_file}
 
