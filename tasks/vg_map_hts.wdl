@@ -173,7 +173,7 @@ task createDistanceIndex {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:ci-684-bc9aa5dfc4b0d14519ea47333075906a4ec74656"
 
     }
 }
