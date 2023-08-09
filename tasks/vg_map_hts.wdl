@@ -154,10 +154,9 @@ task createDistanceIndex {
     input {
         File in_gbz_file
         Int in_extract_mem = 60 + 20
-        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 50
     }
 
-    String out_prefix_name = "kir"
 
     command {
         set -eux -o pipefail
