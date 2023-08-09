@@ -159,12 +159,13 @@ task createDistanceIndex {
 
     String out_prefix_name = "kir"
 
-    command {
+    command <<<
         set -eux -o pipefail
 
+        echo "here"
         vg index -j ~{out_prefix_name}.dist ~{in_gbz_file}
 
-    }
+    >>>
 
     output {
         File output_dist_index = "~{out_prefix_name}.dist"
@@ -176,7 +177,6 @@ task createDistanceIndex {
         docker: "quay.io/vgteam/vg:v1.50.1"
 
     }
-
 }
 #
 #
