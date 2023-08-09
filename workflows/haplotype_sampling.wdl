@@ -1,7 +1,8 @@
 version 1.0
 
-import "../tasks/vg_map_hts.wdl" as map
 import "../tasks/bioinfo_utils.wdl" as utils
+import "../tasks/vg_map_hts.wdl" as map
+
 
 
 workflow HaplotypeSampling {
@@ -9,14 +10,11 @@ workflow HaplotypeSampling {
         author: "Parsa Eskandar"
         email: "seeskand@ucsc.edu"
         description: "Create haplotype sampled graph. More information at https://github.com/vgteam/vg/wiki/Haplotype-Sampling"
-
     }
 
     parameter_meta {
         GBZ_FILE: "Path to .gbz index file"
         INPUT_READ_PATHS: "Path to a .txt file containing input reads paths, each in one line"
-#        INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
-#        INPUT_READ_FILE_2: "Input sample 2nd read pair fastq.gz"
         HAPL_FILE: "Path to .hapl file"
         DIST_FILE: "Path to .dist file"
         R_INDEX_FILE: "Path to .ri file"
@@ -27,20 +25,15 @@ workflow HaplotypeSampling {
 
 
     }
-
     input {
         File GBZ_FILE
         File? INPUT_READ_PATHS
-#        File INPUT_READ_FILE_1
-#        File INPUT_READ_FILE_2
         File? HAPL_FILE
         File? DIST_FILE
         File? R_INDEX_FILE
         String IN_OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
         Int IN_KMER_LENGTH = 29
         String IN_WORKING_DIRECTORY = "."
-
-
     }
 
 #    String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
@@ -57,7 +50,7 @@ workflow HaplotypeSampling {
         if (!defined(DIST_FILE)){
             call map.createDistanceIndex{
                 input:
-                in_gbz_file=GBZ_FILE
+                    in_gbz_file=GBZ_FILE
             }
 
         }

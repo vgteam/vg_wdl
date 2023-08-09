@@ -162,7 +162,7 @@ task createDistanceIndex {
     command {
         set -eux -o pipefail
 
-        vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
+        vg gbwt -CL -Z ~{in_gbz_file} | sort > path_list.txt
 
     }
 
