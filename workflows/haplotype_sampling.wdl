@@ -62,7 +62,7 @@ workflow HaplotypeSampling {
 
         }
 
-        File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
+#        File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
 #
 #        if (!defined(R_INDEX_FILE)){
 #            call map.createRIndex {
