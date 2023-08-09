@@ -554,7 +554,7 @@ task kmerCountingKMC {
         String working_directory
         Int kmer_length = 29
         Int max_ram = 64
-        Array[File] read_files = read_lines(input_read_paths)
+#        Array[File] read_files = read_lines(input_read_paths)
 	    Int nb_cores = 16
         Int disk_size = 200
     }
@@ -571,7 +571,7 @@ task kmerCountingKMC {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
-    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @~{sep=" " read_files} ~{working_directory}/~{output_file_name} ~{working_directory}
+    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @~{input_read_paths} ~{working_directory}/~{output_file_name} ~{working_directory}
     >>>
     output {
         File kff_file = working_directory + "/" + output_file_name + ".kff"
