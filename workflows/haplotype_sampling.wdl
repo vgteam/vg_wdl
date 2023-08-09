@@ -101,7 +101,7 @@ workflow HaplotypeSampling {
 #    }
 
     output {
-        File output_test = createDistanceIndex.path
+        File? output_test = createDistanceIndex.path
     }
 }
 
