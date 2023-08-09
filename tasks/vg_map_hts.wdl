@@ -157,13 +157,12 @@ task createDistanceIndex {
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
 
-    String out_prefix_name = sub(basename(in_gbz_file), "\\.gbz$", "")
+    String out_prefix_name = "kir"
 
     command {
         set -eux -o pipefail
 
-        vg index \
-        -j ${out_prefix_name}.dist ${in_gbz_file}
+        vg index -j ~{out_prefix_name}.dist ~{in_gbz_file}
 
     }
 
