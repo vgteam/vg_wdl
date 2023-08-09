@@ -172,7 +172,7 @@ task createDistanceIndex {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:ci-684-bc9aa5dfc4b0d14519ea47333075906a4ec74656"
+        docker: "quay.io/vgteam/vg:v1.50.0"
 
     }
 }
@@ -217,52 +217,52 @@ task createRIndex {
     }
 
 }
-#
-#
-#task createHaplotypeIndex {
-#    input {
-#        File in_gbz_file
-#        File in_dist_index
-#        File in_R_index
-#        Int nb_cores = 16
-#        Int in_extract_mem = 40 + 20
-#        Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G")) + 20
-#    }
-#
-#    String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
-#
-#    command {
-#        # Set the exit code of a pipeline to that of the rightmost command
-#        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-#        set -o pipefail
-#        # cause a bash script to exit immediately when a command fails
-#        set -e
-#        # cause the bash shell to treat unset variables as an error and exit immediately
-#        set -u
-#        # echo each line of the script to stdout so we can see what is happening
-#        set -o xtrace
-#        #to turn off echo do 'set +o xtrace'
-#
-#
-#        vg haplotypes -v 2 -t ~{nb_cores} -d ~{in_dist_index} -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
-#
-#    }
-#
-#    output {
-#        File output_hap_index = "~{out_prefix_name}.hapl"
-#    }
-#    runtime {
-#        preemptible: 2
-#        cpu: nb_cores
-#        memory: in_extract_mem + " GB"
-#        disks: "local-disk " + in_extract_disk + " SSD"
-#        docker: "quay.io/vgteam/vg:v1.50.0"
-#
-#    }
-#
-#}
-#
-#
+
+
+task createHaplotypeIndex {
+    input {
+        File in_gbz_file
+        File in_dist_index
+        File in_R_index
+        Int nb_cores = 16
+        Int in_extract_mem = 40 + 20
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G")) + 20
+    }
+
+    String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+
+        vg haplotypes -v 2 -t ~{nb_cores} -d ~{in_dist_index} -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
+
+    }
+
+    output {
+        File output_hap_index = "~{out_prefix_name}.hapl"
+    }
+    runtime {
+        preemptible: 2
+        cpu: nb_cores
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: "quay.io/vgteam/vg:v1.50.0"
+
+    }
+
+}
+
+
 #task samplingHaplotypes {
 #    input {
 #        File in_gbz_file

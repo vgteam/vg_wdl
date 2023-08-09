@@ -55,28 +55,28 @@ workflow HaplotypeSampling {
         }
 
         File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
-#
+
         if (!defined(R_INDEX_FILE)){
             call map.createRIndex {
                 input:
                 in_gbz_file=GBZ_FILE
             }
         }
-#
-#        File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
-#
-#        # create the haplotype information file
-#
-#        call map.createHaplotypeIndex {
-#            input:
-#            in_gbz_file=GBZ_FILE,
-#            in_dist_index=dist_index_file,
-#            in_R_index=r_index_file
-#        }
+
+        File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
+
+        # create the haplotype information file
+
+        call map.createHaplotypeIndex {
+            input:
+            in_gbz_file=GBZ_FILE,
+            in_dist_index=dist_index_file,
+            in_R_index=r_index_file
+        }
 
     }
 
-#    File haplotype_index = select_first([HAPL_FILE, createHaplotypeIndex.output_hap_index])
+    File haplotype_index = select_first([HAPL_FILE, createHaplotypeIndex.output_hap_index])
 #
 #    call utils.kmerCountingKMC{
 #        input:
@@ -101,7 +101,7 @@ workflow HaplotypeSampling {
 #    }
 
     output {
-        File? output1 = createRIndex.output_R_index
+        File? output1 = createHaplotypeIndex.output_hap_index
     }
 }
 
