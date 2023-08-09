@@ -20,9 +20,9 @@ workflow HaplotypeSampling {
         HAPL_FILE: "Path to .hapl file"
         DIST_FILE: "Path to .dist file"
         R_INDEX_FILE: "Path to .ri file"
-        OUTPUT_NAME_PREFIX: "Name of the output file (default: haplotype_sampled_graph)"
-        KMER_LENGTH: "Size of kmer using for sampling (default: 29)"
-        WORKING_DIRECTORY: "Path to a directory that files are written to (default: '.')"
+        IN_OUTPUT_NAME_PREFIX: "Name of the output file (default: haplotype_sampled_graph)"
+        IN_KMER_LENGTH: "Size of kmer using for sampling (default: 29)"
+        IN_WORKING_DIRECTORY: "Path to a directory that files are written to (default: '.')"
 
 
 
