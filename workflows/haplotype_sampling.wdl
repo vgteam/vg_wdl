@@ -27,7 +27,7 @@ workflow HaplotypeSampling {
     }
     input {
         File GBZ_FILE
-        File? INPUT_READ_PATHS
+        File INPUT_READ_PATHS
         File? HAPL_FILE
         File? DIST_FILE
         File? R_INDEX_FILE
@@ -36,9 +36,9 @@ workflow HaplotypeSampling {
         String IN_WORKING_DIRECTORY = "."
     }
 
-#    String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
-#    Int KMER_LENGTH = select_first([IN_KMER_LENGTH, 29])
-#    String WORKING_DIRECTORY = select_first([IN_WORKING_DIRECTORY, "."])
+    String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
+    Int KMER_LENGTH = select_first([IN_KMER_LENGTH, 29])
+    String WORKING_DIRECTORY = select_first([IN_WORKING_DIRECTORY, "."])
 
 
 
