@@ -77,18 +77,18 @@ workflow HaplotypeSampling {
     }
 
     File haplotype_index = select_first([HAPL_FILE, createHaplotypeIndex.output_hap_index])
-#
-#    call utils.kmerCountingKMC{
-#        input:
-#            input_read_paths=INPUT_READ_PATHS,
-#            output_file_name=OUTPUT_NAME_PREFIX,
-#            kmer_length=KMER_LENGTH,
-#            working_directory=WORKING_DIRECTORY
-#
-#
-#    }
-#
-#    File kmer_information = kmerCountingKMC.kff_file
+
+    call utils.kmerCountingKMC{
+        input:
+            input_read_paths=INPUT_READ_PATHS,
+            output_file_name=OUTPUT_NAME_PREFIX,
+            kmer_length=KMER_LENGTH,
+            working_directory=WORKING_DIRECTORY
+
+
+    }
+
+    File kmer_information = kmerCountingKMC.kff_file
 #
 #    call map.samplingHaplotypes{
 #        input:
