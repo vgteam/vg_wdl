@@ -556,7 +556,7 @@ task kmerCountingKMC {
         Int max_ram = 64
 
 	    Int nb_cores = 16
-        Int disk_size = round( length(read_files) * size(read_files[0], 'G')) + 50
+        Int disk_size = round( 2 * size(read_files[0], 'G')) + 50
     }
 
     command <<<
