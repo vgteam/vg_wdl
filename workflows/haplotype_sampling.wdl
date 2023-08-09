@@ -101,7 +101,7 @@ workflow HaplotypeSampling {
 #    }
 
     output {
-        File? output1 = createDistanceIndex.dist_index_file
+        File? output1 = createDistanceIndex.output_dist_index
     }
 }
 
