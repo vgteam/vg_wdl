@@ -162,8 +162,7 @@ task createDistanceIndex {
     command <<<
         set -eux -o pipefail
 
-        echo "here"
-        vg index -j ~{out_prefix_name}.dist ~{in_gbz_file}
+        vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
 
     >>>
 
