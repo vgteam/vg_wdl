@@ -162,18 +162,19 @@ task createDistanceIndex {
     command {
         set -eux -o pipefail
 
-        vg index -j ${out_prefix_name}.dist ${in_gbz_file}
+        vg index \
+        -j ${out_prefix_name}.dist ${in_gbz_file}
 
     }
 
     output {
-        File output_dist_index = out_prefix_name + ".dist"
+        File output_dist_index = "~{out_prefix_name}.dist"
     }
     runtime {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.0"
+        docker: "quay.io/vgteam/vg:v1.50.1"
 
     }
 

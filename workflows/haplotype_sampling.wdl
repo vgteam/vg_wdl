@@ -36,9 +36,9 @@ workflow HaplotypeSampling {
         File? HAPL_FILE
         File? DIST_FILE
         File? R_INDEX_FILE
-        String? IN_OUTPUT_NAME_PREFIX
-        Int? IN_KMER_LENGTH
-        String? IN_WORKING_DIRECTORY
+        String IN_OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
+        Int IN_KMER_LENGTH = 29
+        String IN_WORKING_DIRECTORY = "."
 
 
     }
