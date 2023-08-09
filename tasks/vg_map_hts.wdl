@@ -159,12 +159,12 @@ task createDistanceIndex {
 
     String out_prefix_name = sub(basename(in_gbz_file), "\\.gbz$", "")
 
-    command <<<
+    command {
         set -eux -o pipefail
 
         vg index -j ${out_prefix_name}.dist ${in_gbz_file}
 
-    >>>
+    }
 
     output {
         File output_dist_index = out_prefix_name + ".dist"
