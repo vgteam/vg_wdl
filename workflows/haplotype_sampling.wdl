@@ -43,9 +43,9 @@ workflow HaplotypeSampling {
 
     }
 
-    String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
-    Int KMER_LENGTH = select_first([IN_KMER_LENGTH, 29])
-    String WORKING_DIRECTORY = select_first([IN_WORKING_DIRECTORY, "."])
+#    String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
+#    Int KMER_LENGTH = select_first([IN_KMER_LENGTH, 29])
+#    String WORKING_DIRECTORY = select_first([IN_WORKING_DIRECTORY, "."])
 
 
 
@@ -63,24 +63,24 @@ workflow HaplotypeSampling {
         }
 
         File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
-
-        if (!defined(R_INDEX_FILE)){
-            call map.createRIndex {
-                input:
-                in_gbz_file=GBZ_FILE
-            }
-        }
-
-        File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
-
-        # create the haplotype information file
-
-        call map.createHaplotypeIndex {
-            input:
-            in_gbz_file=GBZ_FILE,
-            in_dist_index=dist_index_file,
-            in_R_index=r_index_file
-        }
+#
+#        if (!defined(R_INDEX_FILE)){
+#            call map.createRIndex {
+#                input:
+#                in_gbz_file=GBZ_FILE
+#            }
+#        }
+#
+#        File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
+#
+#        # create the haplotype information file
+#
+#        call map.createHaplotypeIndex {
+#            input:
+#            in_gbz_file=GBZ_FILE,
+#            in_dist_index=dist_index_file,
+#            in_R_index=r_index_file
+#        }
 
     }
 
