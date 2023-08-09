@@ -159,15 +159,16 @@ task createDistanceIndex {
 
     String out_prefix_name = "kir"
 
-    command <<<
+    command {
         set -eux -o pipefail
 
         vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
 
-    >>>
+    }
 
     output {
-        File output_dist_index = "~{out_prefix_name}.dist"
+#        File output_dist_index = "~{out_prefix_name}.dist"
+        File path = "path_list.txt"
     }
     runtime {
         preemptible: 2
