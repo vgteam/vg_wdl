@@ -279,8 +279,8 @@ task samplingHaplotypes {
         File in_gbz_file
         File in_hap_index
         File in_kmer_info
-        String output_file_name
-        String working_directory
+        String? output_file_name
+        String? working_directory
         Int nb_cores = 16
         Int in_extract_mem = 40 + 20
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
