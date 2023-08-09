@@ -14,7 +14,7 @@ workflow HaplotypeSampling {
 
     parameter_meta {
         GBZ_FILE: "Path to .gbz index file"
-        INPUT_READ_PATHS: "Path to a .txt file containing input reads paths, each in one line"
+#        INPUT_READ_PATHS: "Path to a .txt file containing input reads paths, each in one line"
         INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
         INPUT_READ_FILE_2: "Input sample 2st read pair fastq.gz"
         HAPL_FILE: "Path to .hapl file"
