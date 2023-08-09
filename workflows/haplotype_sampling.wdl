@@ -15,6 +15,8 @@ workflow HaplotypeSampling {
     parameter_meta {
         GBZ_FILE: "Path to .gbz index file"
         INPUT_READ_PATHS: "Path to a .txt file containing input reads paths, each in one line"
+        INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
+        INPUT_READ_FILE_2: "Input sample 2st read pair fastq.gz"
         HAPL_FILE: "Path to .hapl file"
         DIST_FILE: "Path to .dist file"
         R_INDEX_FILE: "Path to .ri file"
@@ -27,7 +29,9 @@ workflow HaplotypeSampling {
     }
     input {
         File GBZ_FILE
-        File INPUT_READ_PATHS
+#        File INPUT_READ_PATHS
+        File INPUT_READ_FILE_1
+        File? INPUT_READ_FILE_2
         File? HAPL_FILE
         File? DIST_FILE
         File? R_INDEX_FILE
@@ -80,7 +84,8 @@ workflow HaplotypeSampling {
 
     call utils.kmerCountingKMC{
         input:
-            input_read_paths=INPUT_READ_PATHS,
+            input_read_file_1=INPUT_READ_FILE_1,
+            input_read_file_2=INPUT_READ_FILE_2,
             output_file_name=OUTPUT_NAME_PREFIX,
             kmer_length=KMER_LENGTH,
             working_directory=WORKING_DIRECTORY
