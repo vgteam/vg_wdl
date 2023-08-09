@@ -156,18 +156,17 @@ task createDistanceIndex {
         Int in_extract_mem = 60 + 20
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 50
     }
-
+        String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
 
     command {
         set -eux -o pipefail
 
-        vg gbwt -CL -Z ~{in_gbz_file} | sort > path_list.txt
-
+        vg index -j "~{output_prefix}.dist" ~{in_gbz_file}
     }
 
     output {
 #        File output_dist_index = "~{out_prefix_name}.dist"
-        File path = "path_list.txt"
+        File output_dist_index = "~{output_prefix}.dist"
     }
     runtime {
         preemptible: 2
