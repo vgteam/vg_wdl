@@ -48,7 +48,7 @@ workflow HaplotypeSampling {
         # create the dist index file and r-index file to create the haplotype information file .hapl
 
         if (!defined(DIST_FILE)){
-            call map.createDistanceIndex {
+            call map.createDistanceIndex as kir {
                 input:
                     in_gbz_file=GBZ_FILE
             }
@@ -101,7 +101,7 @@ workflow HaplotypeSampling {
 #    }
 
     output {
-        File? output_test = createDistanceIndex.path
+        File? output_test = kir.path
     }
 }
 
