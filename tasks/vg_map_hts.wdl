@@ -176,47 +176,47 @@ task createDistanceIndex {
 
     }
 }
-#
-#
-#task createRIndex {
-#    input {
-#        File in_gbz_file
-#        Int nb_cores = 16
-#        Int in_extract_mem = 60 + 20
-#        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
-#    }
-#
-#    String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
-#
-#    command {
-#        # Set the exit code of a pipeline to that of the rightmost command
-#        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-#        set -o pipefail
-#        # cause a bash script to exit immediately when a command fails
-#        set -e
-#        # cause the bash shell to treat unset variables as an error and exit immediately
-#        set -u
-#        # echo each line of the script to stdout so we can see what is happening
-#        set -o xtrace
-#        #to turn off echo do 'set +o xtrace'
-#
-#        vg gbwt -p --num-threads ~{nb_cores} -r ~{out_prefix_name}.ri -Z ~{in_gbz_file}
-#
-#    }
-#
-#    output {
-#        File output_R_index = "~{out_prefix_name}.ri"
-#    }
-#    runtime {
-#        preemptible: 2
-#        cpu: nb_cores
-#        memory: in_extract_mem + " GB"
-#        disks: "local-disk " + in_extract_disk + " SSD"
-#        docker: "quay.io/vgteam/vg:v1.50.0"
-#
-#    }
-#
-#}
+
+
+task createRIndex {
+    input {
+        File in_gbz_file
+        Int nb_cores = 16
+        Int in_extract_mem = 60 + 20
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+    }
+
+    String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        vg gbwt -p --num-threads ~{nb_cores} -r ~{out_prefix_name}.ri -Z ~{in_gbz_file}
+
+    }
+
+    output {
+        File output_R_index = "~{out_prefix_name}.ri"
+    }
+    runtime {
+        preemptible: 2
+        cpu: nb_cores
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: "quay.io/vgteam/vg:v1.50.0"
+
+    }
+
+}
 #
 #
 #task createHaplotypeIndex {

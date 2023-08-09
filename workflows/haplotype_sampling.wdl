@@ -56,12 +56,12 @@ workflow HaplotypeSampling {
 
         File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
 #
-#        if (!defined(R_INDEX_FILE)){
-#            call map.createRIndex {
-#                input:
-#                in_gbz_file=GBZ_FILE
-#            }
-#        }
+        if (!defined(R_INDEX_FILE)){
+            call map.createRIndex {
+                input:
+                in_gbz_file=GBZ_FILE
+            }
+        }
 #
 #        File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
 #
