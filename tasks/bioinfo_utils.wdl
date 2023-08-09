@@ -571,7 +571,7 @@ task kmerCountingKMC {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
-    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @~{input_read_paths} ~{working_directory}/~{output_file_name} ~{working_directory}
+    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @~{sep=" " read_files} ~{working_directory}/~{output_file_name} ~{working_directory}
     >>>
     output {
         File kff_file = working_directory + "/" + output_file_name + ".kff"
