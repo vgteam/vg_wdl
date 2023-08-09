@@ -84,29 +84,29 @@ workflow HaplotypeSampling {
 
     }
 
-    File haplotype_index = select_first([HAPL_FILE, createHaplotypeIndex.output_hap_index])
-
-    call utils.kmerCountingKMC{
-        input:
-            input_read_paths=INPUT_READ_PATHS,
-            output_file_name=OUTPUT_NAME_PREFIX,
-            kmer_length=KMER_LENGTH,
-            working_directory=WORKING_DIRECTORY
-
-
-    }
-
-    File kmer_information = kmerCountingKMC.kff_file
-
-    call map.samplingHaplotypes{
-        input:
-            in_gbz_file=GBZ_FILE,
-            in_hap_index=haplotype_index,
-            in_kmer_info=kmer_information,
-            output_file_name=OUTPUT_NAME_PREFIX,
-            working_directory=WORKING_DIRECTORY
-
-    }
+#    File haplotype_index = select_first([HAPL_FILE, createHaplotypeIndex.output_hap_index])
+#
+#    call utils.kmerCountingKMC{
+#        input:
+#            input_read_paths=INPUT_READ_PATHS,
+#            output_file_name=OUTPUT_NAME_PREFIX,
+#            kmer_length=KMER_LENGTH,
+#            working_directory=WORKING_DIRECTORY
+#
+#
+#    }
+#
+#    File kmer_information = kmerCountingKMC.kff_file
+#
+#    call map.samplingHaplotypes{
+#        input:
+#            in_gbz_file=GBZ_FILE,
+#            in_hap_index=haplotype_index,
+#            in_kmer_info=kmer_information,
+#            output_file_name=OUTPUT_NAME_PREFIX,
+#            working_directory=WORKING_DIRECTORY
+#
+#    }
 
 
 
