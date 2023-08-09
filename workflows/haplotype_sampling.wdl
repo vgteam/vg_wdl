@@ -36,12 +36,19 @@ workflow HaplotypeSampling {
         File? HAPL_FILE
         File? DIST_FILE
         File? R_INDEX_FILE
-        String? OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
-        Int? KMER_LENGTH = 29
-        String? WORKING_DIRECTORY = "."
+        String? IN_OUTPUT_NAME_PREFIX
+        Int? IN_KMER_LENGTH
+        String? IN_WORKING_DIRECTORY
 
 
     }
+
+    String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
+    Int KMER_LENGTH = select_fist([IN_KMER_LENGTH, 29])
+    String WORKING_DIRECTORY = select_first([IN_WORKING_DIRECTORY, "."])
+
+
+
 
     # Have to create haplotype information
     if (!defined(HAPL_FILE)) {

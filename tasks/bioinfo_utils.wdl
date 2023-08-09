@@ -549,16 +549,13 @@ task convertCRAMtoFASTQ {
 task kmerCountingKMC {
     input {
         File input_read_paths
-        String? output_file_name
+        String output_file_name
         Array[File] read_files = read_lines(input_read_paths)
-        String? working_directory
-        Int? kmer_length = 29
+        String working_directory
+        Int kmer_length = 29
         Int max_ram = 64
 
 	    Int nb_cores = 16
-
-
-
         Int disk_size = round( length(read_files) * size(read_files[0], 'G')) + 50
     }
 
@@ -577,7 +574,7 @@ task kmerCountingKMC {
     kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @~{input_read_paths} ~{working_directory}/~{output_file_name} ~{working_directory}
     >>>
     output {
-        File kff_file = output_file_name + ".kff"
+        File kff_file = working_directory + "/" + output_file_name + ".kff"
     }
     runtime {
         preemptible: 2
