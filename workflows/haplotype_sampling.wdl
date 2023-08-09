@@ -44,7 +44,7 @@ workflow HaplotypeSampling {
     }
 
     String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
-    Int KMER_LENGTH = select_fist([IN_KMER_LENGTH, 29])
+    Int KMER_LENGTH = select_first([IN_KMER_LENGTH, 29])
     String WORKING_DIRECTORY = select_first([IN_WORKING_DIRECTORY, "."])
 
 
