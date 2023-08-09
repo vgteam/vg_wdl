@@ -30,7 +30,7 @@ workflow HaplotypeSampling {
 
     input {
         File GBZ_FILE
-        File INPUT_READ_PATHS
+        File? INPUT_READ_PATHS
 #        File INPUT_READ_FILE_1
 #        File INPUT_READ_FILE_2
         File? HAPL_FILE
