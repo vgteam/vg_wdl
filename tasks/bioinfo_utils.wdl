@@ -550,13 +550,13 @@ task kmerCountingKMC {
     input {
         File input_read_paths
         String output_file_name
-        Array[File] read_files = read_lines(input_read_paths)
+
         String working_directory
         Int kmer_length = 29
         Int max_ram = 64
-
+        Array[File] read_files = read_lines(input_read_paths)
 	    Int nb_cores = 16
-        Int disk_size = round( 2 * size(read_files[0], 'G')) + 50
+        Int disk_size = 200
     }
 
     command <<<
