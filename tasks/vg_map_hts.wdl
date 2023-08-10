@@ -386,7 +386,7 @@ task createMinimizerIndex {
     }
 
     output {
-        File output_minimizer = "~{out_prefix_name}.min"
+        File output_minimizer = "~{out_name}.min"
     }
     runtime {
         preemptible: 2
