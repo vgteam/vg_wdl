@@ -35,8 +35,6 @@ workflow HaplotypeSampling {
         String IN_OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
         Int IN_KMER_LENGTH = 29
         String IN_WORKING_DIRECTORY = "."
-        String GIRAFFE_OPTIONS = ""
-        String SAMPLE_NAME
         Int CORES = 16
     }
 
