@@ -61,7 +61,8 @@ workflow HaplotypeSampling {
         if (!defined(R_INDEX_FILE)) {
             call map.createRIndex {
                 input:
-                    in_gbz_file=GBZ_FILE
+                    in_gbz_file=GBZ_FILE,
+                    nb_cores=CORES
             }
         }
 
@@ -72,7 +73,8 @@ workflow HaplotypeSampling {
             input:
                 in_gbz_file=GBZ_FILE,
                 in_dist_index=dist_index_file,
-                in_R_index=r_index_file
+                in_R_index=r_index_file,
+                nb_cores=CORES
         }
     }
 
@@ -85,7 +87,8 @@ workflow HaplotypeSampling {
                 input_read_file_2=INPUT_READ_FILE_2,
                 output_file_name=OUTPUT_NAME_PREFIX,
                 kmer_length=KMER_LENGTH,
-                working_directory=WORKING_DIRECTORY
+                working_directory=WORKING_DIRECTORY,
+                nb_cores=CORES
 
         }
 
@@ -99,20 +102,22 @@ workflow HaplotypeSampling {
             in_hap_index=haplotype_index,
             in_kmer_info=kmer_information,
             output_file_name=OUTPUT_NAME_PREFIX,
-            working_directory=WORKING_DIRECTORY
+            working_directory=WORKING_DIRECTORY,
+            nb_cores=CORES
 
     }
 
     call map.createDistanceIndex as giraffeDist {
                 input:
                     in_gbz_file=samplingHaplotypes.output_graph
-            }
+    }
 
     call map.createMinimizerIndex {
         input:
             in_gbz_file=samplingHaplotypes.output_graph,
             out_name=OUTPUT_NAME_PREFIX,
-            in_dist_index=giraffeDist.output_dist_index
+            in_dist_index=giraffeDist.output_dist_index,
+            nb_cores=CORES
 
     }
 
