@@ -555,7 +555,6 @@ task kmerCountingKMC {
         String working_directory
         Int kmer_length
         Int max_ram = 64
-#        Array[File] read_files = read_lines(input_read_paths)
 	    Int nb_cores = 16
         Int disk_size = 200
     }
@@ -576,6 +575,8 @@ task kmerCountingKMC {
     ~{if defined(input_read_file_2) then "echo ~{input_read_file_2} >> scratch_file.txt" else ""}
 
     kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt ~{working_directory}/~{output_file_name} ~{working_directory}
+
+    rm scratch_file.txt
     >>>
     output {
         File kff_file = working_directory + "/" + output_file_name + ".kff"

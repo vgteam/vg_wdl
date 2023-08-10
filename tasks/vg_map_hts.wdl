@@ -156,7 +156,7 @@ task createDistanceIndex {
         Int in_extract_mem = 60 + 20
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
-        String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
+    String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
 
     command {
         set -eux -o pipefail
@@ -165,7 +165,7 @@ task createDistanceIndex {
     }
 
     output {
-#        File output_dist_index = "~{out_prefix_name}.dist"
+        #        File output_dist_index = "~{out_prefix_name}.dist"
         File output_dist_index = "~{output_prefix}.dist"
     }
     runtime {
@@ -176,7 +176,6 @@ task createDistanceIndex {
 
     }
 }
-
 
 task createRIndex {
     input {
@@ -217,7 +216,6 @@ task createRIndex {
     }
 
 }
-
 
 task createHaplotypeIndex {
     input {
@@ -262,7 +260,6 @@ task createHaplotypeIndex {
 
 }
 
-
 task samplingHaplotypes {
     input {
         File in_gbz_file
@@ -304,3 +301,103 @@ task samplingHaplotypes {
     }
 
 }
+#
+#task runVGGIRAFFENoIndex {
+#    input {
+#        File fastq_file_1
+#        File? fastq_file_2
+#        File in_gbz_file
+#        String in_giraffe_options
+#        String in_sample_name
+#        String out_prefix
+#        Int nb_cores = 16
+#        String mem_gb = 120
+#        Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G')) + 150
+#    }
+#
+#    #    String out_prefix = sub(sub(sub(basename(fastq_file_1), "\\.gz$", ""), "\\.fastq$", ""), "\\.fq$", "")
+#    Boolean paired_reads = defined(fastq_file_2)
+#    command <<<
+#        # Set the exit code of a pipeline to that of the rightmost command
+#        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+#        set -o pipefail
+#        # cause a bash script to exit immediately when a command fails
+#        set -e
+#        # cause the bash shell to treat unset variables as an error and exit immediately
+#        set -u
+#        # echo each line of the script to stdout so we can see what is happening
+#        set -o xtrace
+#        #to turn off echo do 'set +o xtrace'
+#
+#        PAIR_ARGS=""
+#        if [ ~{paired_reads} == true ]
+#        then
+#        PAIR_ARGS="-f ~{fastq_file_2}"
+#        fi
+#
+#        vg giraffe \
+#        --progress \
+#        --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+#        --sample "~{in_sample_name}" \
+#        ~{in_giraffe_options} \
+#        --output-format gaf \
+#        -f ~{fastq_file_1} ${PAIR_ARGS} \
+#        -Z ~{in_gbz_file} \
+#        -t ~{nb_cores} > ~{out_prefix}.gaf
+#    >>>
+#    output {
+#        File gaf_file = "~{out_prefix}.gaf"
+#    }
+#    runtime {
+#        preemptible: 2
+#        time: 300
+#        memory: mem_gb + " GB"
+#        cpu: nb_cores
+#        disks: "local-disk " + disk_size + " SSD"
+#        docker: "quay.io/vgteam/vg:v1.50.0"
+#    }
+#}
+
+task createMinimizerIndex {
+    input {
+        File in_gbz_file
+        File in_dist_index
+        String out_name
+        Int nb_cores = 16
+        Int in_extract_mem = 40 + 20
+        Int in_extract_disk = 10 * round(size(in_gbz_file, "G") + size(in_dist_index, "G")) + 20
+    }
+
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        vg minimizer -p -t ~{nb_cores} -o ~{out_name}.min -d ~{in_dist_index} ~{in_gbz_file}
+
+    }
+
+    output {
+        File output_minimizer = "~{out_prefix_name}.min"
+    }
+    runtime {
+        preemptible: 2
+        cpu: nb_cores
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: "quay.io/vgteam/vg:v1.50.0"
+
+    }
+
+}
+
+
+

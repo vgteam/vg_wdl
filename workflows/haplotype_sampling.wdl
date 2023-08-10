@@ -12,7 +12,6 @@ workflow HaplotypeSampling {
 
     parameter_meta {
         GBZ_FILE: "Path to .gbz index file"
-        #        INPUT_READ_PATHS: "Path to a .txt file containing input reads paths, each in one line"
         INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
         INPUT_READ_FILE_2: "Input sample 2st read pair fastq.gz"
         HAPL_FILE: "Path to .hapl file"
@@ -22,11 +21,11 @@ workflow HaplotypeSampling {
         IN_OUTPUT_NAME_PREFIX: "Name of the output file (default: haplotype_sampled_graph)"
         IN_KMER_LENGTH: "Size of kmer using for sampling (default: 29)"
         IN_WORKING_DIRECTORY: "Path to a directory that files are written to (default: '.')"
+        CORES: "Number of cores to use with commands. (default: 16)"
 
     }
     input {
         File GBZ_FILE
-        #        File INPUT_READ_PATHS
         File INPUT_READ_FILE_1
         File? INPUT_READ_FILE_2
         File? HAPL_FILE
@@ -36,6 +35,9 @@ workflow HaplotypeSampling {
         String IN_OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
         Int IN_KMER_LENGTH = 29
         String IN_WORKING_DIRECTORY = "."
+        String GIRAFFE_OPTIONS = ""
+        String SAMPLE_NAME
+        Int CORES = 16
     }
 
     String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
@@ -68,14 +70,12 @@ workflow HaplotypeSampling {
         File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
 
         # create the haplotype information file
-
         call map.createHaplotypeIndex {
             input:
                 in_gbz_file=GBZ_FILE,
                 in_dist_index=dist_index_file,
                 in_R_index=r_index_file
         }
-
     }
 
     File haplotype_index = select_first([HAPL_FILE, createHaplotypeIndex.output_hap_index])
@@ -105,9 +105,39 @@ workflow HaplotypeSampling {
 
     }
 
-    output {
-        File? output1 = samplingHaplotypes.output_graph
+    call map.createDistanceIndex as giraffeDist {
+                input:
+                    in_gbz_file=samplingHaplotypes.output_graph
+            }
+
+    call map.createMinimizerIndex {
+        input:
+            in_gbz_file=samplingHaplotypes.output_graph,
+            out_name=OUTPUT_NAME_PREFIX,
+            in_dist_index=giraffeDist.output_dist_index
+
     }
+
+
+
+#    call map.runVGGIRAFFENoIndex {
+#        input:
+#            fastq_file_1=INPUT_READ_FILE_1,
+#            fastq_file_2=INPUT_READ_FILE_2,
+#            in_giraffe_options=GIRAFFE_OPTIONS,
+#            in_gbz_file=samplingHaplotypes.output_graph,
+#            in_sample_name=SAMPLE_NAME,
+#            nb_cores=CORES,
+#            mem_gb=120,
+#            out_prefix=OUTPUT_NAME_PREFIX
+#    }
+
+    output {
+        File? sampled_graph = samplingHaplotypes.output_graph
+        File? sampled_min = giraffeDist.output_dist_index
+        File? sampled_dist = createMinimizerIndex.output_minimizer
+    }
+
 }
 
 
