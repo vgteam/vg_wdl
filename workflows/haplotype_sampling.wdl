@@ -7,7 +7,7 @@ workflow HaplotypeSampling {
     meta {
         author: "Parsa Eskandar"
         email: "seeskand@ucsc.edu"
-        description: "Create haplotype sampled graph. More information at https://github.com/vgteam/vg/wiki/Haplotype-Sampling"
+        description: "Create haplotype sampled graph and the indexes necessary for the vg giraffe. More information at https://github.com/vgteam/vg/wiki/Haplotype-Sampling"
     }
 
     parameter_meta {

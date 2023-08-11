@@ -165,7 +165,6 @@ task createDistanceIndex {
     }
 
     output {
-        #        File output_dist_index = "~{out_prefix_name}.dist"
         File output_dist_index = "~{output_prefix}.dist"
     }
     runtime {
