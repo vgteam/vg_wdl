@@ -91,7 +91,8 @@ workflow HaplotypeSampling {
                 in_R_index=r_index_file,
                 nb_cores=CORES,
                 kmer_length=KMER_LENGTH,
-                window_length=WINDOW_LENGTH
+                window_length=WINDOW_LENGTH,
+                subchain_length=SUBCHAIN_LENGTH
         }
     }
 
