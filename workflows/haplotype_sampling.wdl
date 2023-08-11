@@ -90,7 +90,8 @@ workflow HaplotypeSampling {
                 in_dist_index=dist_index_file,
                 in_R_index=r_index_file,
                 nb_cores=CORES,
-                kmer_length=KMER_LENGTH
+                kmer_length=KMER_LENGTH,
+                window_length=WINDOW_LENGTH
         }
     }
 
