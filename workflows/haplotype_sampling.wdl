@@ -18,11 +18,17 @@ workflow HaplotypeSampling {
         DIST_FILE: "Path to .dist file"
         R_INDEX_FILE: "Path to .ri file"
         KFF_FILE: "Path to .kff file"
-        IN_OUTPUT_NAME_PREFIX: "Name of the output file (default: haplotype_sampled_graph)"
-        IN_KMER_LENGTH: "Size of kmer using for sampling (default: 29)"
-        IN_WORKING_DIRECTORY: "Path to a directory that files are written to (default: '.')"
-        CORES: "Number of cores to use with commands. (default: 16)"
-
+        IN_OUTPUT_NAME_PREFIX: "Name of the output file (Default: haplotype_sampled_graph)"
+        IN_KMER_LENGTH: "Size of kmer using for sampling (Up to 31) (Default: 29)"
+        IN_WORKING_DIRECTORY: "Path to a directory that files are written to (Default: '.')"
+        CORES: "Number of cores to use with commands. (Default: 16)"
+        WINDOW_LENGTH: "Window length used for building the minimizer index. (Default: 11)"
+        SUBCHAIN_LENGTH: "Target length (in bp) for subchains. (Default: 10000)"
+        HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes. (Default: 4)"
+        PRESENT_DISCOUNT: "Multiplicative factor for discounting scores for present kmers. (Default: 0.9)"
+        HET_ADJUST: "Additive term for adjusting scores for heterozygous kmers. (Default: 0.05)"
+        ABSENT_SCORE: "Score for absent kmers. (Default: 0.8)"
+        INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)"
     }
     input {
         File GBZ_FILE
@@ -36,6 +42,15 @@ workflow HaplotypeSampling {
         Int IN_KMER_LENGTH = 29
         String IN_WORKING_DIRECTORY = "."
         Int CORES = 16
+        Int WINDOW_LENGTH = 11
+        Int SUBCHAIN_LENGTH = 10000
+        Int HAPLOTYPE_NUMBER = 4
+        Float PRESENT_DISCOUNT = 0.9
+        Float HET_ADJUST = 0.05
+        Float ABSENT_SCORE = 0.8
+        Boolean INCLUDE_REFERENCE = true
+
+
     }
 
     String OUTPUT_NAME_PREFIX = select_first([IN_OUTPUT_NAME_PREFIX, "haplotype_sampled_graph"])
@@ -74,7 +89,8 @@ workflow HaplotypeSampling {
                 in_gbz_file=GBZ_FILE,
                 in_dist_index=dist_index_file,
                 in_R_index=r_index_file,
-                nb_cores=CORES
+                nb_cores=CORES,
+                kmer_length=KMER_LENGTH
         }
     }
 
@@ -103,6 +119,11 @@ workflow HaplotypeSampling {
             in_kmer_info=kmer_information,
             output_file_name=OUTPUT_NAME_PREFIX,
             working_directory=WORKING_DIRECTORY,
+            haplotype_number = HAPLOTYPE_NUMBER,
+            present_discount = PRESENT_DISCOUNT,
+            het_adjust = HET_ADJUST,
+            absent_score = ABSENT_SCORE,
+            include_reference = INCLUDE_REFERENCE,
             nb_cores=CORES
 
     }
