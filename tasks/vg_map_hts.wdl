@@ -61,7 +61,7 @@ task runVGGIRAFFE {
         PAIR_ARGS=""
         if [ ~{paired_reads} == true ]
         then
-        PAIR_ARGS="-f ~{fastq_file_2}"
+            PAIR_ARGS="-f ~{fastq_file_2}"
         fi
 
         vg giraffe \
@@ -135,8 +135,8 @@ task extractReference {
 
         if [ ~{in_prefix_to_strip} != "" ]
         then
-        mv ref.fa ref.prefix.fa
-        sed -e "s/>~{in_prefix_to_strip}/>/g" ref.prefix.fa > ref.fa
+            mv ref.fa ref.prefix.fa
+            sed -e "s/>~{in_prefix_to_strip}/>/g" ref.prefix.fa > ref.fa
         fi
     }
     output {
@@ -153,30 +153,19 @@ task extractReference {
 task createDistanceIndex {
     input {
         File in_gbz_file
-        Int in_extract_mem = 60 + 20
+        Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
-
-    String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
+    String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
 
     command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
+        set -eux -o pipefail
 
-        vg index -j ~{out_prefix_name}.dist ~{in_gbz_file}
-
+        vg index -j "~{output_prefix}.dist" ~{in_gbz_file}
     }
 
     output {
-        File output_dist_index = "~{out_prefix_name}.dist"
+        File output_dist_index = "~{output_prefix}.dist"
     }
     runtime {
         preemptible: 2
@@ -185,15 +174,13 @@ task createDistanceIndex {
         docker: "quay.io/vgteam/vg:v1.50.0"
 
     }
-
 }
-
 
 task createRIndex {
     input {
         File in_gbz_file
         Int nb_cores = 16
-        Int in_extract_mem = 60 + 20
+        Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
 
@@ -229,14 +216,16 @@ task createRIndex {
 
 }
 
-
 task createHaplotypeIndex {
     input {
         File in_gbz_file
         File in_dist_index
         File in_R_index
+        Int kmer_length
+        Int window_length
+        Int subchain_length
         Int nb_cores = 16
-        Int in_extract_mem = 40 + 20
+        Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G")) + 20
     }
 
@@ -255,7 +244,7 @@ task createHaplotypeIndex {
         #to turn off echo do 'set +o xtrace'
 
 
-        vg haplotypes -v 2 -t ~{nb_cores} -d ~{in_dist_index} -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
+        vg haplotypes -v 2 --kmer-length ~{kmer_length} --window-length ~{window_length} --subchain-length ~{subchain_length} -t ~{nb_cores} -d ~{in_dist_index} -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
 
     }
 
@@ -273,21 +262,24 @@ task createHaplotypeIndex {
 
 }
 
-
 task samplingHaplotypes {
     input {
         File in_gbz_file
         File in_hap_index
         File in_kmer_info
-        String? output_file_name
-        String? working_directory
+        String output_file_name
+        String working_directory
+        Int haplotype_number
+        Float present_discount
+        Float het_adjust
+        Float absent_score
+        Boolean include_reference
         Int nb_cores = 16
-        Int in_extract_mem = 40 + 20
+        Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
     }
 
-
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -299,9 +291,22 @@ task samplingHaplotypes {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
+        INCLUDE_REF=""
+        if [ ~{include_reference} == true ]
+        then
+            PAIR_ARGS="--include-reference"
+        fi
 
-        vg haplotypes -v 2 -t ~{nb_cores} --include-reference -i ~{in_hap_index} -k ~{in_kmer_info} -g ~{working_directory}/~{output_file_name}.gbz ~{in_gbz_file}
-    }
+        vg haplotypes -v 2 -t ~{nb_cores} \
+        --num-haplotypes ~{haplotype_number} \
+        --present-discount ~{present_discount} \
+        --het-adjustment ~{het_adjust} \
+        --absent-score ~{absent_score} \
+        ${INCLUDE_REF} \
+        -i ~{in_hap_index} \
+        -k ~{in_kmer_info} \
+        -g ~{working_directory}/~{output_file_name}.gbz ~{in_gbz_file}
+    >>>
 
     output {
         File output_graph = working_directory+ "/" + output_file_name+".gbz"
@@ -316,3 +321,46 @@ task samplingHaplotypes {
     }
 
 }
+
+task createMinimizerIndex {
+    input {
+        File in_gbz_file
+        File in_dist_index
+        String out_name
+        Int nb_cores = 16
+        Int in_extract_mem = 120
+        Int in_extract_disk = 4 * round(size(in_gbz_file, "G") + size(in_dist_index, "G")) + 20
+    }
+
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        vg minimizer -p -t ~{nb_cores} -o ~{out_name}.min -d ~{in_dist_index} ~{in_gbz_file}
+
+    }
+
+    output {
+        File output_minimizer = "~{out_name}.min"
+    }
+    runtime {
+        preemptible: 2
+        cpu: nb_cores
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: "quay.io/vgteam/vg:v1.50.0"
+
+    }
+
+}
+
+
+
