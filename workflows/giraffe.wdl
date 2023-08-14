@@ -328,7 +328,7 @@ workflow Giraffe {
         File? output_gaf = mergeGAF.output_merged_gaf
         Array[File]? output_calling_bams = calling_bams
         Array[File]? output_calling_bam_indexes = calling_bam_indexes
-        File? test_ref = reference_file
+
     }   
 }
 

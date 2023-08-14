@@ -95,7 +95,11 @@ task createHaplotypeIndex {
         #to turn off echo do 'set +o xtrace'
 
 
-        vg haplotypes -v 2 --kmer-length ~{kmer_length} --window-length ~{window_length} --subchain-length ~{subchain_length} -t ~{nb_cores} -d ~{in_dist_index} -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
+        vg haplotypes -v 2 --kmer-length ~{kmer_length} \
+        --window-length ~{window_length} \
+        --subchain-length ~{subchain_length} \
+        -t ~{nb_cores} -d ~{in_dist_index} \
+        -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
 
     }
 
