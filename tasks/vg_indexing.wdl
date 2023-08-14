@@ -22,7 +22,7 @@ task createDistanceIndex {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.0"
+        docker: "quay.io/vgteam/vg:v1.50.1"
 
     }
 }
@@ -61,7 +61,7 @@ task createRIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.0"
+        docker: "quay.io/vgteam/vg:v1.50.1"
 
     }
 
@@ -111,7 +111,7 @@ task createHaplotypeIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.0"
+        docker: "quay.io/vgteam/vg:v1.50.1"
 
     }
 
@@ -152,7 +152,7 @@ task createMinimizerIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.0"
+        docker: "quay.io/vgteam/vg:v1.50.1"
 
     }
 
