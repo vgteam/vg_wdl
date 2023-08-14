@@ -161,7 +161,7 @@ task mergeGAF {
         memory: "6GB"
         cpu: 1
         disks: "local-disk " + in_disk + " SSD"
-        docker: "quay.io/vgteam/vg:ci-684-bc9aa5dfc4b0d14519ea47333075906a4ec74656"
+        docker: "quay.io/vgteam/vg:v1.50.0"
     }
 }
 
@@ -280,7 +280,7 @@ task surjectGAFtoBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:ci-684-bc9aa5dfc4b0d14519ea47333075906a4ec74656"
+        docker: "quay.io/vgteam/vg:v1.50.0"
     }
 }
 
