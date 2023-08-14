@@ -97,11 +97,11 @@ workflow Giraffe {
             INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
         }
 
-        File GBZ_FILE = HaplotypeSampling.sampled_graph
-        File DIST_FILE = HaplotypeSampling.sampled_dist
-        File MIN_FILE = HaplotypeSampling.sampled_min
-
     }
+
+    File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
+    File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
+    File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
 
 
     # Split input reads into chunks for parallelized mapping
@@ -123,7 +123,7 @@ workflow Giraffe {
             # calling on the decoys is semantically meaningless.
             call map.extractSubsetPathNames {
                 input:
-                    in_gbz_file=GBZ_FILE,
+                    in_gbz_file=file_gbz,
                     in_extract_mem=MAP_MEM
             }
         }
@@ -141,7 +141,7 @@ workflow Giraffe {
     if (!defined(REFERENCE_FILE)) {
         call map.extractReference {
             input:
-            in_gbz_file=GBZ_FILE,
+            in_gbz_file=file_gbz,
             in_path_list_file=pipeline_path_list_file,
             in_prefix_to_strip=REFERENCE_PREFIX,
             in_extract_mem=MAP_MEM
@@ -177,9 +177,9 @@ workflow Giraffe {
                 fastq_file_1=read_pair_chunk_files.left,
                 fastq_file_2=read_pair_chunk_files.right,
                 in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
+                in_gbz_file=file_gbz,
+                in_dist_file=file_dist,
+                in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -202,9 +202,9 @@ workflow Giraffe {
                 input:
                 fastq_file_1=read_pair_chunk_file,
                 in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
+                in_gbz_file=file_gbz,
+                in_dist_file=file_dist,
+                in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -227,7 +227,7 @@ workflow Giraffe {
         call gautils.surjectGAFtoBAM {
             input:
             in_gaf_file=gaf_file,
-            in_gbz_file=GBZ_FILE,
+            in_gbz_file=file_gbz,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
