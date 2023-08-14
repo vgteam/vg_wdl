@@ -3,6 +3,7 @@ version 1.0
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
+import "./haplotype_sampling.wdl" as hapl
 
 workflow Giraffe {
     meta {
@@ -37,6 +38,8 @@ workflow Giraffe {
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+        HAPLOTYPE_SAMPLING: "Whether ot not to use haplotype sampling before running giraffe. Default is 'false'"
+
     }
     input {
         File? INPUT_READ_FILE_1
@@ -67,6 +70,15 @@ workflow Giraffe {
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
         Int MAP_MEM = 120
+        Boolean HAPLOTYPE_SAMPLING = false
+    }
+
+    call hapl.HaplotypeSampling {
+        input:
+            GBZ_FILE=GBZ_FILE,
+            INPUT_READ_FILE_1=INPUT_READ_FILE_1,
+            INPUT_READ_FILE_2=INPUT_READ_FILE_2
+
     }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
