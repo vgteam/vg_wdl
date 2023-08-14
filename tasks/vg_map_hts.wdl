@@ -183,7 +183,7 @@ task samplingHaplotypes {
         INCLUDE_REF=""
         if [ ~{include_reference} == true ]
         then
-            PAIR_ARGS="--include-reference"
+            INCLUDE_REF="--include-reference"
         fi
 
         vg haplotypes -v 2 -t ~{nb_cores} \
