@@ -1,6 +1,7 @@
 version 1.0
 
 # vg map the reads in a SAM/BAM/CRAM file
+
 task vg_map_hts {
     input {
         File sam_bam_cram
@@ -42,7 +43,7 @@ task runVGGIRAFFE {
         String mem_gb = 120
         Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G')) + 50
     }
-    
+
     String out_prefix = sub(sub(sub(basename(fastq_file_1), "\\.gz$", ""), "\\.fastq$", ""), "\\.fq$", "")
     Boolean paired_reads = defined(fastq_file_2)
     command <<<
@@ -62,18 +63,18 @@ task runVGGIRAFFE {
         then
             PAIR_ARGS="-f ~{fastq_file_2}"
         fi
-        
+
         vg giraffe \
-          --progress \
-          --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --sample "~{in_sample_name}" \
-          ~{in_giraffe_options} \
-          --output-format gaf \
-          -f ~{fastq_file_1} ${PAIR_ARGS} \
-          -Z ~{in_gbz_file} \
-          -d ~{in_dist_file} \
-          -m ~{in_min_file} \
-          -t ~{nb_cores} | gzip > ~{out_prefix}.gaf.gz
+        --progress \
+        --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
+        --sample "~{in_sample_name}" \
+        ~{in_giraffe_options} \
+        --output-format gaf \
+        -f ~{fastq_file_1} ${PAIR_ARGS} \
+        -Z ~{in_gbz_file} \
+        -d ~{in_dist_file} \
+        -m ~{in_min_file} \
+        -t ~{nb_cores} | gzip > ~{out_prefix}.gaf.gz
     >>>
     output {
         File chunk_gaf_file = "~{out_prefix}.gaf.gz"
@@ -128,10 +129,10 @@ task extractReference {
         # Subset to just the paths we care about (may be the whole file) so we
         # get a good dict with just those paths later
         vg paths \
-           --extract-fasta \
-           -p ${in_path_list_file} \
-           --xg ${in_gbz_file} > ref.fa
-        
+        --extract-fasta \
+        -p ${in_path_list_file} \
+        --xg ${in_gbz_file} > ref.fa
+
         if [ ~{in_prefix_to_strip} != "" ]
         then
             mv ref.fa ref.prefix.fa
@@ -148,3 +149,66 @@ task extractReference {
         docker: "quay.io/vgteam/vg:ci-684-bc9aa5dfc4b0d14519ea47333075906a4ec74656"
     }
 }
+
+
+task samplingHaplotypes {
+    input {
+        File in_gbz_file
+        File in_hap_index
+        File in_kmer_info
+        String output_file_name
+        String working_directory
+        Int haplotype_number
+        Float present_discount
+        Float het_adjust
+        Float absent_score
+        Boolean include_reference
+        Int nb_cores = 16
+        Int in_extract_mem = 120
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        INCLUDE_REF=""
+        if [ ~{include_reference} == true ]
+        then
+            PAIR_ARGS="--include-reference"
+        fi
+
+        vg haplotypes -v 2 -t ~{nb_cores} \
+        --num-haplotypes ~{haplotype_number} \
+        --present-discount ~{present_discount} \
+        --het-adjustment ~{het_adjust} \
+        --absent-score ~{absent_score} \
+        ${INCLUDE_REF} \
+        -i ~{in_hap_index} \
+        -k ~{in_kmer_info} \
+        -g ~{working_directory}/~{output_file_name}.gbz ~{in_gbz_file}
+    >>>
+
+    output {
+        File output_graph = working_directory+ "/" + output_file_name+".gbz"
+    }
+    runtime {
+        preemptible: 2
+        cpu: nb_cores
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: "quay.io/vgteam/vg:v1.50.0"
+
+    }
+
+}
+
+

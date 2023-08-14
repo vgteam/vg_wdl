@@ -1,0 +1,5 @@
+{
+  "HaplotypeSampling.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
+  "HaplotypeSampling.INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
+  "HaplotypeSampling.INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz"
+}

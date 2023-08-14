@@ -3,6 +3,7 @@ version 1.0
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
+import "./haplotype_sampling.wdl" as hapl
 
 workflow Giraffe {
     meta {
@@ -37,6 +38,8 @@ workflow Giraffe {
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+        HAPLOTYPE_SAMPLING: "Whether ot not to use haplotype sampling before running giraffe. Default is 'false'"
+
     }
     input {
         File? INPUT_READ_FILE_1
@@ -67,7 +70,11 @@ workflow Giraffe {
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
         Int MAP_MEM = 120
+        Boolean HAPLOTYPE_SAMPLING = false
+
     }
+
+
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
 	    call utils.convertCRAMtoFASTQ {
@@ -81,7 +88,22 @@ workflow Giraffe {
     }
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
-    
+
+    if (HAPLOTYPE_SAMPLING) {
+        call hapl.HaplotypeSampling {
+        input:
+            IN_GBZ_FILE=GBZ_FILE,
+            INPUT_READ_FILE_FIRST=read_1_file,
+            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
+        }
+
+    }
+
+    File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
+    File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
+    File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
+
+
     # Split input reads into chunks for parallelized mapping
     call utils.splitReads as firstReadPair {
         input:
@@ -101,7 +123,7 @@ workflow Giraffe {
             # calling on the decoys is semantically meaningless.
             call map.extractSubsetPathNames {
                 input:
-                    in_gbz_file=GBZ_FILE,
+                    in_gbz_file=file_gbz,
                     in_extract_mem=MAP_MEM
             }
         }
@@ -119,7 +141,7 @@ workflow Giraffe {
     if (!defined(REFERENCE_FILE)) {
         call map.extractReference {
             input:
-            in_gbz_file=GBZ_FILE,
+            in_gbz_file=file_gbz,
             in_path_list_file=pipeline_path_list_file,
             in_prefix_to_strip=REFERENCE_PREFIX,
             in_extract_mem=MAP_MEM
@@ -155,9 +177,9 @@ workflow Giraffe {
                 fastq_file_1=read_pair_chunk_files.left,
                 fastq_file_2=read_pair_chunk_files.right,
                 in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
+                in_gbz_file=file_gbz,
+                in_dist_file=file_dist,
+                in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -180,9 +202,9 @@ workflow Giraffe {
                 input:
                 fastq_file_1=read_pair_chunk_file,
                 in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
+                in_gbz_file=file_gbz,
+                in_dist_file=file_dist,
+                in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -205,7 +227,7 @@ workflow Giraffe {
         call gautils.surjectGAFtoBAM {
             input:
             in_gaf_file=gaf_file,
-            in_gbz_file=GBZ_FILE,
+            in_gbz_file=file_gbz,
             in_path_list_file=pipeline_path_list_file,
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
