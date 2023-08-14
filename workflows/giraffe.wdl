@@ -73,13 +73,7 @@ workflow Giraffe {
         Boolean HAPLOTYPE_SAMPLING = false
     }
 
-    call hapl.HaplotypeSampling {
-        input:
-            IN_GBZ_FILE=GBZ_FILE,
-            INPUT_READ_FILE_FIRST=INPUT_READ_FILE_1,
-            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
 
-    }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
 	    call utils.convertCRAMtoFASTQ {
@@ -93,6 +87,14 @@ workflow Giraffe {
     }
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
+
+    call hapl.HaplotypeSampling {
+        input:
+            IN_GBZ_FILE=GBZ_FILE,
+            INPUT_READ_FILE_FIRST=read_1_file,
+            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
+
+    }
     
     # Split input reads into chunks for parallelized mapping
     call utils.splitReads as firstReadPair {
