@@ -12,9 +12,9 @@ workflow HaplotypeSampling {
     }
 
     parameter_meta {
-        GBZ_FILE: "Path to .gbz index file"
-        INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
-        INPUT_READ_FILE_2: "Input sample 2st read pair fastq.gz"
+        IN_GBZ_FILE: "Path to .gbz index file"
+        INPUT_READ_FILE_FIRST: "Input sample 1st read pair fastq.gz"
+        INPUT_READ_FILE_SECOND: "Input sample 2st read pair fastq.gz"
         HAPL_FILE: "Path to .hapl file"
         DIST_FILE: "Path to .dist file"
         R_INDEX_FILE: "Path to .ri file"
@@ -32,9 +32,9 @@ workflow HaplotypeSampling {
         INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)"
     }
     input {
-        File GBZ_FILE
-        File INPUT_READ_FILE_1
-        File? INPUT_READ_FILE_2
+        File IN_GBZ_FILE
+        File INPUT_READ_FILE_FIRST
+        File? INPUT_READ_FILE_SECOND
         File? HAPL_FILE
         File? DIST_FILE
         File? R_INDEX_FILE
@@ -68,7 +68,7 @@ workflow HaplotypeSampling {
         if (!defined(DIST_FILE)) {
             call index.createDistanceIndex {
                 input:
-                    in_gbz_file=GBZ_FILE
+                    in_gbz_file=IN_GBZ_FILE
             }
         }
 
@@ -77,7 +77,7 @@ workflow HaplotypeSampling {
         if (!defined(R_INDEX_FILE)) {
             call index.createRIndex {
                 input:
-                    in_gbz_file=GBZ_FILE,
+                    in_gbz_file=IN_GBZ_FILE,
                     nb_cores=CORES
             }
         }
@@ -87,7 +87,7 @@ workflow HaplotypeSampling {
         # create the haplotype information file
         call index.createHaplotypeIndex {
             input:
-                in_gbz_file=GBZ_FILE,
+                in_gbz_file=IN_GBZ_FILE,
                 in_dist_index=dist_index_file,
                 in_R_index=r_index_file,
                 nb_cores=CORES,
@@ -102,8 +102,8 @@ workflow HaplotypeSampling {
     if (!defined(KFF_FILE)) {
         call utils.kmerCountingKMC {
             input:
-                input_read_file_1=INPUT_READ_FILE_1,
-                input_read_file_2=INPUT_READ_FILE_2,
+                input_read_file_1=INPUT_READ_FILE_FIRST,
+                input_read_file_2=INPUT_READ_FILE_SECOND,
                 output_file_name=OUTPUT_NAME_PREFIX,
                 kmer_length=KMER_LENGTH,
                 working_directory=WORKING_DIRECTORY,
@@ -117,7 +117,7 @@ workflow HaplotypeSampling {
 
     call map.samplingHaplotypes {
         input:
-            in_gbz_file=GBZ_FILE,
+            in_gbz_file=IN_GBZ_FILE,
             in_hap_index=haplotype_index,
             in_kmer_info=kmer_information,
             output_file_name=OUTPUT_NAME_PREFIX,

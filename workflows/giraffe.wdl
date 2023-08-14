@@ -75,9 +75,9 @@ workflow Giraffe {
 
     call hapl.HaplotypeSampling {
         input:
-            GBZ_FILE=GBZ_FILE,
-            INPUT_READ_FILE_1=INPUT_READ_FILE_1,
-            INPUT_READ_FILE_2=INPUT_READ_FILE_2
+            IN_GBZ_FILE=GBZ_FILE,
+            INPUT_READ_FILE_FIRST=INPUT_READ_FILE_1,
+            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
 
     }
 
