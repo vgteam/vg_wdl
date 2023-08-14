@@ -2,6 +2,7 @@ version 1.0
 
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/vg_map_hts.wdl" as map
+import "../tasks/vg_indexing.wdl" as index
 
 workflow HaplotypeSampling {
     meta {
@@ -65,7 +66,7 @@ workflow HaplotypeSampling {
         # create the dist index file and r-index file to create the haplotype information file .hapl
 
         if (!defined(DIST_FILE)) {
-            call map.createDistanceIndex {
+            call index.createDistanceIndex {
                 input:
                     in_gbz_file=GBZ_FILE
             }
@@ -74,7 +75,7 @@ workflow HaplotypeSampling {
         File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
 
         if (!defined(R_INDEX_FILE)) {
-            call map.createRIndex {
+            call index.createRIndex {
                 input:
                     in_gbz_file=GBZ_FILE,
                     nb_cores=CORES
@@ -84,7 +85,7 @@ workflow HaplotypeSampling {
         File r_index_file = select_first([R_INDEX_FILE, createRIndex.output_R_index])
 
         # create the haplotype information file
-        call map.createHaplotypeIndex {
+        call index.createHaplotypeIndex {
             input:
                 in_gbz_file=GBZ_FILE,
                 in_dist_index=dist_index_file,
@@ -130,12 +131,12 @@ workflow HaplotypeSampling {
 
     }
 
-    call map.createDistanceIndex as giraffeDist {
+    call index.createDistanceIndex as giraffeDist {
                 input:
                     in_gbz_file=samplingHaplotypes.output_graph
     }
 
-    call map.createMinimizerIndex {
+    call index.createMinimizerIndex {
         input:
             in_gbz_file=samplingHaplotypes.output_graph,
             out_name=OUTPUT_NAME_PREFIX,
