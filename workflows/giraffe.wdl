@@ -71,6 +71,7 @@ workflow Giraffe {
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = false
+
     }
 
 
@@ -88,14 +89,21 @@ workflow Giraffe {
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
 
-    call hapl.HaplotypeSampling {
+    if (HAPLOTYPE_SAMPLING) {
+        call hapl.HaplotypeSampling {
         input:
             IN_GBZ_FILE=GBZ_FILE,
             INPUT_READ_FILE_FIRST=read_1_file,
             INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
+        }
+
+        File GBZ_FILE = HaplotypeSampling.sampled_graph
+        File DIST_FILE = HaplotypeSampling.sampled_dist
+        File MIN_FILE = HaplotypeSampling.sampled_min
 
     }
-    
+
+
     # Split input reads into chunks for parallelized mapping
     call utils.splitReads as firstReadPair {
         input:
