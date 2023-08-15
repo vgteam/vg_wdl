@@ -4,6 +4,7 @@ version 1.0
 task createDistanceIndex {
     input {
         File in_gbz_file
+        Int nb_cores = 16
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
@@ -12,7 +13,7 @@ task createDistanceIndex {
     command {
         set -eux -o pipefail
 
-        vg index -j "~{output_prefix}.dist" ~{in_gbz_file}
+        vg index -t ~{nb_cores} -j "~{output_prefix}.dist" ~{in_gbz_file}
     }
 
     output {
@@ -20,6 +21,7 @@ task createDistanceIndex {
     }
     runtime {
         preemptible: 2
+        cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
         docker: "quay.io/vgteam/vg:v1.50.1"

@@ -101,7 +101,7 @@ task extractSubsetPathNames {
 
         vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
 
-        grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM > path_list.sub.txt
+        grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM | grep -v chain_ > path_list.sub.txt
     }
     output {
         File output_path_list_file = "path_list.sub.txt"
