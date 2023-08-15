@@ -39,6 +39,17 @@ workflow Giraffe {
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether ot not to use haplotype sampling before running giraffe. Default is 'false'"
+        HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
+        R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
+        IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
+        IN_KMER_LENGTH: "(OPTIONAL) Size of kmer used in haplotype sampling (Up to 31) (Default: 29)"
+        IN_WINDOW_LENGTH: "Window length used for building the minimizer index used in haplotype sampling. (Default: 11)"
+        IN_SUBCHAIN_LENGTH: "Target length (in bp) for subchains used in haplotype sampling. (Default: 10000)"
+        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+        IN_PRESENT_DISCOUNT: "Multiplicative factor for discounting scores for present kmers used in haplotype sampling. (Default: 0.9)"
+        IN_HET_ADJUST: "Additive term for adjusting scores for heterozygous kmers used in haplotype sampling. (Default: 0.05)"
+        IN_ABSENT_SCORE: "Score for absent kmers used in haplotype sampling. (Default: 0.8)"
+        IN_INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the haplotype-sampled graph. (Default: true)"
 
     }
     input {
@@ -71,6 +82,17 @@ workflow Giraffe {
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = false
+        File? IN_HAPL_FILE
+        File? IN_R_INDEX_FILE
+        File? IN_KFF_FILE
+        Int? KMER_LENGTH
+        Int IN_WINDOW_LENGTH = 11
+        Int IN_SUBCHAIN_LENGTH = 10000
+        Int IN_HAPLOTYPE_NUMBER = 4
+        Float IN_PRESENT_DISCOUNT = 0.9
+        Float IN_HET_ADJUST = 0.05
+        Float IN_ABSENT_SCORE = 0.8
+        Boolean IN_INCLUDE_REFERENCE = true
 
     }
 
@@ -94,7 +116,20 @@ workflow Giraffe {
         input:
             IN_GBZ_FILE=GBZ_FILE,
             INPUT_READ_FILE_FIRST=read_1_file,
-            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2
+            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2,
+            HAPL_FILE=IN_HAPL_FILE,
+            IN_DIST_FILE=DIST_FILE,
+            R_INDEX_FILE=IN_R_INDEX_FILE,
+            KFF_FILE=IN_KFF_FILE,
+            IN_KMER_LENGTH=KMER_LENGTH,
+            CORES=MAP_CORES,
+            WINDOW_LENGTH=IN_WINDOW_LENGTH,
+            SUBCHAIN_LENGTH=IN_SUBCHAIN_LENGTH,
+            HAPLOTYPE_NUMBER=IN_HAPLOTYPE_NUMBER,
+            PRESENT_DISCOUNT=IN_PRESENT_DISCOUNT,
+            HET_ADJUST=IN_HET_ADJUST,
+            ABSENT_SCORE=IN_ABSENT_SCORE,
+            INCLUDE_REFERENCE=IN_INCLUDE_REFERENCE
         }
 
     }

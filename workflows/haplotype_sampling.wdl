@@ -16,7 +16,7 @@ workflow HaplotypeSampling {
         INPUT_READ_FILE_FIRST: "Input sample 1st read pair fastq.gz"
         INPUT_READ_FILE_SECOND: "Input sample 2st read pair fastq.gz"
         HAPL_FILE: "Path to .hapl file"
-        DIST_FILE: "Path to .dist file"
+        IN_DIST_FILE: "Path to .dist file"
         R_INDEX_FILE: "Path to .ri file"
         KFF_FILE: "Path to .kff file"
         IN_OUTPUT_NAME_PREFIX: "Name of the output file (Default: haplotype_sampled_graph)"
@@ -36,7 +36,7 @@ workflow HaplotypeSampling {
         File INPUT_READ_FILE_FIRST
         File? INPUT_READ_FILE_SECOND
         File? HAPL_FILE
-        File? DIST_FILE
+        File? IN_DIST_FILE
         File? R_INDEX_FILE
         File? KFF_FILE
         String? IN_OUTPUT_NAME_PREFIX
@@ -65,14 +65,14 @@ workflow HaplotypeSampling {
     if (!defined(HAPL_FILE)) {
         # create the dist index file and r-index file to create the haplotype information file .hapl
 
-        if (!defined(DIST_FILE)) {
+        if (!defined(IN_DIST_FILE)) {
             call index.createDistanceIndex {
                 input:
                     in_gbz_file=IN_GBZ_FILE
             }
         }
 
-        File dist_index_file = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
+        File dist_index_file = select_first([IN_DIST_FILE, createDistanceIndex.output_dist_index])
 
         if (!defined(R_INDEX_FILE)) {
             call index.createRIndex {
