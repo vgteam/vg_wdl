@@ -30,6 +30,7 @@ workflow HaplotypeSampling {
         HET_ADJUST: "Additive term for adjusting scores for heterozygous kmers. (Default: 0.05)"
         ABSENT_SCORE: "Score for absent kmers. (Default: 0.8)"
         INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)"
+        DIPLOID: "Activate diploid sampling. (Default: false)"
     }
     input {
         File IN_GBZ_FILE
@@ -50,6 +51,7 @@ workflow HaplotypeSampling {
         Float HET_ADJUST = 0.05
         Float ABSENT_SCORE = 0.8
         Boolean INCLUDE_REFERENCE = true
+        Boolean DIPLOID = false
 
 
     }
@@ -127,7 +129,9 @@ workflow HaplotypeSampling {
             het_adjust = HET_ADJUST,
             absent_score = ABSENT_SCORE,
             include_reference = INCLUDE_REFERENCE,
-            nb_cores=CORES
+            nb_cores=CORES,
+            use_diploid_sampling=DIPLOID
+
 
     }
 

@@ -163,6 +163,7 @@ task samplingHaplotypes {
         Float het_adjust
         Float absent_score
         Boolean include_reference
+        Boolean use_diploid_sampling
         Int nb_cores = 16
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
@@ -186,12 +187,18 @@ task samplingHaplotypes {
             INCLUDE_REF="--include-reference"
         fi
 
+        INCLUDE_DIPL=""
+        if [ ~{use_diploid_sampling} == true ]
+        then
+            INCLUDE_DIPL="--diploid-sampling"
+
         vg haplotypes -v 2 -t ~{nb_cores} \
         --num-haplotypes ~{haplotype_number} \
         --present-discount ~{present_discount} \
         --het-adjustment ~{het_adjust} \
         --absent-score ~{absent_score} \
         ${INCLUDE_REF} \
+        ${INCLUDE_DIPL} \
         -i ~{in_hap_index} \
         -k ~{in_kmer_info} \
         -g ~{working_directory}/~{output_file_name}.gbz ~{in_gbz_file}
@@ -205,7 +212,7 @@ task samplingHaplotypes {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "docker pull quay.io/vgteam/vg@sha256:ab9fd7f5d58415e61886f15d3eaef08831f5ec854f31577828f2e975cffbcf55"
 
     }
 
