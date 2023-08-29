@@ -191,6 +191,7 @@ task samplingHaplotypes {
         if [ ~{use_diploid_sampling} == true ]
         then
             INCLUDE_DIPL="--diploid-sampling"
+        fi
 
         vg haplotypes -v 2 -t ~{nb_cores} \
         --num-haplotypes ~{haplotype_number} \
