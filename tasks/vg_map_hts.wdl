@@ -212,7 +212,7 @@ task samplingHaplotypes {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "docker pull quay.io/vgteam/vg@sha256:ab9fd7f5d58415e61886f15d3eaef08831f5ec854f31577828f2e975cffbcf55"
+        docker: "quay.io/vgteam/vg@sha256:ab9fd7f5d58415e61886f15d3eaef08831f5ec854f31577828f2e975cffbcf55"
 
     }
 
