@@ -38,7 +38,7 @@ workflow Giraffe {
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
-        HAPLOTYPE_SAMPLING: "Whether ot not to use haplotype sampling before running giraffe. Default is 'false'"
+        HAPLOTYPE_SAMPLING: "Whether ot not to use haplotype sampling before running giraffe. Default is 'true'"
         HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
@@ -81,7 +81,7 @@ workflow Giraffe {
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
         Int MAP_MEM = 120
-        Boolean HAPLOTYPE_SAMPLING = false
+        Boolean HAPLOTYPE_SAMPLING = true
         File? IN_HAPL_FILE
         File? IN_R_INDEX_FILE
         File? IN_KFF_FILE

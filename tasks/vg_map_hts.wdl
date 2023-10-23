@@ -85,7 +85,7 @@ task runVGGIRAFFE {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.51.0"
     }
 }
 
@@ -110,7 +110,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.51.0"
     }
 }
 
@@ -146,7 +146,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.51.0"
     }
 }
 
@@ -213,7 +213,7 @@ task samplingHaplotypes {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg@sha256:ab9fd7f5d58415e61886f15d3eaef08831f5ec854f31577828f2e975cffbcf55"
+        docker: "quay.io/vgteam/vg:v1.51.0"
 
     }
 
