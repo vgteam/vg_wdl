@@ -1,4 +1,4 @@
-    vg\_wdl
+vg\_wdl
 ---------------
 Eric T Dawson, Mike Lin and Charles Markello, Jean Monlong, Adam Novak
 MIT License, 2023
