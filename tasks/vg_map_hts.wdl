@@ -157,7 +157,6 @@ task samplingHaplotypes {
         File in_hap_index
         File in_kmer_info
         String output_file_name
-        String working_directory
         Int haplotype_number
         Float present_discount
         Float het_adjust
@@ -202,11 +201,11 @@ task samplingHaplotypes {
         ${INCLUDE_DIPL} \
         -i ~{in_hap_index} \
         -k ~{in_kmer_info} \
-        -g ~{working_directory}/~{output_file_name}.gbz ~{in_gbz_file}
+        -g ~{output_file_name}.gbz ~{in_gbz_file}
     >>>
 
     output {
-        File output_graph = working_directory+ "/" + output_file_name+".gbz"
+        File output_graph = output_file_name+".gbz"
     }
     runtime {
         preemptible: 2

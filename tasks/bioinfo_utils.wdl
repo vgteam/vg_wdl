@@ -552,11 +552,10 @@ task kmerCountingKMC {
         File? input_read_file_2
         String output_file_name
 
-        String working_directory
         Int kmer_length
         Int max_ram = 64
 	    Int nb_cores = 16
-        Int disk_size = 200
+        Int disk_size = round(size(input_read_file_1, "G") + size(input_read_file_2, "G")) + 10
     }
 
     command <<<
@@ -574,12 +573,12 @@ task kmerCountingKMC {
     echo ~{input_read_file_1} > scratch_file.txt
     ~{if defined(input_read_file_2) then "echo ~{input_read_file_2} >> scratch_file.txt" else ""}
 
-    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt ~{working_directory}/~{output_file_name} ~{working_directory}
+    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt ~{output_file_name} .
 
     rm scratch_file.txt
     >>>
     output {
-        File kff_file = working_directory + "/" + output_file_name + ".kff"
+        File kff_file = output_file_name + ".kff"
     }
     runtime {
         preemptible: 2
