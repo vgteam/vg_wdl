@@ -544,3 +544,47 @@ task convertCRAMtoFASTQ {
         docker: "quay.io/biocontainers/samtools:1.14--hb421002_0"
     }    
 }
+
+
+task kmerCountingKMC {
+    input {
+        File input_read_file_1
+        File? input_read_file_2
+        String output_file_name
+
+        Int kmer_length
+        Int max_ram = 64
+	    Int nb_cores = 16
+        Int disk_size = round(size(input_read_file_1, "G") + size(input_read_file_2, "G")) + 10
+    }
+
+    command <<<
+    # Set the exit code of a pipeline to that of the rightmost command
+    # to exit with a non-zero status, or zero if all commands of the pipeline exit
+    set -o pipefail
+    # cause a bash script to exit immediately when a command fails
+    set -e
+    # cause the bash shell to treat unset variables as an error and exit immediately
+    set -u
+    # echo each line of the script to stdout so we can see what is happening
+    set -o xtrace
+    #to turn off echo do 'set +o xtrace'
+
+    echo ~{input_read_file_1} > scratch_file.txt
+    ~{if defined(input_read_file_2) then "echo ~{input_read_file_2} >> scratch_file.txt" else ""}
+
+    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt ~{output_file_name} .
+
+    rm scratch_file.txt
+    >>>
+    output {
+        File kff_file = output_file_name + ".kff"
+    }
+    runtime {
+        preemptible: 2
+        cpu: nb_cores
+        memory: max_ram + " GB"
+        disks: "local-disk " + disk_size + " SSD"
+        docker: "quay.io/biocontainers/kmc:3.2.1--hf1761c0_2"
+    }
+}
