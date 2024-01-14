@@ -41,7 +41,8 @@ workflow vgMultiMapCall {
             in_sample_name=SAMPLE_NAME,
             in_merged_bam_file=INPUT_BAM_FILE,
             in_merged_bam_file_index=INPUT_BAM_FILE_INDEX,
-            in_path_list_file=pipeline_path_list_file
+            in_path_list_file=pipeline_path_list_file,
+            mem_gb=if MAP_MEM < 20 then MAP_MEM else 20
     }
     # Run distributed Indel Realignment on contig BAMs
     scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) {

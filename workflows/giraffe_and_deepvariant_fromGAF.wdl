@@ -139,7 +139,8 @@ workflow GiraffeDeepVariantFromGAF {
         in_merged_bam_file=sortBAM.sorted_bam,
         in_merged_bam_file_index=sortBAM.sorted_bam_index,
         in_path_list_file=pipeline_path_list_file,
-        in_prefix_to_strip=REFERENCE_PREFIX
+        in_prefix_to_strip=REFERENCE_PREFIX,
+        mem_gb=if VG_MEM < 20 then VG_MEM else 20
     }
 
     ##
