@@ -10,5 +10,6 @@
   "Giraffe.OUTPUT_CALLING_BAMS": true,
   "Giraffe.OUTPUT_SINGLE_BAM": true,
   "Giraffe.MAP_MEM": 8,
-  "Giraffe.HAPLOTYPE_SAMPLING": true
+  "Giraffe.HAPLOTYPE_SAMPLING": true,
+  "Giraffe.MAP_CORES": 8
 }
