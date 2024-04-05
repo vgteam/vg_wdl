@@ -43,7 +43,7 @@ workflow Giraffe {
         HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
-        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 32)"
 
 
     }
@@ -81,7 +81,7 @@ workflow Giraffe {
         File? IN_HAPL_FILE
         File? IN_R_INDEX_FILE
         File? IN_KFF_FILE
-        Int IN_HAPLOTYPE_NUMBER = 4
+        Int IN_HAPLOTYPE_NUMBER = 32
 
     }
 
