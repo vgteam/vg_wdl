@@ -7,7 +7,8 @@ task runDeepVariantMakeExamples {
         File in_bam_file_index
         File in_reference_file
         File in_reference_index_file
-        Int in_min_mapq
+        String in_model_type = "WGS"
+        Int? in_min_mapq
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
         String in_other_makeexamples_arg = ""
@@ -49,6 +50,67 @@ task runDeepVariantMakeExamples {
           KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
         fi
 
+        MODEL_TYPE=~{in_model_type}
+        MODEL_TYPE_ARGS=()
+        # Determine extra make_example arguments for the given model type just like in DeepVariant's main wrapper script.
+        # See <https://github.com/google/deepvariant/blob/ab068c4588a02e2167051bd9e74c0c9579462b51/scripts/run_deepvariant.py#L243-L276>
+        case ${MODEL_TYPE} in
+            WGS)
+                MODEL_TYPE_ARGS+=(--channels insert_size)
+                if [ ~{defined(in_min_mapq)} == true ]; then
+                    # Add our min MAPQ override
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                fi
+                ;;
+
+            WES)
+                MODEL_TYPE_ARGS+=(--channels insert_size)
+                if [ ~{defined(in_min_mapq)} == true ]; then
+                    # Add our min MAPQ override
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                fi
+                ;;
+
+            PACBIO)
+                MODEL_TYPE_ARGS+=(--add_hp_channel)
+                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
+                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                MODEL_TYPE_ARGS+=(--partition_size 25000)
+                MODEL_TYPE_ARGS+=(--phase_reads)
+                MODEL_TYPE_ARGS+=(--pileup_image_width 199)
+                MODEL_TYPE_ARGS+=(--norealign_reads)
+                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                MODEL_TYPE_ARGS+=(--track_ref_reads)
+                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                ;;
+
+            ONT_R104)
+                MODEL_TYPE_ARGS+=(--add_hp_channel)
+                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
+                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                MODEL_TYPE_ARGS+=(--partition_size 25000)
+                MODEL_TYPE_ARGS+=(--phase_reads)
+                MODEL_TYPE_ARGS+=(--pileup_image_width 199)
+                MODEL_TYPE_ARGS+=(--norealign_reads)
+                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                MODEL_TYPE_ARGS+=(--track_ref_reads)
+                MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
+                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                ;;
+            
+            HYBRID_PACBIO_ILLUMINA)
+                if [ ~{defined(in_min_mapq)} == true ]; then
+                    # Add our min MAPQ override
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                fi
+                ;;
+        esac
+
+
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
@@ -57,9 +119,7 @@ task runDeepVariantMakeExamples {
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
         --sample_name ~{in_sample_name} \
         --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
-        --channels insert_size \
-        --min_mapping_quality ~{in_min_mapq} \
-        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg} \
+        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} "${MODEL_TYPE_ARGS[@]}" ~{in_other_makeexamples_arg} \
         --regions ${CONTIG_ID} \
         --task {}
         ls | grep 'make_examples.tfrecord-' | tar -czf 'make_examples.tfrecord.tar.gz' -T -
@@ -86,6 +146,7 @@ task runDeepVariantCallVariants {
         File in_reference_index_file
         File in_examples_file
         File in_nonvariant_site_tf_file
+        String in_model_type = "WGS"
         File? in_model_meta_file
         File? in_model_index_file
         File? in_model_data_file
@@ -114,6 +175,8 @@ task runDeepVariantCallVariants {
         ln -f -s ~{in_reference_file} reference.fa
         ln -f -s ~{in_reference_index_file} reference.fa.fai
 
+        MODEL_TYPE=~{in_model_type}
+
         # We should use an array here, but that doesn't seem to work the way I
         # usually do them (because of a set -u maybe?)
         if [[ ! -z "~{in_model_meta_file}" ]] ; then
@@ -122,10 +185,10 @@ task runDeepVariantCallVariants {
             ln -f -s "~{in_model_index_file}" model.index
             ln -f -s "~{in_model_data_file}" model.data-00000-of-00001
         else
-            # use default WGS models
-            ln -f -s "/opt/models/wgs/model.ckpt.meta" model.meta
-            ln -f -s "/opt/models/wgs/model.ckpt.index" model.index
-            ln -f -s "/opt/models/wgs/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
+            # use default models for type
+            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.meta" model.meta
+            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.index" model.index
+            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
         fi
         
         /opt/deepvariant/bin/call_variants \

@@ -36,18 +36,19 @@ workflow GiraffeDeepVariant {
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
-        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1"
+        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1. If null, uses DeepVariant default for the model type."
         MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
         GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default or fast)"
         GIRAFFE_OPTIONS: "(OPTIONAL) Extra command line options for Giraffe mapper"
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
         EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'."
-        DV_NORM_READS: "Should DV normalize reads itself? Default is 'fasle'."
+        DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
@@ -81,13 +82,14 @@ workflow GiraffeDeepVariant {
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
         Int REALIGNMENT_EXPANSION_BASES = 160
-        Int MIN_MAPQ = 1
+        Int? MIN_MAPQ = 1
         Int MAX_FRAGMENT_LENGTH = 3000
         String GIRAFFE_PRESET = "default"
         String GIRAFFE_OPTIONS = ""
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        String DV_MODEL_TYPE = "WGS"
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
         File? DV_MODEL_DATA
@@ -328,6 +330,7 @@ workflow GiraffeDeepVariant {
                 in_bam_file_index=calling_bam_index,
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
+                in_model_type=DV_MODEL_TYPE,
                 in_min_mapq=MIN_MAPQ,
                 in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
                 in_norm_reads=DV_NORM_READS,
@@ -342,6 +345,7 @@ workflow GiraffeDeepVariant {
                 in_reference_index_file=reference_index_file,
                 in_examples_file=runDeepVariantMakeExamples.examples_file,
                 in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
+                in_model_type=DV_MODEL_TYPE,
                 in_model_meta_file=DV_MODEL_META,
                 in_model_index_file=DV_MODEL_INDEX,
                 in_model_data_file=DV_MODEL_DATA,
