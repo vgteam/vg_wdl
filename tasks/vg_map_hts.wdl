@@ -140,8 +140,7 @@ task extractReference {
         -p ${in_path_list_file} \
         --xg ${in_gbz_file} > ref.fa
 
-        if [ ~{in_prefix_to_strip} != "" ]
-        then
+        if [ ! -z "~{in_prefix_to_strip}" ] ; then
             mv ref.fa ref.prefix.fa
             sed -e "s/>~{in_prefix_to_strip}/>/g" ref.prefix.fa > ref.fa
         fi
