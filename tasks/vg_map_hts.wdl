@@ -71,7 +71,7 @@ task runVGGIRAFFE {
         --progress \
         --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
         --sample "~{in_sample_name}" \
-        --parameter-preset ~{in_preset} \
+        -b ~{in_preset} \
         ~{in_giraffe_options} \
         --output-format gaf \
         -f ~{fastq_file_1} ${PAIR_ARGS} \
