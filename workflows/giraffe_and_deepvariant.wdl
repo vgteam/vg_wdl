@@ -21,7 +21,7 @@ workflow GiraffeDeepVariant {
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
-        ZIPCODES_FILE: "For chaining-based alignemnt, path to .zipcodes index file"
+        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignemnt, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'true'."
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed. Default is 'true'."
@@ -38,7 +38,8 @@ workflow GiraffeDeepVariant {
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
         MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1"
         MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
-        GIRAFFE_OPTIONS: "(OPTIONAL) extra command line options for Giraffe mapper"
+        GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default or fast)"
+        GIRAFFE_OPTIONS: "(OPTIONAL) Extra command line options for Giraffe mapper"
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
         EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
@@ -82,6 +83,7 @@ workflow GiraffeDeepVariant {
         Int REALIGNMENT_EXPANSION_BASES = 160
         Int MIN_MAPQ = 1
         Int MAX_FRAGMENT_LENGTH = 3000
+        String GIRAFFE_PRESET = "default"
         String GIRAFFE_OPTIONS = ""
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
@@ -188,6 +190,7 @@ workflow GiraffeDeepVariant {
                 input:
                 fastq_file_1=read_pair_chunk_files.left,
                 fastq_file_2=read_pair_chunk_files.right,
+                in_preset=GIRAFFE_PRESET,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
@@ -215,6 +218,7 @@ workflow GiraffeDeepVariant {
             call map.runVGGIRAFFE as runVGGIRAFFEse {
                 input:
                 fastq_file_1=read_pair_chunk_file,
+                in_preset=GIRAFFE_PRESET,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,

@@ -38,6 +38,7 @@ task runVGGIRAFFE {
         File in_dist_file
         File in_min_file
         File? in_zipcodes_file
+        String in_preset = "default"
         String in_giraffe_options
         String in_sample_name
         Int nb_cores = 16
@@ -70,6 +71,7 @@ task runVGGIRAFFE {
         --progress \
         --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
         --sample "~{in_sample_name}" \
+        --parameter-preset ~{in_preset} \
         ~{in_giraffe_options} \
         --output-format gaf \
         -f ~{fastq_file_1} ${PAIR_ARGS} \
