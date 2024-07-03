@@ -202,8 +202,7 @@ task sortBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        if [ ~{in_prefix_to_strip} != "" ]
-        then
+        if [ ! -z "~{in_prefix_to_strip}" ] ; then
             # patch the SQ fields from the dict into a new header
             samtools view -H ~{in_bam_file} | grep ^@HD > new_header.sam
             grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
@@ -422,8 +421,7 @@ task splitBAMbyPath {
         ln -s ~{in_merged_bam_file} input_bam_file.bam
         ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
 
-        if [ ~{in_prefix_to_strip} != "" ]
-        then
+        if [ ! -z "~{in_prefix_to_strip}" ] ; then
             sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_list_file} > paths.txt
         else
             cp ~{in_path_list_file} paths.txt
