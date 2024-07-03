@@ -52,6 +52,7 @@ workflow GiraffeDeepVariant {
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
+        VG_DOCKER: "Container image to use when running vg"
     }
 
     input {
@@ -94,6 +95,8 @@ workflow GiraffeDeepVariant {
         Int MAP_MEM = 120
         Int CALL_CORES = 8
         Int CALL_MEM = 50
+        # TODO: Should we use a different vg Docker just for mapping in case we have call caching?
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
     }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
@@ -129,7 +132,8 @@ workflow GiraffeDeepVariant {
             call map.extractSubsetPathNames {
                 input:
                     in_gbz_file=GBZ_FILE,
-                    in_extract_mem=MAP_MEM
+                    in_extract_mem=MAP_MEM,
+                    vg_docker=VG_DOCKER
             }
         }
     } 
@@ -149,7 +153,8 @@ workflow GiraffeDeepVariant {
             in_gbz_file=GBZ_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_prefix_to_strip=REFERENCE_PREFIX,
-            in_extract_mem=MAP_MEM
+            in_extract_mem=MAP_MEM,
+            vg_docker=VG_DOCKER
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
@@ -197,7 +202,8 @@ workflow GiraffeDeepVariant {
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
                 in_sample_name=SAMPLE_NAME,
                 nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM
+                mem_gb=MAP_MEM,
+                vg_docker=VG_DOCKER
             }
         }
     }
@@ -222,7 +228,8 @@ workflow GiraffeDeepVariant {
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
                 in_sample_name=SAMPLE_NAME,
                 nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM
+                mem_gb=MAP_MEM,
+                vg_docker=VG_DOCKER
             }
         }
     }
@@ -237,7 +244,8 @@ workflow GiraffeDeepVariant {
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
             in_paired_reads=PAIRED_READS,
-            mem_gb=MAP_MEM
+            mem_gb=MAP_MEM,
+            vg_docker=VG_DOCKER
         }
 
         call utils.sortBAM {
@@ -384,7 +392,8 @@ workflow GiraffeDeepVariant {
         call gautils.mergeGAF {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=gaf_chunks
+            in_gaf_chunk_files=gaf_chunks,
+            vg_docker=VG_DOCKER
         }
     }
 

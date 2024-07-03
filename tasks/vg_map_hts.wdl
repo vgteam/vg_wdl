@@ -10,7 +10,7 @@ task vg_map_hts {
         File gcsa_lcp
         File? gbwt
         String vg_map_options = ""
-        String vg_docker
+        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
     command <<<
@@ -42,6 +42,7 @@ task runVGGIRAFFE {
         Int nb_cores = 16
         String mem_gb = 120
         Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G')) + 50
+        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
     String out_prefix = sub(sub(sub(basename(fastq_file_1), "\\.gz$", ""), "\\.fastq$", ""), "\\.fq$", "")
@@ -85,7 +86,7 @@ task runVGGIRAFFE {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: vg_docker
     }
 }
 
@@ -94,6 +95,7 @@ task extractSubsetPathNames {
         File in_gbz_file
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
         Int in_extract_mem = 120
+        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
     command {
@@ -110,7 +112,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: vg_docker
     }
 }
 
@@ -121,6 +123,7 @@ task extractReference {
         String in_prefix_to_strip = ""
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
     command {
@@ -146,7 +149,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: vg_docker
     }
 }
 
@@ -166,6 +169,7 @@ task samplingHaplotypes {
         Int nb_cores = 16
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
     command <<<
@@ -212,7 +216,7 @@ task samplingHaplotypes {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: vg_docker
 
     }
 
