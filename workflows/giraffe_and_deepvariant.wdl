@@ -21,6 +21,7 @@ workflow GiraffeDeepVariant {
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
+        ZIPCODES_FILE: "For chaining-based alignemnt, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'true'."
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed. Default is 'true'."
@@ -64,6 +65,7 @@ workflow GiraffeDeepVariant {
         File GBZ_FILE
         File DIST_FILE
         File MIN_FILE
+        File? ZIPCODES_FILE
         String SAMPLE_NAME
         Boolean OUTPUT_GAF = true
         Boolean OUTPUT_SINGLE_BAM = false
@@ -190,6 +192,7 @@ workflow GiraffeDeepVariant {
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
                 in_min_file=MIN_FILE,
+                in_zipcodes_file=ZIPCODES_FILE,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -216,6 +219,7 @@ workflow GiraffeDeepVariant {
                 in_gbz_file=GBZ_FILE,
                 in_dist_file=DIST_FILE,
                 in_min_file=MIN_FILE,
+                in_zipcodes_file=ZIPCODES_FILE,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on

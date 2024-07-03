@@ -37,6 +37,7 @@ task runVGGIRAFFE {
         File in_gbz_file
         File in_dist_file
         File in_min_file
+        File? in_zipcodes_file
         String in_giraffe_options
         String in_sample_name
         Int nb_cores = 16
@@ -75,6 +76,7 @@ task runVGGIRAFFE {
         -Z ~{in_gbz_file} \
         -d ~{in_dist_file} \
         -m ~{in_min_file} \
+        ~{if defined(in_zipcodes_file) then "-z " + in_zipcodes_file else ""} \
         -t ~{nb_cores} | gzip > ~{out_prefix}.gaf.gz
     >>>
     output {
