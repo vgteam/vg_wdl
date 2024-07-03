@@ -43,7 +43,7 @@ task runVGGIRAFFE {
         String in_sample_name
         Int nb_cores = 16
         String mem_gb = 120
-        Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G')) + 50
+        Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G') + size(in_zipcodes_file, 'G')) + 50
         String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
