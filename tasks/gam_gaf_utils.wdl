@@ -177,6 +177,7 @@ task surjectGAFtoSortedBAM {
         File in_path_list_file
         String in_sample_name
         Boolean in_paired_reads = true
+        Boolean in_prune_low_complexity = true
         Int in_max_fragment_length = 3000
         Boolean make_bam_index = false
         Boolean input_is_gam = false
@@ -199,10 +200,14 @@ task surjectGAFtoSortedBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PAIR_ARGS=""
+        EXTRA_ARGS=()
         if [ ~{in_paired_reads} == true ]
         then
-            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+            EXTRA_ARGS+=(--interleaved --max-frag-len "~{in_max_fragment_length}")
+        fi
+
+        if [[ "~{in_prune_low_complexity}" == "true" ]] ; then
+            EXTRA_ARGS+=(--prune-low-cplx)
         fi
         
         vg surject \
@@ -212,7 +217,7 @@ task surjectGAFtoSortedBAM {
           --bam-output ~{true="" false="--gaf-input" input_is_gam} \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx $PAIR_ARGS \
+          "${EXTRA_ARGS[@]}" \
           ~{in_gaf_file} | samtools sort --threads ~{half_cores} \
                                        -O BAM > ~{out_prefix}.bam
 
@@ -241,6 +246,7 @@ task surjectGAFtoBAM {
         File in_path_list_file
         String in_sample_name
         Boolean in_paired_reads = true
+        Boolean in_prune_low_complexity = true
         Int in_max_fragment_length = 3000
         Boolean input_is_gam = false
         Int nb_cores = 16
@@ -261,10 +267,14 @@ task surjectGAFtoBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PAIR_ARGS=""
+        EXTRA_ARGS=()
         if [ ~{in_paired_reads} == true ]
         then
-            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+            EXTRA_ARGS+=(--interleaved --max-frag-len "~{in_max_fragment_length}")
+        fi
+
+        if [[ "~{in_prune_low_complexity}" == "true" ]] ; then
+            EXTRA_ARGS+=(--prune-low-cplx)
         fi
         
         vg surject \
@@ -274,7 +284,7 @@ task surjectGAFtoBAM {
           --bam-output ~{true="" false="--gaf-input" input_is_gam} \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx $PAIR_ARGS \
+          "${EXTRA_ARGS[@]}" \
           ~{in_gaf_file} > ~{out_prefix}.bam
     >>>
     output {
