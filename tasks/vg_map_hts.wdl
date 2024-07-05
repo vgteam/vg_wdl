@@ -97,18 +97,42 @@ task runVGGIRAFFE {
 task extractSubsetPathNames {
     input {
         File in_gbz_file
+        # If nonempty, we will subset any reference-sense paths to those with this prefix
+        String in_reference_prefix = ""
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
         Int in_extract_mem = 120
         String vg_docker = "quay.io/vgteam/vg:v1.51.0"
     }
 
-    command {
+    command <<<
         set -eux -o pipefail
+        
+        # First try listing reference-sense paths. May fail if vg doesn't have this yet.
+        vg paths --list --reference-paths -x ~{in_gbz_file} > raw_path_list.txt || touch raw_path_list.txt
 
-        vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
+        if [[ "$(wc -l raw_path_list.txt | cut -f1 -d" ")" -gt "0" ]] ; then
+            # We have reference-sense paths.
+            if [[ ! -z "~{in_reference_prefix}" ]] ; then
+                # Pull only the paths that actually have this prefix.
+                # Leave the prefix on.
+                grep "~{in_reference_prefix}" raw_path_list.txt | sort > path_list.txt
+            else
+                # Keep all the paths.
+                sort raw_path_list.txt > path_list.txt
+            fi
+        else
+            # Couldn't get reference paths. This is probably an old GBZ that predates them.
+            # Pull all contig names and assume they are paths also.
+            vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
+        fi
 
         grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM | grep -v chain_ > path_list.sub.txt
-    }
+
+        if [[ "$(wc -l path_list.sub.txt | cut -f1 -d" ")" == "0" ]] ; then
+            echo >&2 "Error: could not find any paths!"
+            exit 1
+        fi
+    >>>
     output {
         File output_path_list_file = "path_list.sub.txt"
     }

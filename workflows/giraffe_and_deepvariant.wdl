@@ -138,6 +138,7 @@ workflow GiraffeDeepVariant {
             call map.extractSubsetPathNames {
                 input:
                     in_gbz_file=GBZ_FILE,
+                    in_reference_prefix=REFERENCE_PREFIX,
                     in_extract_mem=MAP_MEM,
                     vg_docker=VG_DOCKER
             }
