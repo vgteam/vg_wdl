@@ -19,7 +19,7 @@ task uncompressReferenceIfNeeded {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        if [[ "$(file -b --mime-type ~{in_reference_file})" == "application/gzip" ]] ; then
+        if [[ ~{in_reference_file} == *.gz ]] ; then
             # Decompress
             pigz -d -c -p ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
         else 
