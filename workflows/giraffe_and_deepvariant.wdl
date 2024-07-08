@@ -166,7 +166,14 @@ workflow GiraffeDeepVariant {
             vg_docker=VG_DOCKER
         }
     }
-    File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
+    if (defined(REFERENCE_FILE)) {
+        call utils.uncompressReferenceIfNeeded {
+            input:
+            # We know REFERENCE_FILE is defined but the WDL type system doesn't.
+            in_reference_file=select_first([REFERENCE_FILE]),
+        }
+    }
+    File reference_file = select_first([uncompressReferenceIfNeeded.reference_file, extractReference.reference_file])
     
     if (!defined(REFERENCE_INDEX_FILE)) {
         call utils.indexReference {

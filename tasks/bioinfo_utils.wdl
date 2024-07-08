@@ -1,5 +1,45 @@
 version 1.0
 
+task uncompressReferenceIfNeeded {
+    input {
+        File in_reference_file
+        Int in_uncompress_cores = 4
+        Int in_uncompress_disk = 5 * round(size(in_reference_file, "G")) + 20
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        if [[ "$(file -b --mime-type ~{in_reference_file})" == "application/gzip" ]] ; then
+            # Decompress
+            pigz -d -c -p ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
+        else 
+            # It wasn't compressed. Link through.
+            ln -s ~{in_reference_file} "ref.fa"
+        fi
+    >>>
+    output {
+        File reference_file = "ref.fa"
+    }
+    runtime {
+        preemptible: 2
+        time: 20
+        cpu: in_uncompress_cores
+        memory: "2 GB"
+        disks: "local-disk " + in_uncompress_disk + " SSD"
+        docker: "quay.io/glennhickey/pigz:2.3.1"
+    }
+}
+
 task indexReference {
     input {
         File in_reference_file
