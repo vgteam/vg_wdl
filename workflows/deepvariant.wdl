@@ -170,6 +170,7 @@ workflow DeepVariant {
         File output_gvcf_index = concatClippedGVCFChunks.output_merged_vcf_index
         Array[File] output_calling_bams = calling_bam
         Array[File] output_calling_bam_indexes = calling_bam_index
+        File output_unmapped_bam = splitBAMbyPath.bam_unmapped_file
     }
 
 }

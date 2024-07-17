@@ -4,7 +4,7 @@ import "../tasks/variant_evaluation.wdl" as eval
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
-import "../tasks/deepvariant.wdl" as dv
+import "./deepvariant.wdl" as dv_wf
 
 workflow GiraffeDeepVariant {
 
@@ -32,7 +32,7 @@ workflow GiraffeDeepVariant {
         REFERENCE_PREFIX: "Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)"
         REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
-        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set"
+        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths."
         PRUNE_LOW_COMPLEXITY: "Whether or not to remove low-complexity or short in-tail anchors when surjecting and force tail realingment. Default is 'true'."
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
@@ -175,7 +175,7 @@ workflow GiraffeDeepVariant {
     }
     File reference_file = select_first([uncompressReferenceIfNeeded.reference_file, extractReference.reference_file])
     
-    if (!defined(REFERENCE_INDEX_FILE)) {
+    if (!defined(REFERENCE_INDEX_FILE) || !defined(REFERENCE_DICT_FILE)) {
         call utils.indexReference {
             input:
                 in_reference_file=reference_file
@@ -283,98 +283,32 @@ workflow GiraffeDeepVariant {
         in_alignment_bam_chunk_files=sortBAM.sorted_bam
     }
 
-    # Split merged alignment by contigs list
-    call utils.splitBAMbyPath {
+    # Run the DeepVariant calling workflow
+    call dv_wf.DeepVariant {
         input:
-        in_sample_name=SAMPLE_NAME,
-        in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-        in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
-        in_path_list_file=pipeline_path_list_file,
-        in_prefix_to_strip=REFERENCE_PREFIX
-    }
-
-    ##
-    ## Call variants with DeepVariant in each contig
-    ##
-    scatter (bam_and_index_for_path in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
-        ## Evantually shift and realign reads
-        if (LEFTALIGN_BAM){
-            # Just left-shift each read individually
-            call utils.leftShiftBAMFile {
-                input:
-                in_bam_file=bam_and_index_for_path.left,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file
-            }
-        }
-        if (REALIGN_INDELS) {
-            File forrealign_bam = select_first([leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
-            File forrealign_index = select_first([leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-            # Do indel realignment
-            call utils.prepareRealignTargets {
-                input:
-                in_bam_file=forrealign_bam,
-                in_bam_index_file=forrealign_index,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_reference_dict_file=reference_dict_file,
-                in_expansion_bases=REALIGNMENT_EXPANSION_BASES
-            }
-            call utils.runAbraRealigner {
-                input:
-                    in_bam_file=forrealign_bam,
-                    in_bam_index_file=forrealign_index,
-                    in_target_bed_file=prepareRealignTargets.output_target_bed_file,
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    # If the user has set a very low memory for mapping, don't use more for realignment
-                    memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
-            }
-        }
-        File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
-        File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-        ## DeepVariant calling
-        call dv.runDeepVariantMakeExamples {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_bam_file=calling_bam,
-                in_bam_file_index=calling_bam_index,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_model_type=DV_MODEL_TYPE,
-                in_min_mapq=MIN_MAPQ,
-                in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                in_norm_reads=DV_NORM_READS,
-                in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
-                in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
-        }
-        call dv.runDeepVariantCallVariants {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_examples_file=runDeepVariantMakeExamples.examples_file,
-                in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
-                in_model_type=DV_MODEL_TYPE,
-                in_model_meta_file=DV_MODEL_META,
-                in_model_index_file=DV_MODEL_INDEX,
-                in_model_data_file=DV_MODEL_DATA,
-                in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
-        }
-    }
-
-    # Merge distributed variant called VCFs
-    call utils.concatClippedVCFChunks {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_vcf_file
-    }
-    call utils.concatClippedVCFChunks as concatClippedGVCFChunks {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_gvcf_file
+        MERGED_BAM_FILE=mergeAlignmentBAMChunks.merged_bam_file,
+        MERGED_BAM_FILE_INDEX=mergeAlignmentBAMChunks.merged_bam_file_index,
+        SAMPLE_NAME=SAMPLE_NAME,
+        PATH_LIST_FILE=pipeline_path_list_file,
+        REFERENCE_PREFIX=REFERENCE_PREFIX,
+        REFERENCE_FILE=reference_file,
+        REFERENCE_INDEX_FILE=reference_index_file,
+        REFERENCE_DICT_FILE=reference_dict_file,
+        LEFTALIGN_BAM=LEFTALIGN_BAM,
+        REALIGN_INDELS=REALIGN_INDELS,
+        REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,
+        MIN_MAPQ=MIN_MAPQ,
+        DV_MODEL_TYPE=DV_MODEL_TYPE,
+        DV_MODEL_META=DV_MODEL_META,
+        DV_MODEL_INDEX=DV_MODEL_INDEX,
+        DV_MODEL_DATA=DV_MODEL_DATA,
+        DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
+        DV_NORM_READS=DV_NORM_READS,
+        OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
+        SPLIT_READ_CORES=SPLIT_READ_CORES,
+        REALIGN_MEM=if MAP_MEM < 40 then MAP_MEM else 40,
+        CALL_CORES=CALL_CORES,
+        CALL_MEM=CALL_MEM
     }
     
     if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
@@ -388,8 +322,8 @@ workflow GiraffeDeepVariant {
         # Direct vcfeval comparison makes an archive with FP and FN VCFs
         call eval.compareCalls {
             input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
+                in_sample_vcf_file=DeepVariant.output_vcf,
+                in_sample_vcf_index_file=DeepVariant.output_vcf_index,
                 in_truth_vcf_file=select_first([TRUTH_VCF]),
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_template_archive=buildReferenceTemplate.output_template_archive,
@@ -400,8 +334,8 @@ workflow GiraffeDeepVariant {
         # Hap.py comparison makes accuracy results stratified by SNPs and indels
         call eval.compareCallsHappy {
             input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
+                in_sample_vcf_file=DeepVariant.output_vcf,
+                in_sample_vcf_index_file=DeepVariant.output_vcf_index,
                 in_truth_vcf_file=select_first([TRUTH_VCF]),
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_reference_file=reference_file,
@@ -424,22 +358,22 @@ workflow GiraffeDeepVariant {
         call utils.mergeAlignmentBAMChunks as mergeBAM {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=select_all(flatten([calling_bam, [splitBAMbyPath.bam_unmapped_file]]))
+            in_alignment_bam_chunk_files=select_all(flatten([DeepVariant.output_calling_bams, [DeepVariant.output_unmapped_bam]]))
         }
     }
 
     if (!OUTPUT_SINGLE_BAM){
-        Array[File] output_calling_bam_files = calling_bam
-        Array[File] output_calling_bam_index_files = calling_bam_index
+        Array[File] output_calling_bam_files = DeepVariant.output_calling_bams
+        Array[File] output_calling_bam_index_files = DeepVariant.output_calling_bam_indexes
     }
 
     output {
         File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
         File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
-        File output_vcf = concatClippedVCFChunks.output_merged_vcf
-        File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
-        File output_gvcf = concatClippedGVCFChunks.output_merged_vcf
-        File output_gvcf_index = concatClippedGVCFChunks.output_merged_vcf_index
+        File output_vcf = DeepVariant.output_vcf
+        File output_vcf_index = DeepVariant.output_vcf_index
+        File output_gvcf = DeepVariant.output_gvcf
+        File output_gvcf_index = DeepVariant.output_gvcf_index
         File? output_gaf = mergeGAF.output_merged_gaf
         File? output_bam = mergeBAM.merged_bam_file
         File? output_bam_index = mergeBAM.merged_bam_file_index
