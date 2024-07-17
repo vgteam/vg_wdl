@@ -1,5 +1,6 @@
 version 1.0
 
+# Run DeepVariant example generation on a single-contig BAM named <sample>.<contig>(.indel_realigned)?(.left_shifted)?.bam
 task runDeepVariantMakeExamples {
     input {
         String in_sample_name
@@ -139,6 +140,7 @@ task runDeepVariantMakeExamples {
     }
 }
 
+# Run DeepVariant calling on a file of examples, on GPUs.
 task runDeepVariantCallVariants {
     input {
         String in_sample_name
@@ -152,6 +154,7 @@ task runDeepVariantCallVariants {
         File? in_model_data_file
         Int in_call_cores
         Int in_call_mem
+        Boolean in_use_gpus = true
         String in_dv_gpu_container = "google/deepvariant:1.5.0-gpu"
     }
     Int disk_size = 5 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 50
@@ -211,6 +214,7 @@ task runDeepVariantCallVariants {
         maxRetries: 5
         memory: in_call_mem + " GB"
         cpu: in_call_cores
+        gpu: in_use_gpus
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
