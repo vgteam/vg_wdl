@@ -417,6 +417,7 @@ task prepareRealignTargets {
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
+          -allowPotentiallyMisencodedQuals \
           -nt ~{thread_count} \
           -R reference.fa \
           -L ${CONTIG_ID} \
