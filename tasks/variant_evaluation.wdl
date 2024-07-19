@@ -77,6 +77,7 @@ task compareCallsHappy {
         File in_truth_vcf_index_file
         File in_reference_file
         File in_reference_index_file
+        File? in_template_archive
         File? in_evaluation_regions_file
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G") + size(in_reference_file, "G")) + 20
         Int in_mem = 16
@@ -84,13 +85,20 @@ task compareCallsHappy {
     }
     command <<<
         set -eux -o pipefail
-    
+        
+        TEMPLATE_ARGS=()
+        if [ ~{defined(in_template_archive)} == true ]; then
+            # Set up RTG template; we assume it drops a "template.sdf"
+            tar -xf "~{in_template_archive}"
+            TEMPLATE_ARGS+=(--engine-vcfeval-template template.sdf)
+        fi
+
         # Put sample and truth near their indexes
         ln -s "~{in_sample_vcf_file}" sample.vcf.gz
         ln -s "~{in_sample_vcf_index_file}" sample.vcf.gz.tbi
         ln -s "~{in_truth_vcf_file}" truth.vcf.gz
         ln -s "~{in_truth_vcf_index_file}" truth.vcf.gz.tbi
-        
+
         # Reference and its index must be adjacent and not at arbitrary paths
         # the runner gives.
         ln -f -s "~{in_reference_file}" reference.fa
@@ -105,6 +113,7 @@ task compareCallsHappy {
             --reference reference.fa \
             --threads ~{in_cores} \
             --engine=vcfeval \
+            "${TEMPLATE_ARGS[@]}" \
             -o happy_results/eval
     
         tar -czf happy_results.tar.gz happy_results/

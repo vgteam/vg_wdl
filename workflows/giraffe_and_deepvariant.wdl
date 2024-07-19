@@ -1,6 +1,5 @@
 version 1.0
 
-import "../tasks/variant_evaluation.wdl" as eval
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
@@ -298,6 +297,9 @@ workflow GiraffeDeepVariant {
         REALIGN_INDELS=REALIGN_INDELS,
         REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,
         MIN_MAPQ=MIN_MAPQ,
+        TRUTH_VCF=TRUTH_VCF,
+        TRUTH_VCF_INDEX=TRUTH_VCF_INDEX,
+        EVALUATION_REGIONS_BED=EVALUATION_REGIONS_BED,
         DV_MODEL_TYPE=DV_MODEL_TYPE,
         DV_MODEL_META=DV_MODEL_META,
         DV_MODEL_INDEX=DV_MODEL_INDEX,
@@ -311,39 +313,7 @@ workflow GiraffeDeepVariant {
         CALL_MEM=CALL_MEM
     }
     
-    if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
     
-        # To evaluate the VCF we need a template of the reference
-        call eval.buildReferenceTemplate {
-            input:
-                in_reference_file=reference_file
-        }
-        
-        # Direct vcfeval comparison makes an archive with FP and FN VCFs
-        call eval.compareCalls {
-            input:
-                in_sample_vcf_file=DeepVariant.output_vcf,
-                in_sample_vcf_index_file=DeepVariant.output_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_template_archive=buildReferenceTemplate.output_template_archive,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_mem=CALL_MEM
-        }
-        
-        # Hap.py comparison makes accuracy results stratified by SNPs and indels
-        call eval.compareCallsHappy {
-            input:
-                in_sample_vcf_file=DeepVariant.output_vcf,
-                in_sample_vcf_index_file=DeepVariant.output_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_mem=CALL_MEM
-        }
-    }
 
     if (OUTPUT_GAF){
         call gautils.mergeGAF {
@@ -368,8 +338,8 @@ workflow GiraffeDeepVariant {
     }
 
     output {
-        File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
-        File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
+        File? output_vcfeval_evaluation_archive = DeepVariant.output_vcfeval_evaluation_archive
+        File? output_happy_evaluation_archive = DeepVariant.output_happy_evaluation_archive
         File output_vcf = DeepVariant.output_vcf
         File output_vcf_index = DeepVariant.output_vcf_index
         File output_gvcf = DeepVariant.output_gvcf
