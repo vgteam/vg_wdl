@@ -68,10 +68,17 @@ workflow DeepVariant {
         Int CALL_MEM = 50
     }
 
+    call utils.uncompressReferenceIfNeeded {
+        input:
+        # We know REFERENCE_FILE is defined but the WDL type system doesn't.
+        in_reference_file=REFERENCE_FILE
+    }
+    File reference_file = uncompressReferenceIfNeeded.reference_file
+
     if (!defined(REFERENCE_INDEX_FILE) || !defined(REFERENCE_DICT_FILE)) {
         call utils.indexReference {
             input:
-                in_reference_file=REFERENCE_FILE
+                in_reference_file=reference_file
         }
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
@@ -97,7 +104,7 @@ workflow DeepVariant {
             call utils.leftShiftBAMFile {
                 input:
                 in_bam_file=bam_and_index_for_path.left,
-                in_reference_file=REFERENCE_FILE,
+                in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file
             }
         }
@@ -109,7 +116,7 @@ workflow DeepVariant {
                 input:
                 in_bam_file=forrealign_bam,
                 in_bam_index_file=forrealign_index,
-                in_reference_file=REFERENCE_FILE,
+                in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_reference_dict_file=reference_dict_file,
                 in_expansion_bases=REALIGNMENT_EXPANSION_BASES
@@ -119,7 +126,7 @@ workflow DeepVariant {
                     in_bam_file=forrealign_bam,
                     in_bam_index_file=forrealign_index,
                     in_target_bed_file=prepareRealignTargets.output_target_bed_file,
-                    in_reference_file=REFERENCE_FILE,
+                    in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     memoryGb=REALIGN_MEM
             }
@@ -132,7 +139,7 @@ workflow DeepVariant {
                 in_sample_name=SAMPLE_NAME,
                 in_bam_file=calling_bam,
                 in_bam_file_index=calling_bam_index,
-                in_reference_file=REFERENCE_FILE,
+                in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_model_type=DV_MODEL_TYPE,
                 in_min_mapq=MIN_MAPQ,
@@ -145,7 +152,7 @@ workflow DeepVariant {
         call dv.runDeepVariantCallVariants {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_reference_file=REFERENCE_FILE,
+                in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_examples_file=runDeepVariantMakeExamples.examples_file,
                 in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
@@ -175,7 +182,7 @@ workflow DeepVariant {
         # To evaluate the VCF we need a template of the reference
         call eval.buildReferenceTemplate {
             input:
-                in_reference_file=REFERENCE_FILE
+                in_reference_file=reference_file
         }
         
         # Direct vcfeval comparison makes an archive with FP and FN VCFs
@@ -197,7 +204,7 @@ workflow DeepVariant {
                 in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
                 in_truth_vcf_file=select_first([TRUTH_VCF]),
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_reference_file=REFERENCE_FILE,
+                in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_template_archive=buildReferenceTemplate.output_template_archive,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
