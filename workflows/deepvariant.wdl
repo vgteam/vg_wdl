@@ -198,7 +198,7 @@ workflow DeepVariant {
                 in_truth_vcf_file=select_first([TRUTH_VCF]),
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_reference_file=REFERENCE_FILE,
-                in_reference_index_file=REFERENCE_INDEX_FILE,
+                in_reference_index_file=reference_index_file,
                 in_template_archive=buildReferenceTemplate.output_template_archive,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
                 in_mem=CALL_MEM
