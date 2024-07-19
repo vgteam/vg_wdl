@@ -22,13 +22,15 @@ task uncompressReferenceIfNeeded {
         if [[ ~{in_reference_file} == *.gz ]] ; then
             # Decompress
             pigz -d -c -p ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
+            echo "decompressed" > control.txt
         else 
             # It wasn't compressed. Link through.
-            ln -s ~{in_reference_file} "ref.fa"
+            echo "pass-through" > control.txt
         fi
     >>>
     output {
-        File reference_file = "ref.fa"
+        # Pass through the input if we said we want to.
+        File reference_file = if read_lines("control.txt")[0] == "pass-through" then in_reference_file else "ref.fa"
     }
     runtime {
         preemptible: 2
