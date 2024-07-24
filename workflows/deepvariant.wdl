@@ -26,6 +26,7 @@ workflow DeepVariant {
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
         EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        TARGET_REGION: "contig or region to restrict evaluation to"
         DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
@@ -55,6 +56,7 @@ workflow DeepVariant {
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        String? TARGET_REGION
         String DV_MODEL_TYPE = "WGS"
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
@@ -194,6 +196,7 @@ workflow DeepVariant {
                 in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                 in_template_archive=buildReferenceTemplate.output_template_archive,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
+                in_target_region=TARGET_REGION,
                 in_mem=CALL_MEM
         }
         
@@ -208,6 +211,7 @@ workflow DeepVariant {
                 in_reference_index_file=reference_index_file,
                 in_template_archive=buildReferenceTemplate.output_template_archive,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
+                in_target_region=TARGET_REGION,
                 in_mem=CALL_MEM
         }
     }

@@ -30,6 +30,7 @@ task compareCalls {
         File in_truth_vcf_index_file
         File in_template_archive
         File? in_evaluation_regions_file
+        String? in_target_region
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G")) + 20
         Int in_mem = 16
         Int in_cores = 8
@@ -50,6 +51,7 @@ task compareCalls {
             --baseline truth.vcf.gz \
             --calls sample.vcf.gz \
             ~{"--evaluation-regions=" + in_evaluation_regions_file} \
+            ~{"--region=" + in_target_region} \
             --template template.sdf \
             --threads ~{in_cores} \
             --output vcfeval_results
@@ -79,6 +81,7 @@ task compareCallsHappy {
         File in_reference_index_file
         File? in_template_archive
         File? in_evaluation_regions_file
+        String? in_target_region
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G") + size(in_reference_file, "G")) + 20
         Int in_mem = 16
         Int in_cores = 8
@@ -110,6 +113,7 @@ task compareCallsHappy {
             truth.vcf.gz \
             sample.vcf.gz \
             ~{"-f " + in_evaluation_regions_file} \
+            ~{"-l " + in_target_region} \
             --pass-only \
             --reference reference.fa \
             --threads ~{in_cores} \
