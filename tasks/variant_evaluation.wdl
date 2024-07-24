@@ -110,6 +110,7 @@ task compareCallsHappy {
             truth.vcf.gz \
             sample.vcf.gz \
             ~{"-f " + in_evaluation_regions_file} \
+            --pass-only \
             --reference reference.fa \
             --threads ~{in_cores} \
             --engine=vcfeval \
