@@ -610,7 +610,7 @@ task runSplitJointGenotypedVCF {
     runtime {
         memory: 50 + " GB"
         disks: "local-disk 100 SSD"
-        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+        docker: "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
     }
 }
 

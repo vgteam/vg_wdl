@@ -1429,7 +1429,7 @@ task runVCFClipper {
     runtime {
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+        docker: "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
     }
 }
 
@@ -1465,7 +1465,7 @@ task concatClippedVCFChunks {
         time: 60
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+        docker: "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
     }
 }
 
@@ -1537,7 +1537,7 @@ task normalizeVCF {
         cpu: in_vgcall_cores
         memory: in_vgcall_mem + " GB"
         disks: "local-disk " + in_vgcall_disk + " SSD"
-        docker: "quay.io/biocontainers/bcftools@sha256:95c212df20552fc74670d8f16d20099d9e76245eda6a1a6cfff4bd39e57be01b"
+        docker: "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
     }
 }
 
