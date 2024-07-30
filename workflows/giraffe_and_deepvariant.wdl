@@ -43,6 +43,7 @@ workflow GiraffeDeepVariant {
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
         EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        RUN_STANDALONE_VCFEVAL: "whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)"
         DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
@@ -56,6 +57,8 @@ workflow GiraffeDeepVariant {
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
         VG_DOCKER: "Container image to use when running vg"
+        VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
+        VG_SURJECT_DOCKER: "Alternate container image to use when running vg surject"
     }
 
     input {
@@ -90,6 +93,7 @@ workflow GiraffeDeepVariant {
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        Boolean RUN_STANDALONE_VCFEVAL = true
         String DV_MODEL_TYPE = "WGS"
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
@@ -102,8 +106,9 @@ workflow GiraffeDeepVariant {
         Int MAP_MEM = 120
         Int CALL_CORES = 8
         Int CALL_MEM = 50
-        # TODO: Should we use a different vg Docker just for mapping in case we have call caching?
         String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
+        String? VG_GIRAFFE_DOCKER
+        String? VG_SURJECT_DOCKER
     }
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
@@ -220,7 +225,7 @@ workflow GiraffeDeepVariant {
                 in_sample_name=SAMPLE_NAME,
                 nb_cores=MAP_CORES,
                 mem_gb=MAP_MEM,
-                vg_docker=VG_DOCKER
+                vg_docker=select_first([VG_GIRAFFE_DOCKER, VG_DOCKER])
             }
         }
     }
@@ -248,7 +253,7 @@ workflow GiraffeDeepVariant {
                 in_sample_name=SAMPLE_NAME,
                 nb_cores=MAP_CORES,
                 mem_gb=MAP_MEM,
-                vg_docker=VG_DOCKER
+                vg_docker=select_first([VG_GIRAFFE_DOCKER, VG_DOCKER])
             }
         }
     }
@@ -265,7 +270,7 @@ workflow GiraffeDeepVariant {
             in_paired_reads=PAIRED_READS,
             in_prune_low_complexity=PRUNE_LOW_COMPLEXITY,
             mem_gb=MAP_MEM,
-            vg_docker=VG_DOCKER
+            vg_docker=select_first([VG_SURJECT_DOCKER, VG_DOCKER])
         }
 
         call utils.sortBAM {
@@ -300,6 +305,7 @@ workflow GiraffeDeepVariant {
         TRUTH_VCF=TRUTH_VCF,
         TRUTH_VCF_INDEX=TRUTH_VCF_INDEX,
         EVALUATION_REGIONS_BED=EVALUATION_REGIONS_BED,
+        RUN_STANDALONE_VCFEVAL=RUN_STANDALONE_VCFEVAL,
         DV_MODEL_TYPE=DV_MODEL_TYPE,
         DV_MODEL_META=DV_MODEL_META,
         DV_MODEL_INDEX=DV_MODEL_INDEX,

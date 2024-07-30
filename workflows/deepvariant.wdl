@@ -26,6 +26,7 @@ workflow DeepVariant {
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
         EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        RUN_STANDALONE_VCFEVAL: "whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)"
         TARGET_REGION: "contig or region to restrict evaluation to"
         DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
@@ -56,6 +57,7 @@ workflow DeepVariant {
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        Boolean RUN_STANDALONE_VCFEVAL = true
         String? TARGET_REGION
         String DV_MODEL_TYPE = "WGS"
         File? DV_MODEL_META
@@ -187,17 +189,19 @@ workflow DeepVariant {
                 in_reference_file=reference_file
         }
         
-        # Direct vcfeval comparison makes an archive with FP and FN VCFs
-        call eval.compareCalls {
-            input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_template_archive=buildReferenceTemplate.output_template_archive,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_target_region=TARGET_REGION,
-                in_mem=CALL_MEM
+        if (RUN_STANDALONE_VCFEVAL) {
+            # Direct vcfeval comparison makes an archive with FP and FN VCFs
+            call eval.compareCalls {
+                input:
+                    in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
+                    in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
+                    in_truth_vcf_file=select_first([TRUTH_VCF]),
+                    in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
+                    in_template_archive=buildReferenceTemplate.output_template_archive,
+                    in_evaluation_regions_file=EVALUATION_REGIONS_BED,
+                    in_target_region=TARGET_REGION,
+                    in_mem=CALL_MEM
+            }
         }
         
         # Hap.py comparison makes accuracy results stratified by SNPs and indels
