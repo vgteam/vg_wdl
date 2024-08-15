@@ -33,7 +33,7 @@ workflow DeepVariant {
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
-        DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'."
+        DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         REALIGN_MEM: "Memory, in GB, to use when realigning the reads. Default is 40."
