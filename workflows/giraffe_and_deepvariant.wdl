@@ -58,6 +58,10 @@ workflow GiraffeDeepVariant {
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'false'"
         IN_DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
+        HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
+        R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
+        IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
+        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
         VG_DOCKER: "Container image to use when running vg"
@@ -111,6 +115,10 @@ workflow GiraffeDeepVariant {
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = false
         Boolean IN_DIPLOID = true
+        File? IN_HAPL_FILE
+        File? IN_R_INDEX_FILE
+        File? IN_KFF_FILE
+        Int IN_HAPLOTYPE_NUMBER = 4
         Int CALL_CORES = 8
         Int CALL_MEM = 50
         String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
