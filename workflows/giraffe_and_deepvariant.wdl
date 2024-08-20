@@ -160,6 +160,7 @@ workflow GiraffeDeepVariant {
 
     File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
     File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
+    File file_zipcodes = select_first([HaplotypeSampling.sampled_zipcodes, ZIPCODES_FILE])
     File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
 
     
@@ -250,7 +251,7 @@ workflow GiraffeDeepVariant {
                 in_gbz_file=file_gbz,
                 in_dist_file=file_dist,
                 in_min_file=file_min,
-                in_zipcodes_file=ZIPCODES_FILE,
+                in_zipcodes_file=file_zipcodes,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -278,7 +279,7 @@ workflow GiraffeDeepVariant {
                 in_gbz_file=file_gbz,
                 in_dist_file=file_dist,
                 in_min_file=file_min,
-                in_zipcodes_file=ZIPCODES_FILE,
+                in_zipcodes_file=file_zipcodes,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
