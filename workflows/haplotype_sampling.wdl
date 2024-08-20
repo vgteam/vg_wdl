@@ -147,6 +147,7 @@ workflow HaplotypeSampling {
     output {
         File sampled_graph = samplingHaplotypes.output_graph
         File sampled_min = createMinimizerIndex.output_minimizer
+        File sampled_zipcodes = createMinimizerIndex.output_zipcodes
         File sampled_dist = giraffeDist.output_dist_index
     }
 

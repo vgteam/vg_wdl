@@ -142,12 +142,13 @@ task createMinimizerIndex {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        vg minimizer -p -t ~{nb_cores} -o ~{out_name}.min -d ~{in_dist_index} ~{in_gbz_file}
+        vg minimizer -p -t ~{nb_cores} -o ~{out_name}.min -z ~{out_name}.withzip.zipcodes -d ~{in_dist_index} ~{in_gbz_file}
 
     }
 
     output {
-        File output_minimizer = "~{out_name}.min"
+        File output_minimizer = "~{out_name}.withzip.min"
+        File output_zipcodes = "~{out_name}.zipcodes"
     }
     runtime {
         preemptible: 2
