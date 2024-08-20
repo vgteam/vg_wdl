@@ -133,7 +133,7 @@ task compareCallsHappy {
     }
     runtime {
         preemptible: 2
-        docker: "jmcdani20/hap.py:v0.3.12"
+        docker: "quay.io/adamnovak/hap.py:v0.3.15"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
         memory: in_mem + " GB"
