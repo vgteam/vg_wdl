@@ -155,7 +155,9 @@ task createMinimizerIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        #TODO: This should be put back to the actual official release
+        #docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:cache-lr-giraffe-sr-run"
 
     }
 
