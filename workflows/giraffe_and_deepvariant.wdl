@@ -152,6 +152,7 @@ workflow GiraffeDeepVariant {
             CORES=MAP_CORES,
             HAPLOTYPE_NUMBER=IN_HAPLOTYPE_NUMBER,
             DIPLOID=IN_DIPLOID,
+            VG_DOCKER=VG_DOCKER,
         }
 
     }

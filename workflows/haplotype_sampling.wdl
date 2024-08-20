@@ -50,6 +50,7 @@ workflow HaplotypeSampling {
         Float ABSENT_SCORE = 0.8
         Boolean INCLUDE_REFERENCE = true
         Boolean DIPLOID = true
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
 
 
     }
@@ -140,7 +141,8 @@ workflow HaplotypeSampling {
             in_gbz_file=samplingHaplotypes.output_graph,
             out_name=OUTPUT_NAME_PREFIX,
             in_dist_index=giraffeDist.output_dist_index,
-            nb_cores=CORES
+            nb_cores=CORES,
+            vg_docker=VG_DOCKER
 
     }
 
