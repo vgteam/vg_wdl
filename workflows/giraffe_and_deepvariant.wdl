@@ -42,7 +42,8 @@ workflow GiraffeDeepVariant {
         GIRAFFE_OPTIONS: "(OPTIONAL) Extra command line options for Giraffe mapper"
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
-        EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        EVALUATION_REGIONS_BED: "BED to evaluate against TRUTH_VCF on, where false positives will be counted"
+        RESTRICT_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
         TARGET_REGION: "contig or region to restrict evaluation to"
         RUN_STANDALONE_VCFEVAL: "whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)"
         DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
@@ -94,6 +95,7 @@ workflow GiraffeDeepVariant {
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        File? RESTRICT_REGIONS_BED
         String? TARGET_REGION
         Boolean RUN_STANDALONE_VCFEVAL = true
         String DV_MODEL_TYPE = "WGS"
@@ -307,6 +309,7 @@ workflow GiraffeDeepVariant {
         TRUTH_VCF=TRUTH_VCF,
         TRUTH_VCF_INDEX=TRUTH_VCF_INDEX,
         EVALUATION_REGIONS_BED=EVALUATION_REGIONS_BED,
+        RESTRICT_REGIONS_BED=RESTRICT_REGIONS_BED,
         TARGET_REGION=TARGET_REGION,
         RUN_STANDALONE_VCFEVAL=RUN_STANDALONE_VCFEVAL,
         DV_MODEL_TYPE=DV_MODEL_TYPE,

@@ -25,7 +25,8 @@ workflow DeepVariant {
         MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1. If null, uses DeepVariant default for the model type."
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
-        EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        EVALUATION_REGIONS_BED: "BED to evaluate against TRUTH_VCF on, where false positives will be counted"
+        RESTRICT_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
         TARGET_REGION: "contig or region to restrict evaluation to"
         RUN_STANDALONE_VCFEVAL: "whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)"
         DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
@@ -57,6 +58,7 @@ workflow DeepVariant {
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        File? RESTRICT_REGIONS_BED
         String? TARGET_REGION
         Boolean RUN_STANDALONE_VCFEVAL = true
         String DV_MODEL_TYPE = "WGS"
@@ -199,6 +201,7 @@ workflow DeepVariant {
                     in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
                     in_template_archive=buildReferenceTemplate.output_template_archive,
                     in_evaluation_regions_file=EVALUATION_REGIONS_BED,
+                    in_restrict_regions_file=RESTRICT_REGIONS_BED,
                     in_target_region=TARGET_REGION,
                     in_mem=CALL_MEM
             }
@@ -215,6 +218,7 @@ workflow DeepVariant {
                 in_reference_index_file=reference_index_file,
                 in_template_archive=buildReferenceTemplate.output_template_archive,
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
+                in_restrict_regions_file=RESTRICT_REGIONS_BED,
                 in_target_region=TARGET_REGION,
                 in_mem=CALL_MEM
         }
