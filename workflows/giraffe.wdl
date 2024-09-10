@@ -18,6 +18,7 @@ workflow Giraffe {
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
+        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignemnt, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? Default is 'true'."
         OUTPUT_CALLING_BAMS: "Should individual contig BAMs be saved? Default is 'false'."
@@ -30,10 +31,12 @@ workflow Giraffe {
         REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
         REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set"
+        PRUNE_LOW_COMPLEXITY: "Whether or not to remove low-complexity or short in-tail anchors when surjecting and force tail realingment. Default is 'true'."  
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
         MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
+        GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10)"  
         GIRAFFE_OPTIONS: "(OPTIONAL) extra command line options for Giraffe mapper"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
@@ -45,7 +48,9 @@ workflow Giraffe {
         IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
         IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
 
-
+        VG_DOCKER: "Container image to use when running vg"
+        VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
+        VG_SURJECT_DOCKER: "Alternate container image to use when running vg surject"
     }
     input {
         File? INPUT_READ_FILE_1
@@ -56,6 +61,7 @@ workflow Giraffe {
         File GBZ_FILE
         File DIST_FILE
         File MIN_FILE
+        File? ZIPCODES_FILE
         String SAMPLE_NAME
         Boolean OUTPUT_SINGLE_BAM = true
         Boolean OUTPUT_CALLING_BAMS = false
@@ -68,10 +74,12 @@ workflow Giraffe {
         File? REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
         File? REFERENCE_DICT_FILE
+        Boolean PRUNE_LOW_COMPLEXITY = true
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
         Int REALIGNMENT_EXPANSION_BASES = 160
         Int MAX_FRAGMENT_LENGTH = 3000
+        String GIRAFFE_PRESET = "default"
         String GIRAFFE_OPTIONS = ""
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
@@ -82,7 +90,10 @@ workflow Giraffe {
         File? IN_R_INDEX_FILE
         File? IN_KFF_FILE
         Int IN_HAPLOTYPE_NUMBER = 4
-
+        
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
+        String? VG_GIRAFFE_DOCKER
+        String? VG_SURJECT_DOCKER  
     }
 
 
@@ -119,6 +130,7 @@ workflow Giraffe {
 
     File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
     File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
+    File file_zipcodes = select_first([HaplotypeSampling.sampled_zipcodes, ZIPCODES_FILE])
     File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
 
 
@@ -142,7 +154,9 @@ workflow Giraffe {
             call map.extractSubsetPathNames {
                 input:
                     in_gbz_file=file_gbz,
-                    in_extract_mem=MAP_MEM
+                    in_reference_prefix=REFERENCE_PREFIX,
+                    in_extract_mem=MAP_MEM,
+                    vg_docker=VG_DOCKER
             }
         }
     } 
@@ -162,7 +176,8 @@ workflow Giraffe {
             in_gbz_file=file_gbz,
             in_path_list_file=pipeline_path_list_file,
             in_prefix_to_strip=REFERENCE_PREFIX,
-            in_extract_mem=MAP_MEM
+            in_extract_mem=MAP_MEM,
+            vg_docker=VG_DOCKER
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
@@ -194,9 +209,11 @@ workflow Giraffe {
                 input:
                 fastq_file_1=read_pair_chunk_files.left,
                 fastq_file_2=read_pair_chunk_files.right,
+                in_preset=GIRAFFE_PRESET,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_gbz_file=file_gbz,
                 in_dist_file=file_dist,
+                in_zipcodes_file=file_zipcodes,
                 in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
@@ -210,7 +227,8 @@ workflow Giraffe {
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
                 in_sample_name=SAMPLE_NAME,
                 nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM
+                mem_gb=MAP_MEM,
+                vg_docker=select_first([VG_GIRAFFE_DOCKER, VG_DOCKER])
             }
         }
     }
@@ -219,9 +237,11 @@ workflow Giraffe {
             call map.runVGGIRAFFE as runVGGIRAFFEse {
                 input:
                 fastq_file_1=read_pair_chunk_file,
+                in_preset=GIRAFFE_PRESET,
                 in_giraffe_options=GIRAFFE_OPTIONS,
                 in_gbz_file=file_gbz,
                 in_dist_file=file_dist,
+                in_zipcodes_file=file_zipcodes,
                 in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
@@ -235,7 +255,8 @@ workflow Giraffe {
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
                 in_sample_name=SAMPLE_NAME,
                 nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM
+                mem_gb=MAP_MEM,
+                vg_docker=select_first([VG_GIRAFFE_DOCKER, VG_DOCKER])
             }
         }
     }
@@ -250,7 +271,9 @@ workflow Giraffe {
             in_sample_name=SAMPLE_NAME,
             in_max_fragment_length=MAX_FRAGMENT_LENGTH,
             in_paired_reads=PAIRED_READS,
-            mem_gb=MAP_MEM
+            in_prune_low_complexity=PRUNE_LOW_COMPLEXITY,
+            mem_gb=MAP_MEM,
+            vg_docker=select_first([VG_SURJECT_DOCKER, VG_DOCKER])
         }
 
         call utils.sortBAM {
