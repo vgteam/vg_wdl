@@ -1,9 +1,9 @@
 version 1.0
 
 import "../tasks/bioinfo_utils.wdl" as utils
-import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
 import "./deepvariant.wdl" as dv_wf
+import "./giraffe.wdl" as giraffe_wf
 
 
 workflow GiraffeDeepVariant {
@@ -116,28 +116,6 @@ workflow GiraffeDeepVariant {
         String? VG_SURJECT_DOCKER
     }
 
-    if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
-	    call utils.convertCRAMtoFASTQ {
-            input:
-            in_cram_file=INPUT_CRAM_FILE,
-            in_ref_file=CRAM_REF,
-            in_ref_index_file=CRAM_REF_INDEX,
-            in_paired_reads=PAIRED_READS,
-            in_cores=SPLIT_READ_CORES
-	    }
-    }
-
-    File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
-    
-    # Split input reads into chunks for parallelized mapping
-    call utils.splitReads as firstReadPair {
-        input:
-            in_read_file=read_1_file,
-            in_pair_id="1",
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES
-    }
-    
     # Which path names to work on?
     if (!defined(CONTIGS)) {
         if (!defined(PATH_LIST_FILE)) {
@@ -192,111 +170,52 @@ workflow GiraffeDeepVariant {
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
     File reference_dict_file = select_first([REFERENCE_DICT_FILE, indexReference.reference_dict_file])
-    
-    ################################################################
-    # Distribute vg mapping operation over each chunked read pair #
-    ################################################################
-    if(PAIRED_READS){
-        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
-        call utils.splitReads as secondReadPair {
-            input:
-            in_read_file=read_2_file,
-            in_pair_id="2",
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES
-        }
-        Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
-        scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-            call map.runVGGIRAFFE as runVGGIRAFFEpe {
-                input:
-                fastq_file_1=read_pair_chunk_files.left,
-                fastq_file_2=read_pair_chunk_files.right,
-                in_preset=GIRAFFE_PRESET,
-                in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
-                in_zipcodes_file=ZIPCODES_FILE,
-                # We always need to pass a full dict file here, with lengths,
-                # because if we pass just path lists and the paths are not
-                # completely contained in the graph (like if we're working on
-                # GRCh38 paths in a CHM13-based graph), giraffe won't be able
-                # to get the path lengths and will crash.
-                # TODO: Somehow this problem is supposed to go away if we pull
-                # any GRCh38. prefix off the path names by setting
-                # REFERENCE_PREFIX and making sure the prefix isn't in the
-                # truth set.
-                # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                in_sample_name=SAMPLE_NAME,
-                nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM,
-                vg_docker=select_first([VG_GIRAFFE_DOCKER, VG_DOCKER])
-            }
-        }
-    }
-    if (!PAIRED_READS) {
-        scatter (read_pair_chunk_file in firstReadPair.output_read_chunks) {
-            call map.runVGGIRAFFE as runVGGIRAFFEse {
-                input:
-                fastq_file_1=read_pair_chunk_file,
-                in_preset=GIRAFFE_PRESET,
-                in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
-                in_zipcodes_file=ZIPCODES_FILE,
-                # We always need to pass a full dict file here, with lengths,
-                # because if we pass just path lists and the paths are not
-                # completely contained in the graph (like if we're working on
-                # GRCh38 paths in a CHM13-based graph), giraffe won't be able
-                # to get the path lengths and will crash.
-                # TODO: Somehow this problem is supposed to go away if we pull
-                # any GRCh38. prefix off the path names by setting
-                # REFERENCE_PREFIX and making sure the prefix isn't in the
-                # truth set.
-                # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                in_sample_name=SAMPLE_NAME,
-                nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM,
-                vg_docker=select_first([VG_GIRAFFE_DOCKER, VG_DOCKER])
-            }
-        }
-    }
 
-    Array[File] gaf_chunks = select_first([runVGGIRAFFEpe.chunk_gaf_file, runVGGIRAFFEse.chunk_gaf_file])
-    scatter (gaf_file in gaf_chunks) {
-        call gautils.surjectGAFtoBAM {
-            input:
-            in_gaf_file=gaf_file,
-            in_gbz_file=GBZ_FILE,
-            in_path_list_file=pipeline_path_list_file,
-            in_sample_name=SAMPLE_NAME,
-            in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_paired_reads=PAIRED_READS,
-            in_prune_low_complexity=PRUNE_LOW_COMPLEXITY,
-            mem_gb=MAP_MEM,
-            vg_docker=select_first([VG_SURJECT_DOCKER, VG_DOCKER])
-        }
-
-        call utils.sortBAM {
-            input:
-            in_bam_file=surjectGAFtoBAM.output_bam_file,
-            in_ref_dict=reference_dict_file,
-            in_prefix_to_strip=REFERENCE_PREFIX
-        }
-    }
-
-    call utils.mergeAlignmentBAMChunks {
+    # Run the giraffe mapping workflow.
+    # We don't do postprocessing in the Giraffe workflow, just the DV workflow.
+    call giraffe_wf.Giraffe {
         input:
-        in_sample_name=SAMPLE_NAME,
-        in_alignment_bam_chunk_files=sortBAM.sorted_bam
+        INPUT_READ_FILE_1=INPUT_READ_FILE_1,
+        INPUT_READ_FILE_2=INPUT_READ_FILE_2,
+        INPUT_CRAM_FILE=INPUT_CRAM_FILE,
+        CRAM_REF=CRAM_REF,
+        CRAM_REF_INDEX=CRAM_REF_INDEX,
+        GBZ_FILE=GBZ_FILE,
+        DIST_FILE=DIST_FILE,
+        MIN_FILE=MIN_FILE,
+        ZIPCODES_FILE=ZIPCODES_FILE,
+        SAMPLE_NAME=SAMPLE_NAME,
+        OUTPUT_SINGLE_BAM=true,
+        OUTPUT_CALLING_BAMS=false,
+        OUTPUT_GAF=OUTPUT_GAF,
+        PAIRED_READS=PAIRED_READS,
+        READS_PER_CHUNK=READS_PER_CHUNK,
+        PATH_LIST_FILE=pipeline_path_list_file,
+        CONTIGS=CONTIGS,
+        REFERENCE_PREFIX=REFERENCE_PREFIX,
+        REFERENCE_FILE=reference_file,
+        REFERENCE_INDEX_FILE=reference_index_file,
+        REFERENCE_DICT_FILE=reference_dict_file,
+        PRUNE_LOW_COMPLEXITY=PRUNE_LOW_COMPLEXITY,
+        LEFTALIGN_BAM=false,
+        REALIGN_INDELS=false,
+        MAX_FRAGMENT_LENGTH=MAX_FRAGMENT_LENGTH,
+        GIRAFFE_PRESET=GIRAFFE_PRESET,
+        GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
+        SPLIT_READ_CORES=SPLIT_READ_CORES,
+        MAP_CORES=MAP_CORES,
+        MAP_MEM=MAP_MEM,
+        HAPLOTYPE_SAMPLING=false,
+        VG_DOCKER=VG_DOCKER,
+        VG_GIRAFFE_DOCKER=VG_GIRAFFE_DOCKER,
+        VG_SURJECT_DOCKER=VG_SURJECT_DOCKER
     }
 
     # Run the DeepVariant calling workflow
     call dv_wf.DeepVariant {
         input:
-        MERGED_BAM_FILE=mergeAlignmentBAMChunks.merged_bam_file,
-        MERGED_BAM_FILE_INDEX=mergeAlignmentBAMChunks.merged_bam_file_index,
+        MERGED_BAM_FILE=select_first([Giraffe.output_bam]),
+        MERGED_BAM_FILE_INDEX=select_first([Giraffe.output_bam_index]),
         SAMPLE_NAME=SAMPLE_NAME,
         PATH_LIST_FILE=pipeline_path_list_file,
         REFERENCE_PREFIX=REFERENCE_PREFIX,
@@ -326,17 +245,6 @@ workflow GiraffeDeepVariant {
         CALL_MEM=CALL_MEM
     }
     
-    
-
-    if (OUTPUT_GAF){
-        call gautils.mergeGAF {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=gaf_chunks,
-            vg_docker=VG_DOCKER
-        }
-    }
-
     if (OUTPUT_SINGLE_BAM){
         call utils.mergeAlignmentBAMChunks as mergeBAM {
             input:
@@ -357,7 +265,7 @@ workflow GiraffeDeepVariant {
         File output_vcf_index = DeepVariant.output_vcf_index
         File output_gvcf = DeepVariant.output_gvcf
         File output_gvcf_index = DeepVariant.output_gvcf_index
-        File? output_gaf = mergeGAF.output_merged_gaf
+        File? output_gaf = Giraffe.output_gaf
         File? output_bam = mergeBAM.merged_bam_file
         File? output_bam_index = mergeBAM.merged_bam_file_index
         Array[File]? output_calling_bams = output_calling_bam_files

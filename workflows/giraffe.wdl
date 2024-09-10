@@ -262,97 +262,116 @@ workflow Giraffe {
     }
 
     Array[File] gaf_chunks = select_first([runVGGIRAFFEpe.chunk_gaf_file, runVGGIRAFFEse.chunk_gaf_file])
-    scatter (gaf_file in gaf_chunks) {
-        call gautils.surjectGAFtoBAM {
-            input:
-            in_gaf_file=gaf_file,
-            in_gbz_file=file_gbz,
-            in_path_list_file=pipeline_path_list_file,
-            in_sample_name=SAMPLE_NAME,
-            in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_paired_reads=PAIRED_READS,
-            in_prune_low_complexity=PRUNE_LOW_COMPLEXITY,
-            mem_gb=MAP_MEM,
-            vg_docker=select_first([VG_SURJECT_DOCKER, VG_DOCKER])
-        }
-
-        call utils.sortBAM {
-            input:
-            in_bam_file=surjectGAFtoBAM.output_bam_file,
-            in_ref_dict=reference_dict_file,
-            in_prefix_to_strip=REFERENCE_PREFIX
-        }
-    }
-
-    call utils.mergeAlignmentBAMChunks {
-        input:
-        in_sample_name=SAMPLE_NAME,
-        in_alignment_bam_chunk_files=sortBAM.sorted_bam
-    }
-
-    # Split merged alignment by contigs list
-    call utils.splitBAMbyPath {
-        input:
-        in_sample_name=SAMPLE_NAME,
-        in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-        in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
-        in_path_list_file=pipeline_path_list_file,
-        in_prefix_to_strip=REFERENCE_PREFIX
-    }
-
-    ##
-    ## Prepare each BAM
-    ##
-    scatter (bam_and_index_for_path in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
-        ## Evantually shift and realign reads
-        if (LEFTALIGN_BAM){
-            # Just left-shift each read individually
-            call utils.leftShiftBAMFile {
-                input:
-                in_bam_file=bam_and_index_for_path.left,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file
-            }
-        }
-        if (REALIGN_INDELS) {
-            File forrealign_bam = select_first([leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
-            File forrealign_index = select_first([leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-            # Do indel realignment
-            call utils.prepareRealignTargets {
-                input:
-                in_bam_file=forrealign_bam,
-                in_bam_index_file=forrealign_index,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_reference_dict_file=reference_dict_file,
-                in_expansion_bases=REALIGNMENT_EXPANSION_BASES
-            }
-            call utils.runAbraRealigner {
-                input:
-                    in_bam_file=forrealign_bam,
-                    in_bam_index_file=forrealign_index,
-                    in_target_bed_file=prepareRealignTargets.output_target_bed_file,
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    # If the user has set a very low memory for mapping, don't use more for realignment
-                    memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
-            }
-        }
-        File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
-        File processed_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-    }
     
-    if (OUTPUT_SINGLE_BAM){
-        call utils.mergeAlignmentBAMChunks as mergeBAM {
+    if (OUTPUT_SINGLE_BAM || OUTPUT_CALLING_BAMS) {
+        # We are outputting BAM so surjection is needed
+
+        scatter (gaf_file in gaf_chunks) {
+            call gautils.surjectGAFtoBAM {
+                input:
+                in_gaf_file=gaf_file,
+                in_gbz_file=file_gbz,
+                in_path_list_file=pipeline_path_list_file,
+                in_sample_name=SAMPLE_NAME,
+                in_max_fragment_length=MAX_FRAGMENT_LENGTH,
+                in_paired_reads=PAIRED_READS,
+                in_prune_low_complexity=PRUNE_LOW_COMPLEXITY,
+                mem_gb=MAP_MEM,
+                vg_docker=select_first([VG_SURJECT_DOCKER, VG_DOCKER])
+            }
+
+            call utils.sortBAM {
+                input:
+                in_bam_file=surjectGAFtoBAM.output_bam_file,
+                in_ref_dict=reference_dict_file,
+                in_prefix_to_strip=REFERENCE_PREFIX
+            }
+        }
+        
+        # Merge up the unprocessed surjected alignments
+        call utils.mergeAlignmentBAMChunks {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]]))
+            in_alignment_bam_chunk_files=sortBAM.sorted_bam
         }
-    }
-    
-    if (OUTPUT_CALLING_BAMS){
-        Array[File] calling_bams = processed_bam
-        Array[File] calling_bam_indexes = processed_bam_index
+
+        if (OUTPUT_CALLING_BAMS || LEFTALIGN_BAM || REALIGN_INDELS) {
+            # We will need to split up the BAM by contig to do processing on it.
+            # TODO: Unify BAM processing with deepvariant.wdl
+
+            # Split merged alignment by contigs list
+            call utils.splitBAMbyPath {
+                input:
+                in_sample_name=SAMPLE_NAME,
+                in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
+                in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
+                in_path_list_file=pipeline_path_list_file,
+                in_prefix_to_strip=REFERENCE_PREFIX
+            }
+
+            ##
+            ## Prepare each BAM
+            ##
+            scatter (bam_and_index_for_path in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
+                ## Evantually shift and realign reads
+                if (LEFTALIGN_BAM){
+                    # Just left-shift each read individually
+                    call utils.leftShiftBAMFile {
+                        input:
+                        in_bam_file=bam_and_index_for_path.left,
+                        in_reference_file=reference_file,
+                        in_reference_index_file=reference_index_file
+                    }
+                }
+                if (REALIGN_INDELS) {
+                    File forrealign_bam = select_first([leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
+                    File forrealign_index = select_first([leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
+                    # Do indel realignment
+                    call utils.prepareRealignTargets {
+                        input:
+                        in_bam_file=forrealign_bam,
+                        in_bam_index_file=forrealign_index,
+                        in_reference_file=reference_file,
+                        in_reference_index_file=reference_index_file,
+                        in_reference_dict_file=reference_dict_file,
+                        in_expansion_bases=REALIGNMENT_EXPANSION_BASES
+                    }
+                    call utils.runAbraRealigner {
+                        input:
+                            in_bam_file=forrealign_bam,
+                            in_bam_index_file=forrealign_index,
+                            in_target_bed_file=prepareRealignTargets.output_target_bed_file,
+                            in_reference_file=reference_file,
+                            in_reference_index_file=reference_index_file,
+                            # If the user has set a very low memory for mapping, don't use more for realignment
+                            memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
+                    }
+                }
+                File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
+                File processed_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
+            }
+        
+            if (OUTPUT_SINGLE_BAM && (LEFTALIGN_BAM || REALIGN_INDELS)){
+                # We're outputting one big BAM and we've actually made changes to the chunks. Put them back together.
+                call utils.mergeAlignmentBAMChunks as mergeBAM {
+                    input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]]))
+                }
+            }
+            
+            if (OUTPUT_CALLING_BAMS){
+                Array[File] calling_bams = processed_bam
+                Array[File] calling_bam_indexes = processed_bam_index
+            }
+        }
+
+        if (OUTPUT_SINGLE_BAM) {
+            # Find the single BAM and index that we want to output.
+            # We want the one after postprocessing if we did any, and the plain merged sorted BAM otherwise.
+            File single_bam = select_first([mergeBAM.merged_bam_file, mergeAlignmentBAMChunks.merged_bam_file])
+            File single_bam_index = select_first([mergeBAM.merged_bam_file_index, mergeAlignmentBAMChunks.merged_bam_file_index])
+        }
     }
     
     if (OUTPUT_GAF){
