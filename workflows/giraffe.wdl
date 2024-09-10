@@ -18,7 +18,7 @@ workflow Giraffe {
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
-        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignemnt, path to .zipcodes index file"
+        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignment, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? Default is 'true'."
         OUTPUT_CALLING_BAMS: "Should individual contig BAMs be saved? Default is 'false'."

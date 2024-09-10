@@ -21,7 +21,7 @@ workflow GiraffeDeepVariant {
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
-        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignemnt, path to .zipcodes index file"
+        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignment, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'true'."
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed. Default is 'true'."
