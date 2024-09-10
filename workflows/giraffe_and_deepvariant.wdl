@@ -173,6 +173,7 @@ workflow GiraffeDeepVariant {
 
     # Run the giraffe mapping workflow.
     # We don't do postprocessing in the Giraffe workflow, just the DV workflow.
+    # Otherwise we'd split to contig BAMs, process, re-merge, and re-split.
     call giraffe_wf.Giraffe {
         input:
         INPUT_READ_FILE_1=INPUT_READ_FILE_1,
