@@ -16,6 +16,7 @@ workflow DeepVariant {
         SAMPLE_NAME: "The sample name"
         PATH_LIST_FILE: "Text file where each line is a path name."
         REFERENCE_PREFIX: "Remove this off the beginning of path names to get contig names in the BAM (set to match prefix in PATH_LIST_FILE)"
+        REFERENCE_PREFIX_ON_BAM: "If true, the REFERENCE_PREFIX is also on the sequence names in the BAM header and needs to be removed."
         REFERENCE_FILE: "FASTA reference to call against."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
         REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths."
@@ -48,6 +49,7 @@ workflow DeepVariant {
         String SAMPLE_NAME
         File PATH_LIST_FILE
         String REFERENCE_PREFIX = ""
+        Boolean REFERENCE_PREFIX_ON_BAM = false
         File REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
         File? REFERENCE_DICT_FILE
@@ -97,7 +99,8 @@ workflow DeepVariant {
         in_merged_bam_file=MERGED_BAM_FILE,
         in_merged_bam_file_index=MERGED_BAM_FILE_INDEX,
         in_path_list_file=PATH_LIST_FILE,
-        in_prefix_to_strip=REFERENCE_PREFIX
+        in_prefix_to_strip=REFERENCE_PREFIX,
+        strip_from_bam=REFERENCE_PREFIX_ON_BAM
     }
 
     ##

@@ -453,6 +453,7 @@ task splitBAMbyPath {
         File in_merged_bam_file_index
         File in_path_list_file
         String in_prefix_to_strip = ""
+        Boolean strip_from_bam = false
         Int thread_count = 16
         Int disk_size = round(3 * size(in_merged_bam_file, 'G')) + 20
         Int mem_gb = 20
@@ -464,30 +465,68 @@ task splitBAMbyPath {
         ln -s ~{in_merged_bam_file} input_bam_file.bam
         ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
 
-        if [ ! -z "~{in_prefix_to_strip}" ] ; then
+        if [[ ! -z "~{in_prefix_to_strip}" ]] ; then
             sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_list_file} > paths.txt
         else
             cp ~{in_path_list_file} paths.txt
         fi
         
-        while read -r contig; do
+        while read -r CONTIG; do
+            if [[ ! -z "~{in_prefix_to_strip}" ]] ; then
+                PROCESSED_CONTIG="$(echo "${CONTIG}" | sed -e "s/~{in_prefix_to_strip}//g")"
+            else
+                PROCESSED_CONTIG="${CONTIG}"
+            fi
+            if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
+                # The contigs in the BAM are with the prefix
+                LOOKUP_CONTIG="${CONTIG}"
+                # We're going to run the extracted BAM through a pass of header modification
+                VIEW_BAM="bam_fifo"
+                rm -f "${VIEW_BAM}"
+                mkfifo "${VIEW_BAM}"
+            else
+                # The contigs in the BAM lack the prefix
+                LOOKUP_CONTIG="${PROCESSED_CONTIG}"
+                VIEW_BAM="~{in_sample_name}.${PROCESSED_CONTIG}.bam"
+            fi
             samtools view \
               -@ ~{thread_count} \
               -h -O BAM \
-              input_bam_file.bam ${contig} \
-              -o ~{in_sample_name}.${contig}.bam \
-            && samtools index \
-              ~{in_sample_name}.${contig}.bam
-        done < paths.txt
+              input_bam_file.bam "${LOOKUP_CONTIG}" >"${VIEW_BAM}" &
+            
+            if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
+                # We need another reheadering step to make the final BAM
+                samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" "${VIEW_BAM}" >"~{in_sample_name}.${PROCESSED_CONTIG}.bam" &
+            fi
+
+            wait
+            
+            samtools index "~{in_sample_name}.${PROCESSED_CONTIG}.bam"
+        done < ~{in_path_list_file}
 
         ## get unmapped reads
         mkdir unmapped
+        if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
+            VIEW_BAM="bam_fifo"
+            rm -f "${VIEW_BAM}"
+            mkfifo "${VIEW_BAM}"
+        else
+            VIEW_BAM="unmapped/~{in_sample_name}.unmapped.bam"
+        fi
+
         samtools view \
                  -@ ~{thread_count} \
                  -h -O BAM \
                  -f 4 \
                  input_bam_file.bam \
-                 -o unmapped/~{in_sample_name}.unmapped.bam \
+                 -o "${VIEW_BAM}" &
+        
+        if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
+            samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" "${VIEW_BAM}" >unmapped/~{in_sample_name}.unmapped.bam &
+        fi
+
+        wait
+
     >>>
     output {
         Array[File] bam_contig_files = glob("~{in_sample_name}.*.bam")
