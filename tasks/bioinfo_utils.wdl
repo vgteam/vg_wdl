@@ -527,7 +527,7 @@ task splitBAMbyPath {
         memory: mem_gb + " GB"
         cpu: thread_count
         disks: "local-disk " + disk_size + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+        docker: "staphb/samtools:1.20"
     }
 }
 
@@ -568,7 +568,7 @@ task mergeAlignmentBAMChunks {
         memory: mem_gb + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+        docker: "staphb/samtools:1.20"
     }
 }
 
@@ -610,7 +610,7 @@ task convertCRAMtoFASTQ {
         cpu: in_cores
         memory: "50 GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/biocontainers/samtools:1.14--hb421002_0"
+        docker: "staphb/samtools:1.20"
     }    
 }
 
