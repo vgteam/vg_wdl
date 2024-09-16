@@ -481,25 +481,19 @@ task splitBAMbyPath {
                 # The contigs in the BAM are with the prefix
                 LOOKUP_CONTIG="${CONTIG}"
                 # We're going to run the extracted BAM through a pass of header modification
-                VIEW_BAM="bam_fifo"
-                rm -f "${VIEW_BAM}"
-                mkfifo "${VIEW_BAM}"
+                samtools view \
+                  -@ ~{thread_count} \
+                  -h -O BAM \
+                  input_bam_file.bam "${LOOKUP_CONTIG}" | \
+                samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" - >"~{in_sample_name}.${PROCESSED_CONTIG}.bam"
             else
                 # The contigs in the BAM lack the prefix
                 LOOKUP_CONTIG="${PROCESSED_CONTIG}"
-                VIEW_BAM="~{in_sample_name}.${PROCESSED_CONTIG}.bam"
+                samtools view \
+                  -@ ~{thread_count} \
+                  -h -O BAM \
+                  input_bam_file.bam "${LOOKUP_CONTIG}" >"~{in_sample_name}.${PROCESSED_CONTIG}.bam"
             fi
-            samtools view \
-              -@ ~{thread_count} \
-              -h -O BAM \
-              input_bam_file.bam "${LOOKUP_CONTIG}" >"${VIEW_BAM}" &
-            
-            if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
-                # We need another reheadering step to make the final BAM
-                samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" "${VIEW_BAM}" >"~{in_sample_name}.${PROCESSED_CONTIG}.bam" &
-            fi
-
-            wait
             
             samtools index "~{in_sample_name}.${PROCESSED_CONTIG}.bam"
         done < ~{in_path_list_file}
@@ -507,25 +501,20 @@ task splitBAMbyPath {
         ## get unmapped reads
         mkdir unmapped
         if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
-            VIEW_BAM="bam_fifo"
-            rm -f "${VIEW_BAM}"
-            mkfifo "${VIEW_BAM}"
+            samtools view \
+                -@ ~{thread_count} \
+                -h -O BAM \
+                -f 4 \
+                input_bam_file.bam | \
+            samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" - >unmapped/~{in_sample_name}.unmapped.bam
         else
-            VIEW_BAM="unmapped/~{in_sample_name}.unmapped.bam"
+            samtools view \
+                -@ ~{thread_count} \
+                -h -O BAM \
+                -f 4 \
+                input_bam_file.bam \
+                -o "unmapped/~{in_sample_name}.unmapped.bam"
         fi
-
-        samtools view \
-                 -@ ~{thread_count} \
-                 -h -O BAM \
-                 -f 4 \
-                 input_bam_file.bam \
-                 -o "${VIEW_BAM}" &
-        
-        if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
-            samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" "${VIEW_BAM}" >unmapped/~{in_sample_name}.unmapped.bam &
-        fi
-
-        wait
 
     >>>
     output {
