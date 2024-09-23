@@ -54,6 +54,8 @@ workflow GiraffeDeepVariant {
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
         DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
+        DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs"
+        DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
@@ -106,6 +108,8 @@ workflow GiraffeDeepVariant {
         Boolean DV_KEEP_LEGACY_AC = true
         Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
+        String? DV_NO_GPU_DOCKER
+        String? DV_GPU_DOCKER
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
         Int MAP_MEM = 120
@@ -240,6 +244,8 @@ workflow GiraffeDeepVariant {
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
         DV_NORM_READS=DV_NORM_READS,
         OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
+        DV_NO_GPU_DOCKER=DV_NO_GPU_DOCKER,
+        DV_GPU_DOCKER=DV_GPU_DOCKER,
         SPLIT_READ_CORES=SPLIT_READ_CORES,
         REALIGN_MEM=if MAP_MEM < 40 then MAP_MEM else 40,
         CALL_CORES=CALL_CORES,

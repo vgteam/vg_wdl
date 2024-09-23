@@ -37,6 +37,8 @@ workflow DeepVariant {
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
         DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
+        DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs"
+        DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         REALIGN_MEM: "Memory, in GB, to use when realigning the reads. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
@@ -70,6 +72,8 @@ workflow DeepVariant {
         Boolean DV_KEEP_LEGACY_AC = true
         Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
+        String? DV_NO_GPU_DOCKER
+        String? DV_GPU_DOCKER
         Int SPLIT_READ_CORES = 8
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
@@ -155,6 +159,7 @@ workflow DeepVariant {
                 in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
                 in_norm_reads=DV_NORM_READS,
                 in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
+                in_dv_container=DV_NO_GPU_DOCKER,
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
         }
@@ -169,6 +174,7 @@ workflow DeepVariant {
                 in_model_meta_file=DV_MODEL_META,
                 in_model_index_file=DV_MODEL_INDEX,
                 in_model_data_file=DV_MODEL_DATA,
+                in_dv_gpu_container=DV_GPU_DOCKER,
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
         }
