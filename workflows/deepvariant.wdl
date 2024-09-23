@@ -23,7 +23,7 @@ workflow DeepVariant {
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'. If true, all input reads, including secondaries, must have the read sequence given."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'. If true, all input reads must be in a read group."
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
-        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1. If null, uses DeepVariant default for the model type."
+        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is the DeepVariant default for the model type."
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
         EVALUATION_REGIONS_BED: "BED to evaluate against TRUTH_VCF on, where false positives will be counted"
@@ -58,7 +58,7 @@ workflow DeepVariant {
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
         Int REALIGNMENT_EXPANSION_BASES = 160
-        Int? MIN_MAPQ = 1
+        Int? MIN_MAPQ
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED

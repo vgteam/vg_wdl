@@ -37,7 +37,7 @@ workflow GiraffeDeepVariant {
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
-        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1. If null, uses DeepVariant default for the model type."
+        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is the DeepVariant default for the model type."
         MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
         GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10)"
         GIRAFFE_OPTIONS: "(OPTIONAL) Extra command line options for Giraffe mapper"
@@ -91,7 +91,7 @@ workflow GiraffeDeepVariant {
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
         Int REALIGNMENT_EXPANSION_BASES = 160
-        Int? MIN_MAPQ = 1
+        Int? MIN_MAPQ
         Int MAX_FRAGMENT_LENGTH = 3000
         String GIRAFFE_PRESET = "default"
         String GIRAFFE_OPTIONS = ""
