@@ -383,8 +383,8 @@ workflow Giraffe {
     }
     
     output {
-        File? output_bam = mergeBAM.merged_bam_file
-        File? output_bam_index = mergeBAM.merged_bam_file_index
+        File? output_bam = single_bam
+        File? output_bam_index = single_bam_index
         File? output_gaf = mergeGAF.output_merged_gaf
         Array[File]? output_calling_bams = calling_bams
         Array[File]? output_calling_bam_indexes = calling_bam_indexes
