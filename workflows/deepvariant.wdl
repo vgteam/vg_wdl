@@ -39,7 +39,6 @@ workflow DeepVariant {
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs"
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs"
-        SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         REALIGN_MEM: "Memory, in GB, to use when realigning the reads. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
@@ -74,7 +73,6 @@ workflow DeepVariant {
         String OTHER_MAKEEXAMPLES_ARG = ""
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
-        Int SPLIT_READ_CORES = 8
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
         Int CALL_MEM = 50
