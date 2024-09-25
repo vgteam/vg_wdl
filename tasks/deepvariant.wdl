@@ -131,11 +131,20 @@ task runDeepVariantMakeExamples {
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
+        ls -lah model_dir
+        CHECKPOINT_INDEX_FILES=(model_dir/*.ckpt.index)
+        if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
+            # This is a checkpoint-format model and we need to name it by passing this path without the .index
+            CHECKPOINT_NAME="${CHECKPOINT_INDEX_FILES[0]%.index}"
+        else
+            # This is a savedmodel-format model and is named just by the directory
+            CHECKPOINT_NAME="model_dir"
+        fi
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
-        --checkpoint model_dir \
+        --checkpoint "${CHECKPOINT_NAME}" \
         --ref reference.fa \
         --reads input_bam_file.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
@@ -208,11 +217,20 @@ task runDeepVariantCallVariants {
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
+        ls -lah model_dir
+        CHECKPOINT_INDEX_FILES=(model_dir/*.ckpt.index)
+        if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
+            # This is a checkpoint-format model and we need to name it by passing this path without the .index
+            CHECKPOINT_NAME="${CHECKPOINT_INDEX_FILES[0]%.index}"
+        else
+            # This is a savedmodel-format model and is named just by the directory
+            CHECKPOINT_NAME="model_dir"
+        fi
         
         /opt/deepvariant/bin/call_variants \
         --outfile call_variants_output.tfrecord.gz \
         --examples "make_examples.tfrecord@~{in_call_cores}.gz" \
-        --checkpoint model_dir && \
+        --checkpoint "${CHECKPOINT_NAME}" && \
         /opt/deepvariant/bin/postprocess_variants \
         --ref reference.fa \
         --infile call_variants_output.tfrecord.gz \
