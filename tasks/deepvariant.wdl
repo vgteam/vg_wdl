@@ -131,7 +131,7 @@ task runDeepVariantMakeExamples {
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
-        ls -lah model_dir
+        ls -lah model_dir >&2
         CHECKPOINT_INDEX_FILES=(model_dir/*.ckpt.index)
         if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
             # This is a checkpoint-format model and we need to name it by passing this path without the .index
@@ -217,7 +217,7 @@ task runDeepVariantCallVariants {
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
-        ls -lah model_dir
+        ls -lah model_dir >&2
         CHECKPOINT_INDEX_FILES=(model_dir/*.ckpt.index)
         if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
             # This is a checkpoint-format model and we need to name it by passing this path without the .index
