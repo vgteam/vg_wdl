@@ -16,7 +16,7 @@ task runDeepVariantMakeExamples {
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
         String in_other_makeexamples_arg = ""
-        Boolean in_use_channel_list = false # Needs to be True for DV 1.7+
+        Boolean in_use_model_channels = false # Needs to be True for DV 1.7+
         Int in_call_cores
         Int in_call_mem
         String in_dv_container = "google/deepvariant:1.5.0"
@@ -62,7 +62,7 @@ task runDeepVariantMakeExamples {
         # Except instead of building a channel list we load it form the model.
         case ${MODEL_TYPE} in
             WGS)
-                if [[ ~{in_use_channel_list} == false ]] ; then
+                if [[ ~{in_use_model_channels} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--channels insert_size)
                 fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
@@ -72,7 +72,7 @@ task runDeepVariantMakeExamples {
                 ;;
 
             WES)
-                if [[ ~{in_use_channel_list} == false ]] ; then
+                if [[ ~{in_use_model_channels} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--channels insert_size)
                 fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
@@ -82,7 +82,7 @@ task runDeepVariantMakeExamples {
                 ;;
 
             PACBIO)
-                if [[ ~{in_use_channel_list} == false ]] ; then
+                if [[ ~{in_use_model_channels} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--add_hp_channel)
                 fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
@@ -99,7 +99,7 @@ task runDeepVariantMakeExamples {
                 ;;
 
             ONT_R104)
-                if [[ ~{in_use_channel_list} == false ]] ; then
+                if [[ ~{in_use_model_channels} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--add_hp_channel)
                 fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')

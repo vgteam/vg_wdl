@@ -93,7 +93,7 @@ workflow Giraffe {
         
         String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
         String? VG_GIRAFFE_DOCKER
-        String? VG_SURJECT_DOCKER  
+        String? VG_SURJECT_DOCKER
     }
 
 
@@ -130,7 +130,12 @@ workflow Giraffe {
 
     File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
     File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
-    File file_zipcodes = select_first([HaplotypeSampling.sampled_zipcodes, ZIPCODES_FILE])
+    # The zipcode file is optional but we still have a priority list of places to get it from.
+    # But we can't select_first sicne they all might be null.
+    Array[File] possible_zipcode_files = select_all([HaplotypeSampling.sampled_zipcodes, ZIPCODES_FILE])
+    # We can't actually use None in WDL 1.0 so we need to use a nonexistent null file.
+    File? NULL_FILE
+    File? file_zipcodes = if length(possible_zipcode_files) > 0 then possible_zipcode_files[0] else NULL_FILE
     File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
 
 
