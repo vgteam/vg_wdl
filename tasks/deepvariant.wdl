@@ -13,6 +13,7 @@ task runDeepVariantMakeExamples {
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
         String in_other_makeexamples_arg = ""
+        Boolean in_use_channel_list = false # Needs to be True for DV 1.7+
         Int in_call_cores
         Int in_call_mem
         String in_dv_container = "google/deepvariant:1.5.0"
@@ -53,11 +54,18 @@ task runDeepVariantMakeExamples {
 
         MODEL_TYPE=~{in_model_type}
         MODEL_TYPE_ARGS=()
+        if [[ ~{in_use_channel_list} == true ]] ; then
+            CHANNEL_ARG="--channel_list"
+            CHANNELS=(read_base base_quality mapping_quality strand read_supports_variant base_differs_from_ref)
+        else
+            CHANNEL_ARG="--channels"
+            CHANNELS=()
+        fi
         # Determine extra make_example arguments for the given model type just like in DeepVariant's main wrapper script.
         # See <https://github.com/google/deepvariant/blob/ab068c4588a02e2167051bd9e74c0c9579462b51/scripts/run_deepvariant.py#L243-L276>
         case ${MODEL_TYPE} in
             WGS)
-                MODEL_TYPE_ARGS+=(--channels insert_size)
+                CHANNELS+=(insert_size)
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
@@ -65,7 +73,7 @@ task runDeepVariantMakeExamples {
                 ;;
 
             WES)
-                MODEL_TYPE_ARGS+=(--channels insert_size)
+                CHANNELS+=(insert_size)
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
@@ -73,7 +81,9 @@ task runDeepVariantMakeExamples {
                 ;;
 
             PACBIO)
-                MODEL_TYPE_ARGS+=(--add_hp_channel)
+                if [[ ~{in_use_channel_list} == false ]] ; then
+                    MODEL_TYPE_ARGS+=(--add_hp_channel)
+                fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
                 MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
                 MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
@@ -88,7 +98,9 @@ task runDeepVariantMakeExamples {
                 ;;
 
             ONT_R104)
-                MODEL_TYPE_ARGS+=(--add_hp_channel)
+                if [[ ~{in_use_channel_list} == false ]] ; then
+                    MODEL_TYPE_ARGS+=(--add_hp_channel)
+                fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
                 MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
                 MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
@@ -110,6 +122,11 @@ task runDeepVariantMakeExamples {
                 fi
                 ;;
         esac
+
+        if [[ "${#CHANNELS[@]}" != "0" ]] ; then
+            # If we have any channels we need a channel argument
+            MODEL_TYPE_ARGS+=("${CHANNEL_ARG}" "${CHANNELS[@]}")
+        fi
 
 
         seq 0 $((~{in_call_cores}-1)) | \
