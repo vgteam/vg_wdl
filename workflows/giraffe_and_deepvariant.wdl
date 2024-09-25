@@ -51,6 +51,7 @@ workflow GiraffeDeepVariant {
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
+        DV_MODEL_FILES: "Array of all files for a DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
         DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
@@ -106,6 +107,7 @@ workflow GiraffeDeepVariant {
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
         File? DV_MODEL_DATA
+        Array[File]? DV_MODEL_FILES
         Boolean DV_KEEP_LEGACY_AC = true
         Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
@@ -243,6 +245,7 @@ workflow GiraffeDeepVariant {
         DV_MODEL_META=DV_MODEL_META,
         DV_MODEL_INDEX=DV_MODEL_INDEX,
         DV_MODEL_DATA=DV_MODEL_DATA,
+        DV_MODEL_FILES=DV_MODEL_FILES,
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
         DV_NORM_READS=DV_NORM_READS,
         OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,

@@ -9,9 +9,7 @@ task runDeepVariantMakeExamples {
         File in_reference_file
         File in_reference_index_file
         String in_model_type = "WGS"
-        File? in_model_meta_file
-        File? in_model_index_file
-        File? in_model_data_file
+        Array[File] in_model_files = []
         Int? in_min_mapq
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
@@ -125,26 +123,19 @@ task runDeepVariantMakeExamples {
         esac
 
         # Set up the model so DV can read the channels out of it
-
-        # We should use an array here, but that doesn't seem to work the way I
-        # usually do them (because of a set -u maybe?)
-        if [[ ! -z "~{in_model_meta_file}" ]] ; then
-            # Model files must be adjacent and not at arbitrary paths
-            ln -f -s "~{in_model_meta_file}" model.meta
-            ln -f -s "~{in_model_index_file}" model.index
-            ln -f -s "~{in_model_data_file}" model.data-00000-of-00001
+        if [[ ~{length(in_model_files)} -gt 0 ]] ; then
+            # Need to use a custom model
+            mkdir model_dir
+            ln -s ~{sep=" " in_model_files} model_dir/
         else
-            # use default models for type
-            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.meta" model.meta
-            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.index" model.index
-            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
+            # Use default models for type
+            ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
-
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
-        --checkpoint model \
+        --checkpoint model_dir \
         --ref reference.fa \
         --reads input_bam_file.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
@@ -179,9 +170,7 @@ task runDeepVariantCallVariants {
         File in_examples_file
         File in_nonvariant_site_tf_file
         String in_model_type = "WGS"
-        File? in_model_meta_file
-        File? in_model_index_file
-        File? in_model_data_file
+        Array[File] in_model_files = []
         Int in_call_cores
         Int in_call_mem
         Boolean in_use_gpus = true
@@ -210,24 +199,20 @@ task runDeepVariantCallVariants {
 
         MODEL_TYPE=~{in_model_type}
 
-        # We should use an array here, but that doesn't seem to work the way I
-        # usually do them (because of a set -u maybe?)
-        if [[ ! -z "~{in_model_meta_file}" ]] ; then
-            # Model files must be adjacent and not at arbitrary paths
-            ln -f -s "~{in_model_meta_file}" model.meta
-            ln -f -s "~{in_model_index_file}" model.index
-            ln -f -s "~{in_model_data_file}" model.data-00000-of-00001
+        # Set up the model
+        if [[ ~{length(in_model_files)} -gt 0 ]] ; then
+            # Need to use a custom model
+            mkdir model_dir
+            ln -s ~{sep=" " in_model_files} model_dir/
         else
-            # use default models for type
-            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.meta" model.meta
-            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.index" model.index
-            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
+            # Use default models for type
+            ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
         
         /opt/deepvariant/bin/call_variants \
         --outfile call_variants_output.tfrecord.gz \
         --examples "make_examples.tfrecord@~{in_call_cores}.gz" \
-        --checkpoint model && \
+        --checkpoint model_dir && \
         /opt/deepvariant/bin/postprocess_variants \
         --ref reference.fa \
         --infile call_variants_output.tfrecord.gz \
