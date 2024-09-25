@@ -9,6 +9,9 @@ task runDeepVariantMakeExamples {
         File in_reference_file
         File in_reference_index_file
         String in_model_type = "WGS"
+        File? in_model_meta_file
+        File? in_model_index_file
+        File? in_model_data_file
         Int? in_min_mapq
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
@@ -54,18 +57,14 @@ task runDeepVariantMakeExamples {
 
         MODEL_TYPE=~{in_model_type}
         MODEL_TYPE_ARGS=()
-        if [[ ~{in_use_channel_list} == true ]] ; then
-            CHANNEL_ARG="--channel_list"
-            CHANNELS=(read_base base_quality mapping_quality strand read_supports_variant base_differs_from_ref)
-        else
-            CHANNEL_ARG="--channels"
-            CHANNELS=()
-        fi
         # Determine extra make_example arguments for the given model type just like in DeepVariant's main wrapper script.
         # See <https://github.com/google/deepvariant/blob/ab068c4588a02e2167051bd9e74c0c9579462b51/scripts/run_deepvariant.py#L243-L276>
+        # Except instead of building a channel list we load it form the model.
         case ${MODEL_TYPE} in
             WGS)
-                CHANNELS+=(insert_size)
+                if [[ ~{in_use_channel_list} == false ]] ; then
+                    MODEL_TYPE_ARGS+=(--channels insert_size)
+                fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
@@ -73,7 +72,9 @@ task runDeepVariantMakeExamples {
                 ;;
 
             WES)
-                CHANNELS+=(insert_size)
+                if [[ ~{in_use_channel_list} == false ]] ; then
+                    MODEL_TYPE_ARGS+=(--channels insert_size)
+                fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
@@ -123,15 +124,27 @@ task runDeepVariantMakeExamples {
                 ;;
         esac
 
-        if [[ "${#CHANNELS[@]}" != "0" ]] ; then
-            # If we have any channels we need a channel argument
-            MODEL_TYPE_ARGS+=("${CHANNEL_ARG}" "${CHANNELS[@]}")
+        # Set up the model so DV can read the channels out of it
+
+        # We should use an array here, but that doesn't seem to work the way I
+        # usually do them (because of a set -u maybe?)
+        if [[ ! -z "~{in_model_meta_file}" ]] ; then
+            # Model files must be adjacent and not at arbitrary paths
+            ln -f -s "~{in_model_meta_file}" model.meta
+            ln -f -s "~{in_model_index_file}" model.index
+            ln -f -s "~{in_model_data_file}" model.data-00000-of-00001
+        else
+            # use default models for type
+            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.meta" model.meta
+            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.index" model.index
+            ln -f -s "/opt/models/${MODEL_TYPE,,}/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
         fi
 
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
+        --checkpoint model \
         --ref reference.fa \
         --reads input_bam_file.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \

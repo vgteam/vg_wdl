@@ -123,7 +123,7 @@ task extractSubsetPathNames {
         else
             # Couldn't get reference paths. This is probably an old GBZ that predates them.
             # Pull all contig names and assume they are paths also.
-            vg gbwt -CL -Z ${in_gbz_file} | sort > path_list.txt
+            vg gbwt -CL -Z ~{in_gbz_file} | sort > path_list.txt
         fi
 
         grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM | grep -v chain_ > path_list.sub.txt
