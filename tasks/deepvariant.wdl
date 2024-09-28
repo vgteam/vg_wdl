@@ -140,11 +140,16 @@ task runDeepVariantMakeExamples {
             # This is a savedmodel-format model and is named just by the directory
             CHECKPOINT_NAME="model_dir"
         fi
+        CHECKPOINT_ARGS=()
+        if [[ ~{in_use_model_channels} == true ]] ; then
+            # We only actually show the model to DV if we want to use the channels from it. Older DV can't take it here.
+            CHECKPOINT_ARGS+=(--checkpoint "${CHECKPOINT_NAME}")
+        fi
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
-        --checkpoint "${CHECKPOINT_NAME}" \
+        "${CHECKPOINT_ARGS[@]}" \
         --ref reference.fa \
         --reads input_bam_file.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
