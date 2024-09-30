@@ -10,6 +10,7 @@ task runDeepVariantMakeExamples {
         File in_reference_index_file
         String in_model_type = "WGS"
         Array[File] in_model_files = []
+        Array[File] in_model_variables_files = []
         Int? in_min_mapq
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
@@ -136,6 +137,12 @@ task runDeepVariantMakeExamples {
             # Need to use a custom model
             mkdir model_dir
             ln -s ~{sep=" " in_model_files} model_dir/
+            if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
+                # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
+                # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
+                mkdir model_dir/variables
+                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
+            fi
         else
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
@@ -194,6 +201,7 @@ task runDeepVariantCallVariants {
         File in_nonvariant_site_tf_file
         String in_model_type = "WGS"
         Array[File] in_model_files = []
+        Array[File] in_model_variables_files = []
         Int in_call_cores
         Int in_call_mem
         Boolean in_use_gpus = true
@@ -227,6 +235,12 @@ task runDeepVariantCallVariants {
             # Need to use a custom model
             mkdir model_dir
             ln -s ~{sep=" " in_model_files} model_dir/
+            if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
+                # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
+                # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
+                mkdir model_dir/variables
+                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
+            fi
         else
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir

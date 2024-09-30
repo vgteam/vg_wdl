@@ -34,7 +34,8 @@ workflow DeepVariant {
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
-        DV_MODEL_FILES: "Array of all files for a DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
+        DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
+        DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
         DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
@@ -71,6 +72,7 @@ workflow DeepVariant {
         File? DV_MODEL_INDEX
         File? DV_MODEL_DATA
         Array[File] DV_MODEL_FILES = select_all([DV_MODEL_META, DV_MODEL_INDEX, DV_MODEL_DATA])
+        Array[File] DV_MODEL_VARIABLES_FILES = []
         Boolean DV_KEEP_LEGACY_AC = true
         Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
@@ -158,6 +160,7 @@ workflow DeepVariant {
                 in_reference_index_file=reference_index_file,
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
+                in_model_variables_files=DV_MODEL_VARIABLES_FILES,
                 in_min_mapq=MIN_MAPQ,
                 in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
                 in_norm_reads=DV_NORM_READS,
@@ -176,6 +179,7 @@ workflow DeepVariant {
                 in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
+                in_model_variables_files=DV_MODEL_VARIABLES_FILES,
                 in_dv_gpu_container=DV_GPU_DOCKER,
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
