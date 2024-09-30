@@ -56,7 +56,7 @@ workflow GiraffeDeepVariant {
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
         DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
-        DV_USE_MODEL_CHANNELS: "Flag to use DeepVariant's model to infer channels. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one."
+        DV_IS_1_7_OR_NEWER: "Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs"
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
@@ -113,7 +113,7 @@ workflow GiraffeDeepVariant {
         Boolean DV_KEEP_LEGACY_AC = true
         Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
-        Boolean? DV_USE_MODEL_CHANNELS
+        Boolean? DV_IS_1_7_OR_NEWER
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
         Int SPLIT_READ_CORES = 8
@@ -251,7 +251,7 @@ workflow GiraffeDeepVariant {
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
         DV_NORM_READS=DV_NORM_READS,
         OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
-        DV_USE_MODEL_CHANNELS=DV_USE_MODEL_CHANNELS,
+        DV_IS_1_7_OR_NEWER=DV_IS_1_7_OR_NEWER,
         DV_NO_GPU_DOCKER=DV_NO_GPU_DOCKER,
         DV_GPU_DOCKER=DV_GPU_DOCKER,
         REALIGN_MEM=if MAP_MEM < 40 then MAP_MEM else 40,

@@ -14,7 +14,7 @@ task runDeepVariantMakeExamples {
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
         String in_other_makeexamples_arg = ""
-        Boolean in_use_model_channels = false # Needs to be True for DV 1.7+
+        Boolean in_dv_is_1_7_or_newer = false # Needs to be True for DV 1.7+
         Int in_call_cores
         Int in_call_mem
         String in_dv_container = "google/deepvariant:1.5.0"
@@ -60,7 +60,7 @@ task runDeepVariantMakeExamples {
         # Except instead of building a channel list we load it form the model.
         case ${MODEL_TYPE} in
             WGS)
-                if [[ ~{in_use_model_channels} == false ]] ; then
+                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--channels insert_size)
                 fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
@@ -70,7 +70,7 @@ task runDeepVariantMakeExamples {
                 ;;
 
             WES)
-                if [[ ~{in_use_model_channels} == false ]] ; then
+                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--channels insert_size)
                 fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
@@ -80,7 +80,7 @@ task runDeepVariantMakeExamples {
                 ;;
 
             PACBIO)
-                if [[ ~{in_use_model_channels} == false ]] ; then
+                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--add_hp_channel)
                 fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
@@ -94,10 +94,13 @@ task runDeepVariantMakeExamples {
                 MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
                 MODEL_TYPE_ARGS+=(--track_ref_reads)
                 MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                fi
                 ;;
 
             ONT_R104)
-                if [[ ~{in_use_model_channels} == false ]] ; then
+                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
                     MODEL_TYPE_ARGS+=(--add_hp_channel)
                 fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
@@ -112,12 +115,18 @@ task runDeepVariantMakeExamples {
                 MODEL_TYPE_ARGS+=(--track_ref_reads)
                 MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
                 MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                fi
                 ;;
             
             HYBRID_PACBIO_ILLUMINA)
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                fi
+                if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
                 fi
                 ;;
         esac
@@ -141,7 +150,7 @@ task runDeepVariantMakeExamples {
             CHECKPOINT_NAME="model_dir"
         fi
         CHECKPOINT_ARGS=()
-        if [[ ~{in_use_model_channels} == true ]] ; then
+        if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
             # We only actually show the model to DV if we want to use the channels from it. Older DV can't take it here.
             CHECKPOINT_ARGS+=(--checkpoint "${CHECKPOINT_NAME}")
         fi
