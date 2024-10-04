@@ -45,6 +45,7 @@ workflow DeepVariant {
         REALIGN_MEM: "Memory, in GB, to use when realigning the reads. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
+        EVAL_MEM: "Memory, in GB, to use when evaluating variant calls. Default is CALL_MEM."
     }
 
     input {
@@ -82,6 +83,7 @@ workflow DeepVariant {
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
         Int CALL_MEM = 50
+        Int EVAL_MEM = CALL_MEM
     }
 
     call utils.uncompressReferenceIfNeeded {
@@ -218,7 +220,7 @@ workflow DeepVariant {
                     in_evaluation_regions_file=EVALUATION_REGIONS_BED,
                     in_restrict_regions_file=RESTRICT_REGIONS_BED,
                     in_target_region=TARGET_REGION,
-                    in_mem=CALL_MEM
+                    in_mem=EVAL_MEM
             }
         }
         
@@ -235,7 +237,7 @@ workflow DeepVariant {
                 in_evaluation_regions_file=EVALUATION_REGIONS_BED,
                 in_restrict_regions_file=RESTRICT_REGIONS_BED,
                 in_target_region=TARGET_REGION,
-                in_mem=CALL_MEM
+                in_mem=EVAL_MEM
         }
     }
 
