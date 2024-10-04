@@ -14,6 +14,9 @@ workflow DeepVariant {
         MERGED_BAM_FILE: "The all-contigs sorted BAM to call with."
         MERGED_BAM_FILE_INDEX: "The .bai index for the input BAM file"
         SAMPLE_NAME: "The sample name"
+        OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed by default. Default is 'false'."
+        OUTPUT_CALLING_BAMS: "Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM."
+        OUTPUT_UNMAPPED_BAM: "Should an unmapped reads BAM be saved? Default is false."
         CONTIGS: "Contig path names to use as PATH_LIST_FILE. Must be set if PATH_LIST_FILE is not."
         PATH_LIST_FILE: "Text file where each line is a contig name to evaluate on. Must be set if CONTIGS is not."
         REFERENCE_PREFIX: "Remove this off the beginning of path names to get contig names in the BAM (set to match prefix in PATH_LIST_FILE)"
@@ -53,6 +56,9 @@ workflow DeepVariant {
         File MERGED_BAM_FILE
         File MERGED_BAM_FILE_INDEX
         String SAMPLE_NAME
+        Boolean OUTPUT_SINGLE_BAM = false
+        Boolean OUTPUT_CALLING_BAMS = !OUTPUT_SINGLE_BAM
+        Boolean OUTPUT_UNMAPPED_BAM = false
         Array[String]+? CONTIGS
         File PATH_LIST_FILE = write_lines(select_first([CONTIGS]))
         String REFERENCE_PREFIX = ""
@@ -243,6 +249,23 @@ workflow DeepVariant {
         }
     }
 
+    if (OUTPUT_SINGLE_BAM) {
+        call utils.mergeAlignmentBAMChunks as mergeBAM {
+            input:
+            in_sample_name=SAMPLE_NAME,
+            in_alignment_bam_chunk_files=flatten([calling_bam, [splitBAMbyPath.bam_unmapped_file]])
+        }
+    }
+
+    if (OUTPUT_CALLING_BAMS) {
+        Array[File] output_calling_bam_files = calling_bam
+        Array[File] output_calling_bam_index_files = calling_bam_index
+    }
+
+    if (OUTPUT_UNMAPPED_BAM) {
+        File output_unmapped_bam_file = splitBAMbyPath.bam_unmapped_file
+    }
+
     output {
         File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
         File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
@@ -250,9 +273,11 @@ workflow DeepVariant {
         File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
         File output_gvcf = concatClippedGVCFChunks.output_merged_vcf
         File output_gvcf_index = concatClippedGVCFChunks.output_merged_vcf_index
-        Array[File] output_calling_bams = calling_bam
-        Array[File] output_calling_bam_indexes = calling_bam_index
-        File output_unmapped_bam = splitBAMbyPath.bam_unmapped_file
+        File? output_bam = mergeBAM.merged_bam_file
+        File? output_bam_index = mergeBAM.merged_bam_file_index
+        Array[File]? output_calling_bams = output_calling_bam_files
+        Array[File]? output_calling_bam_indexes = output_calling_bam_index_files
+        File? output_unmapped_bam = output_unmapped_bam_file
     }
 
 }

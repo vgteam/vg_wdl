@@ -26,6 +26,7 @@ workflow GiraffeDeepVariant {
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'true'."
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed by default. Default is 'false'."
         OUTPUT_CALLING_BAMS: "Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM."
+        OUTPUT_UNMAPPED_BAM: "Should an unmapped reads BAM be saved? Default is false."
         PAIRED_READS: "Are the reads paired? Default is 'true'."
         READS_PER_CHUNK: "Number of reads contained in each mapping chunk. Default 20 000 000."
         CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index."
@@ -85,6 +86,7 @@ workflow GiraffeDeepVariant {
         Boolean OUTPUT_GAF = true
         Boolean OUTPUT_SINGLE_BAM = false
         Boolean OUTPUT_CALLING_BAMS = !OUTPUT_SINGLE_BAM
+        Boolean OUTPUT_UNMAPPED_BAM = false
         Boolean PAIRED_READS = true
         Int READS_PER_CHUNK = 20000000
         Array[String]+? CONTIGS
@@ -232,6 +234,9 @@ workflow GiraffeDeepVariant {
         MERGED_BAM_FILE=select_first([Giraffe.output_bam]),
         MERGED_BAM_FILE_INDEX=select_first([Giraffe.output_bam_index]),
         SAMPLE_NAME=SAMPLE_NAME,
+        OUTPUT_SINGLE_BAM=OUTPUT_SINGLE_BAM,
+        OUTPUT_CALLING_BAMS=OUTPUT_CALLING_BAMS,
+        OUTPUT_UNMAPPED_BAM=OUTPUT_UNMAPPED_BAM,
         PATH_LIST_FILE=pipeline_path_list_file,
         REFERENCE_PREFIX=REFERENCE_PREFIX,
         REFERENCE_FILE=reference_file,
@@ -265,19 +270,6 @@ workflow GiraffeDeepVariant {
         EVAL_MEM=EVAL_MEM
     }
     
-    if (OUTPUT_SINGLE_BAM){
-        call utils.mergeAlignmentBAMChunks as mergeBAM {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=flatten([DeepVariant.output_calling_bams, [DeepVariant.output_unmapped_bam]])
-        }
-    }
-
-    if (OUTPUT_CALLING_BAMS){
-        Array[File] output_calling_bam_files = DeepVariant.output_calling_bams
-        Array[File] output_calling_bam_index_files = DeepVariant.output_calling_bam_indexes
-    }
-
     output {
         File? output_vcfeval_evaluation_archive = DeepVariant.output_vcfeval_evaluation_archive
         File? output_happy_evaluation_archive = DeepVariant.output_happy_evaluation_archive
@@ -286,9 +278,10 @@ workflow GiraffeDeepVariant {
         File output_gvcf = DeepVariant.output_gvcf
         File output_gvcf_index = DeepVariant.output_gvcf_index
         File? output_gaf = Giraffe.output_gaf
-        File? output_bam = mergeBAM.merged_bam_file
-        File? output_bam_index = mergeBAM.merged_bam_file_index
-        Array[File]? output_calling_bams = output_calling_bam_files
-        Array[File]? output_calling_bam_indexes = output_calling_bam_index_files
+        File? output_bam = DeepVariant.output_bam
+        File? output_bam_index = DeepVariant.output_bam_index
+        Array[File]? output_calling_bams = DeepVariant.output_calling_bams
+        Array[File]? output_calling_bam_indexes = DeepVariant.output_calling_bam_indexes
+        File? output_unmapped_bam = DeepVariant.output_unmapped_bam
     }   
 }
