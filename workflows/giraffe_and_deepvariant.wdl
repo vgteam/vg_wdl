@@ -65,6 +65,7 @@ workflow GiraffeDeepVariant {
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
+        EVAL_MEM: "Memory, in GB, to use when evaluating variant calls. Default is CALL_MEM."
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
         VG_SURJECT_DOCKER: "Alternate container image to use when running vg surject"
@@ -123,6 +124,7 @@ workflow GiraffeDeepVariant {
         Int MAP_MEM = 120
         Int CALL_CORES = 8
         Int CALL_MEM = 50
+        Int EVAL_MEM = 50
         String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
@@ -259,7 +261,8 @@ workflow GiraffeDeepVariant {
         DV_GPU_DOCKER=DV_GPU_DOCKER,
         REALIGN_MEM=if MAP_MEM < 40 then MAP_MEM else 40,
         CALL_CORES=CALL_CORES,
-        CALL_MEM=CALL_MEM
+        CALL_MEM=CALL_MEM,
+        EVAL_MEM=EVAL_MEM
     }
     
     if (OUTPUT_SINGLE_BAM){
