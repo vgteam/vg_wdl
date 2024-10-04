@@ -28,8 +28,8 @@ workflow GiraffeDeepVariant {
         OUTPUT_CALLING_BAMS: "Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM."
         PAIRED_READS: "Are the reads paired? Default is 'true'."
         READS_PER_CHUNK: "Number of reads contained in each mapping chunk. Default 20 000 000."
-        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
         CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index."
+        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
         REFERENCE_PREFIX: "Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)"
         REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
@@ -87,8 +87,8 @@ workflow GiraffeDeepVariant {
         Boolean OUTPUT_CALLING_BAMS = !OUTPUT_SINGLE_BAM
         Boolean PAIRED_READS = true
         Int READS_PER_CHUNK = 20000000
-        File? PATH_LIST_FILE
         Array[String]+? CONTIGS
+        File? PATH_LIST_FILE
         String REFERENCE_PREFIX = ""
         File? REFERENCE_FILE
         File? REFERENCE_INDEX_FILE

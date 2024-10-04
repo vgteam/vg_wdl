@@ -14,7 +14,8 @@ workflow DeepVariant {
         MERGED_BAM_FILE: "The all-contigs sorted BAM to call with."
         MERGED_BAM_FILE_INDEX: "The .bai index for the input BAM file"
         SAMPLE_NAME: "The sample name"
-        PATH_LIST_FILE: "Text file where each line is a path name."
+        CONTIGS: "Contig path names to use as PATH_LIST_FILE. Must be set if PATH_LIST_FILE is not."
+        PATH_LIST_FILE: "Text file where each line is a contig name to evaluate on. Must be set if CONTIGS is not."
         REFERENCE_PREFIX: "Remove this off the beginning of path names to get contig names in the BAM (set to match prefix in PATH_LIST_FILE)"
         REFERENCE_PREFIX_ON_BAM: "If true, the REFERENCE_PREFIX is also on the sequence names in the BAM header and needs to be removed."
         REFERENCE_FILE: "FASTA reference to call against."
@@ -52,7 +53,8 @@ workflow DeepVariant {
         File MERGED_BAM_FILE
         File MERGED_BAM_FILE_INDEX
         String SAMPLE_NAME
-        File PATH_LIST_FILE
+        Array[String]+? CONTIGS
+        File PATH_LIST_FILE = write_lines(select_first([CONTIGS]))
         String REFERENCE_PREFIX = ""
         Boolean REFERENCE_PREFIX_ON_BAM = false
         File REFERENCE_FILE
