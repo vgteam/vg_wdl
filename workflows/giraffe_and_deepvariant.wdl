@@ -35,6 +35,8 @@ workflow GiraffeDeepVariant {
         REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
         REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths."
+        HAPLOID_CONTIGS: "(OPTIONAL) Names of contigs in the reference (without REFERENCE_PREFIX) that are haploid in this sample (often chrX and chrY). Not compatible with DeepVariant 1.5."
+        PAR_REGIONS_BED_FILE: "(OPTIONAL) BED file with pseudo-autosomal regions. Not compatible with DeepVariant 1.5."
         PRUNE_LOW_COMPLEXITY: "Whether or not to remove low-complexity or short in-tail anchors when surjecting and force tail realingment. Default is 'true'."
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
@@ -95,6 +97,8 @@ workflow GiraffeDeepVariant {
         File? REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
         File? REFERENCE_DICT_FILE
+        Array[String]? HAPLOID_CONTIGS
+        File? PAR_REGIONS_BED_FILE
         Boolean PRUNE_LOW_COMPLEXITY = true
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
@@ -242,6 +246,8 @@ workflow GiraffeDeepVariant {
         REFERENCE_FILE=reference_file,
         REFERENCE_INDEX_FILE=reference_index_file,
         REFERENCE_DICT_FILE=reference_dict_file,
+        HAPLOID_CONTIGS=HAPLOID_CONTIGS,
+        PAR_REGIONS_BED_FILE=PAR_REGIONS_BED_FILE,
         LEFTALIGN_BAM=LEFTALIGN_BAM,
         REALIGN_INDELS=REALIGN_INDELS,
         REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,

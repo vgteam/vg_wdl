@@ -191,7 +191,7 @@ task runDeepVariantMakeExamples {
     }
 }
 
-# Run DeepVariant calling on a file of examples, on GPUs.
+# Run DeepVariant calling AND postprocessing on a file of examples, on GPUs.
 task runDeepVariantCallVariants {
     input {
         String in_sample_name
@@ -202,6 +202,10 @@ task runDeepVariantCallVariants {
         String in_model_type = "WGS"
         Array[File] in_model_files = []
         Array[File] in_model_variables_files = []
+        # Not available on DV1.5
+        Array[String] in_haploid_contigs = []
+        # Not available on DV1.5
+        File? in_par_regions_bed_file
         Int in_call_cores
         Int in_call_mem
         Boolean in_use_gpus = true
@@ -264,6 +268,8 @@ task runDeepVariantCallVariants {
         --infile call_variants_output.tfrecord.gz \
         --nonvariant_site_tfrecord_path "gvcf.tfrecord@~{in_call_cores}.gz" \
         --outfile "~{in_sample_name}_deepvariant.vcf.gz" \
+        ~{if length(in_haploid_contigs) > 0 then "--haploid_contigs" else ""} ~{sep=',' in_haploid_contigs} \
+        ~{"--par_regions_bed " + in_par_regions_bed_file} \
         --gvcf_outfile "~{in_sample_name}_deepvariant.g.vcf.gz"
     >>>
     output {
@@ -283,4 +289,5 @@ task runDeepVariantCallVariants {
         docker: in_dv_gpu_container
     }
 }
+
 

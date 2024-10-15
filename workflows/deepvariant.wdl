@@ -24,6 +24,8 @@ workflow DeepVariant {
         REFERENCE_FILE: "FASTA reference to call against."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
         REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths."
+        HAPLOID_CONTIGS: "(OPTIONAL) Names of contigs in the reference (without REFERENCE_PREFIX) that are haploid in this sample (often chrX and chrY). Not compatible with DeepVariant 1.5."
+        PAR_REGIONS_BED_FILE: "(OPTIONAL) BED file with pseudo-autosomal regions. Not compatible with DeepVariant 1.5."
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'. If true, all input reads, including secondaries, must have the read sequence given."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'. If true, all input reads must be in a read group."
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
@@ -66,6 +68,8 @@ workflow DeepVariant {
         File REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
         File? REFERENCE_DICT_FILE
+        Array[String]? HAPLOID_CONTIGS
+        File? PAR_REGIONS_BED_FILE
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
         Int REALIGNMENT_EXPANSION_BASES = 160
@@ -190,6 +194,8 @@ workflow DeepVariant {
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
                 in_model_variables_files=DV_MODEL_VARIABLES_FILES,
+                in_haploid_contigs=HAPLOID_CONTIGS,
+                in_par_regions_bed_file=PAR_REGIONS_BED_FILE,
                 in_dv_gpu_container=DV_GPU_DOCKER,
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
