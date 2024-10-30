@@ -51,7 +51,6 @@ workflow DeepVariant {
         REALIGN_MEM: "Memory, in GB, to use when realigning the reads. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
-        EXAMPLE_CORES: "Number of cores to use when making variant candidates. Default is CALL_CORES."
         EVAL_MEM: "Memory, in GB, to use when evaluating variant calls. Default is 60."
     }
 
@@ -96,7 +95,6 @@ workflow DeepVariant {
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
         Int CALL_MEM = 50
-        Int EXAMPLE_CORES = CALL_CORES
         Int EVAL_MEM = 60
     }
 
@@ -183,7 +181,7 @@ workflow DeepVariant {
                 in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
                 in_dv_is_1_7_or_newer=DV_IS_1_7_OR_NEWER,
                 in_dv_container=DV_NO_GPU_DOCKER,
-                in_call_cores=EXAMPLE_CORES,
+                in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
         }
         call dv.runDeepVariantCallVariants {
