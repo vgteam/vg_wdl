@@ -30,6 +30,7 @@ workflow HaplotypeSampling {
         ABSENT_SCORE: "Score for absent kmers. (Default: 0.8)"
         INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)"
         DIPLOID: "Activate diploid sampling. (Default: true)"
+        LINEAR_STRUCTURE: "Use linear structure for the sampled graph. (Default: false)"
     }
     input {
         File IN_GBZ_FILE
@@ -50,6 +51,7 @@ workflow HaplotypeSampling {
         Float ABSENT_SCORE = 0.8
         Boolean INCLUDE_REFERENCE = true
         Boolean DIPLOID = true
+        Boolean LINEAR_STRUCTURE = false
 
 
     }
@@ -125,7 +127,8 @@ workflow HaplotypeSampling {
             absent_score = ABSENT_SCORE,
             include_reference = INCLUDE_REFERENCE,
             nb_cores=CORES,
-            use_diploid_sampling=DIPLOID
+            use_diploid_sampling=DIPLOID,
+            use_linear_structure=LINEAR_STRUCTURE
 
 
     }

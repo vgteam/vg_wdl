@@ -163,6 +163,7 @@ task samplingHaplotypes {
         Float absent_score
         Boolean include_reference
         Boolean use_diploid_sampling
+        Boolean use_linear_structure
         Int nb_cores = 16
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
@@ -192,6 +193,12 @@ task samplingHaplotypes {
             INCLUDE_DIPL="--diploid-sampling"
         fi
 
+        INCLUDE_LINEAR=""
+        if [ ~{use_linear_structure} == true ]
+        then
+            INCLUDE_LINEAR="--linear-structure"
+        fi
+
         vg haplotypes -v 2 -t ~{nb_cores} \
         --num-haplotypes ~{haplotype_number} \
         --present-discount ~{present_discount} \
@@ -199,6 +206,7 @@ task samplingHaplotypes {
         --absent-score ~{absent_score} \
         ${INCLUDE_REF} \
         ${INCLUDE_DIPL} \
+        ${INCLUDE_LINEAR} \
         -i ~{in_hap_index} \
         -k ~{in_kmer_info} \
         -g ~{output_file_name}.gbz ~{in_gbz_file}
