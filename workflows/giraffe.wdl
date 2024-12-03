@@ -4,6 +4,7 @@ import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
 import "./haplotype_sampling.wdl" as hapl
+import "../tasks/vg_indexing.wdl" as index
 
 workflow Giraffe {
     meta {
@@ -40,10 +41,11 @@ workflow Giraffe {
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'"
         IN_DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
-        HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
+        IN_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
-        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 32)"
+        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+
 
     }
     input {
@@ -53,8 +55,8 @@ workflow Giraffe {
         File? CRAM_REF
         File? CRAM_REF_INDEX
         File GBZ_FILE
-        File DIST_FILE
-        File MIN_FILE
+        File? DIST_FILE
+        File? MIN_FILE
         String SAMPLE_NAME
         Boolean OUTPUT_SINGLE_BAM = true
         Boolean OUTPUT_CALLING_BAMS = false
@@ -80,23 +82,29 @@ workflow Giraffe {
         File? IN_HAPL_FILE
         File? IN_R_INDEX_FILE
         File? IN_KFF_FILE
-        Int IN_HAPLOTYPE_NUMBER = 32
+        Int IN_HAPLOTYPE_NUMBER = 4
 
     }
 
+
+
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
-        call utils.convertCRAMtoFASTQ {
+	    call utils.convertCRAMtoFASTQ {
             input:
-                in_cram_file=INPUT_CRAM_FILE,
-                in_ref_file=CRAM_REF,
-                in_ref_index_file=CRAM_REF_INDEX,
-                in_paired_reads=PAIRED_READS,
-                in_cores=SPLIT_READ_CORES
-        }
+            in_cram_file=INPUT_CRAM_FILE,
+            in_ref_file=CRAM_REF,
+            in_ref_index_file=CRAM_REF_INDEX,
+            in_paired_reads=PAIRED_READS,
+            in_cores=SPLIT_READ_CORES
+	    }
     }
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
 
+
+
+
+	
     if (HAPLOTYPE_SAMPLING) {
         call hapl.HaplotypeSampling {
             input:
@@ -112,11 +120,41 @@ workflow Giraffe {
                 DIPLOID=IN_DIPLOID,
         }
 
+        File file_gbz1 = HaplotypeSampling.sampled_graph
+        File file_min1 = HaplotypeSampling.sampled_min
+        File file_dist1 = HaplotypeSampling.sampled_dist
+
+    }
+    if (!HAPLOTYPE_SAMPLING){
+        if(!defined(DIST_FILE)) {
+            call index.createDistanceIndex {
+                    input:
+                        in_gbz_file=GBZ_FILE
+                }
+        }
+        File file_dist2 = select_first([createDistanceIndex.output_dist_index, DIST_FILE])
+
+        if(!defined(MIN_FILE)){
+            call index.createMinimizerIndex {
+            input:
+                in_gbz_file=GBZ_FILE,
+                out_name="",
+                in_dist_index=file_dist2,
+                nb_cores=MAP_CORES
+
+            }
+        }
+        File file_min2 =  select_first([createMinimizerIndex.output_minimizer, MIN_FILE])
+
     }
 
-    File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
-    File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
-    File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
+    File file_gbz = select_first([file_gbz1, GBZ_FILE])
+    File file_min = select_first([file_min1, file_min2])
+    File file_dist = select_first([file_dist1, file_dist2])
+
+
+
+
 
 
     # Split input reads into chunks for parallelized mapping
@@ -127,7 +165,7 @@ workflow Giraffe {
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES
     }
-
+    
     # Which path names to work on?
     if (!defined(CONTIGS)) {
         if (!defined(PATH_LIST_FILE)) {
@@ -142,7 +180,7 @@ workflow Giraffe {
                     in_extract_mem=MAP_MEM
             }
         }
-    }
+    } 
     if (defined(CONTIGS)) {
         # Put the paths in a file to use later. We know the value is defined,
         # but WDL is a bit low on unboxing calls for optionals so we use
@@ -150,20 +188,20 @@ workflow Giraffe {
         File written_path_names_file = write_lines(select_first([CONTIGS]))
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractSubsetPathNames.output_path_list_file, written_path_names_file])
-
+    
     # To make sure that we have a FASTA reference with a contig set that
     # exactly matches the graph, we generate it ourselves, from the graph.
     if (!defined(REFERENCE_FILE)) {
         call map.extractReference {
             input:
-                in_gbz_file=file_gbz,
-                in_path_list_file=pipeline_path_list_file,
-                in_prefix_to_strip=REFERENCE_PREFIX,
-                in_extract_mem=MAP_MEM
+            in_gbz_file=file_gbz,
+            in_path_list_file=pipeline_path_list_file,
+            in_prefix_to_strip=REFERENCE_PREFIX,
+            in_extract_mem=MAP_MEM
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
-
+    
     if (!defined(REFERENCE_INDEX_FILE)) {
         call utils.indexReference {
             input:
@@ -172,29 +210,29 @@ workflow Giraffe {
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
     File reference_dict_file = select_first([REFERENCE_DICT_FILE, indexReference.reference_dict_file])
-
+    
     ################################################################
     # Distribute vg mapping operation over each chunked read pair #
     ################################################################
-    if(PAIRED_READS) {
+    if(PAIRED_READS){
         File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
         call utils.splitReads as secondReadPair {
             input:
-                in_read_file=read_2_file,
-                in_pair_id="2",
-                in_reads_per_chunk=READS_PER_CHUNK,
-                in_split_read_cores=SPLIT_READ_CORES
+            in_read_file=read_2_file,
+            in_pair_id="2",
+            in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES
         }
         Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
         scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
             call map.runVGGIRAFFE as runVGGIRAFFEpe {
                 input:
-                    fastq_file_1=read_pair_chunk_files.left,
-                    fastq_file_2=read_pair_chunk_files.right,
-                    in_giraffe_options=GIRAFFE_OPTIONS,
-                    in_gbz_file=file_gbz,
-                    in_dist_file=file_dist,
-                    in_min_file=file_min,
+                fastq_file_1=read_pair_chunk_files.left,
+                fastq_file_2=read_pair_chunk_files.right,
+                in_giraffe_options=GIRAFFE_OPTIONS,
+                in_gbz_file=file_gbz,
+                in_dist_file=file_dist,
+                in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -205,9 +243,9 @@ workflow Giraffe {
                 # REFERENCE_PREFIX and making sure the prefix isn't in the
                 # truth set.
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                    in_sample_name=SAMPLE_NAME,
-                    nb_cores=MAP_CORES,
-                    mem_gb=MAP_MEM
+                in_sample_name=SAMPLE_NAME,
+                nb_cores=MAP_CORES,
+                mem_gb=MAP_MEM
             }
         }
     }
@@ -215,11 +253,11 @@ workflow Giraffe {
         scatter (read_pair_chunk_file in firstReadPair.output_read_chunks) {
             call map.runVGGIRAFFE as runVGGIRAFFEse {
                 input:
-                    fastq_file_1=read_pair_chunk_file,
-                    in_giraffe_options=GIRAFFE_OPTIONS,
-                    in_gbz_file=file_gbz,
-                    in_dist_file=file_dist,
-                    in_min_file=file_min,
+                fastq_file_1=read_pair_chunk_file,
+                in_giraffe_options=GIRAFFE_OPTIONS,
+                in_gbz_file=file_gbz,
+                in_dist_file=file_dist,
+                in_min_file=file_min,
                 # We always need to pass a full dict file here, with lengths,
                 # because if we pass just path lists and the paths are not
                 # completely contained in the graph (like if we're working on
@@ -230,9 +268,9 @@ workflow Giraffe {
                 # REFERENCE_PREFIX and making sure the prefix isn't in the
                 # truth set.
                 # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                    in_sample_name=SAMPLE_NAME,
-                    nb_cores=MAP_CORES,
-                    mem_gb=MAP_MEM
+                in_sample_name=SAMPLE_NAME,
+                nb_cores=MAP_CORES,
+                mem_gb=MAP_MEM
             }
         }
     }
@@ -241,37 +279,37 @@ workflow Giraffe {
     scatter (gaf_file in gaf_chunks) {
         call gautils.surjectGAFtoBAM {
             input:
-                in_gaf_file=gaf_file,
-                in_gbz_file=file_gbz,
-                in_path_list_file=pipeline_path_list_file,
-                in_sample_name=SAMPLE_NAME,
-                in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-                in_paired_reads=PAIRED_READS,
-                mem_gb=MAP_MEM
+            in_gaf_file=gaf_file,
+            in_gbz_file=file_gbz,
+            in_path_list_file=pipeline_path_list_file,
+            in_sample_name=SAMPLE_NAME,
+            in_max_fragment_length=MAX_FRAGMENT_LENGTH,
+            in_paired_reads=PAIRED_READS,
+            mem_gb=MAP_MEM
         }
 
         call utils.sortBAM {
             input:
-                in_bam_file=surjectGAFtoBAM.output_bam_file,
-                in_ref_dict=reference_dict_file,
-                in_prefix_to_strip=REFERENCE_PREFIX
+            in_bam_file=surjectGAFtoBAM.output_bam_file,
+            in_ref_dict=reference_dict_file,
+            in_prefix_to_strip=REFERENCE_PREFIX
         }
     }
 
     call utils.mergeAlignmentBAMChunks {
         input:
-            in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=sortBAM.sorted_bam
+        in_sample_name=SAMPLE_NAME,
+        in_alignment_bam_chunk_files=sortBAM.sorted_bam
     }
 
     # Split merged alignment by contigs list
     call utils.splitBAMbyPath {
         input:
-            in_sample_name=SAMPLE_NAME,
-            in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-            in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
-            in_path_list_file=pipeline_path_list_file,
-            in_prefix_to_strip=REFERENCE_PREFIX
+        in_sample_name=SAMPLE_NAME,
+        in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
+        in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
+        in_path_list_file=pipeline_path_list_file,
+        in_prefix_to_strip=REFERENCE_PREFIX
     }
 
     ##
@@ -279,13 +317,13 @@ workflow Giraffe {
     ##
     scatter (bam_and_index_for_path in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
         ## Evantually shift and realign reads
-        if (LEFTALIGN_BAM) {
+        if (LEFTALIGN_BAM){
             # Just left-shift each read individually
             call utils.leftShiftBAMFile {
                 input:
-                    in_bam_file=bam_and_index_for_path.left,
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file
+                in_bam_file=bam_and_index_for_path.left,
+                in_reference_file=reference_file,
+                in_reference_index_file=reference_index_file
             }
         }
         if (REALIGN_INDELS) {
@@ -294,12 +332,12 @@ workflow Giraffe {
             # Do indel realignment
             call utils.prepareRealignTargets {
                 input:
-                    in_bam_file=forrealign_bam,
-                    in_bam_index_file=forrealign_index,
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    in_reference_dict_file=reference_dict_file,
-                    in_expansion_bases=REALIGNMENT_EXPANSION_BASES
+                in_bam_file=forrealign_bam,
+                in_bam_index_file=forrealign_index,
+                in_reference_file=reference_file,
+                in_reference_index_file=reference_index_file,
+                in_reference_dict_file=reference_dict_file,
+                in_expansion_bases=REALIGNMENT_EXPANSION_BASES
             }
             call utils.runAbraRealigner {
                 input:
@@ -308,35 +346,35 @@ workflow Giraffe {
                     in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
-                # If the user has set a very low memory for mapping, don't use more for realignment
+                    # If the user has set a very low memory for mapping, don't use more for realignment
                     memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
             }
         }
         File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
         File processed_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
     }
-
-    if (OUTPUT_SINGLE_BAM) {
+    
+    if (OUTPUT_SINGLE_BAM){
         call utils.mergeAlignmentBAMChunks as mergeBAM {
             input:
-                in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]]))
+            in_sample_name=SAMPLE_NAME,
+            in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]]))
         }
     }
-
-    if (OUTPUT_CALLING_BAMS) {
+    
+    if (OUTPUT_CALLING_BAMS){
         Array[File] calling_bams = processed_bam
         Array[File] calling_bam_indexes = processed_bam_index
     }
-
-    if (OUTPUT_GAF) {
+    
+    if (OUTPUT_GAF){
         call gautils.mergeGAF {
             input:
-                in_sample_name=SAMPLE_NAME,
-                in_gaf_chunk_files=gaf_chunks
+            in_sample_name=SAMPLE_NAME,
+            in_gaf_chunk_files=gaf_chunks
         }
     }
-
+    
     output {
         File? output_bam = mergeBAM.merged_bam_file
         File? output_bam_index = mergeBAM.merged_bam_file_index
@@ -344,6 +382,6 @@ workflow Giraffe {
         Array[File]? output_calling_bams = calling_bams
         Array[File]? output_calling_bam_indexes = calling_bam_indexes
 
-    }
+    }   
 }
 

@@ -4,8 +4,8 @@ version 1.0
 task createDistanceIndex {
     input {
         File in_gbz_file
-        Int nb_cores = 16
-        Int in_extract_mem = 120
+        Int nb_cores = 32
+        Int in_extract_mem = 300 + 4 * round(size(in_gbz_file, "G"))
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
     String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
@@ -24,7 +24,7 @@ task createDistanceIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.60.0"
 
     }
 }
@@ -33,7 +33,7 @@ task createRIndex {
     input {
         File in_gbz_file
         Int nb_cores = 16
-        Int in_extract_mem = 120
+        Int in_extract_mem = 160 + 2 * round(size(in_gbz_file, "G"))
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
     }
 
@@ -78,7 +78,7 @@ task createHaplotypeIndex {
         Int window_length
         Int subchain_length
         Int nb_cores = 16
-        Int in_extract_mem = 120
+        Int in_extract_mem = 160 + round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G"))
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G")) + 20
     }
 
@@ -113,7 +113,7 @@ task createHaplotypeIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.60.0"
 
     }
 
@@ -126,7 +126,7 @@ task createMinimizerIndex {
         File in_dist_index
         String out_name
         Int nb_cores = 16
-        Int in_extract_mem = 120
+        Int in_extract_mem = 180 + 4 * round(size(in_gbz_file, "G") + size(in_dist_index, "G"))
         Int in_extract_disk = 4 * round(size(in_gbz_file, "G") + size(in_dist_index, "G")) + 20
     }
 
@@ -154,7 +154,7 @@ task createMinimizerIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.60.0"
 
     }
 

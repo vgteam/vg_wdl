@@ -111,7 +111,7 @@ task splitReads {
         String in_pair_id
         Int in_reads_per_chunk
         Int in_split_read_cores
-        Int in_split_read_disk = 5 * round(size(in_read_file, "G")) + 20
+        Int in_split_read_disk = 5 * round(size(in_read_file, "G")) + 100
     }
 
     command <<<
@@ -127,16 +127,15 @@ task splitReads {
         #to turn off echo do 'set +o xtrace'
 
         CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
+        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > $FILE.fq.gz' - "fq_chunk_~{in_pair_id}.part."
     >>>
     output {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
     }
     runtime {
         preemptible: 2
-        time: 120
         cpu: in_split_read_cores
-        memory: "2 GB"
+        memory: "200 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
         docker: "quay.io/glennhickey/pigz:2.3.1"
     }

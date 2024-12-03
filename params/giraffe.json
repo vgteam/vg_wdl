@@ -2,13 +2,12 @@
   "Giraffe.INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
   "Giraffe.INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz",
   "Giraffe.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
+  "Giraffe.READS_PER_CHUNK": 1000,
   "Giraffe.REFERENCE_PREFIX": "chr",
   "Giraffe.SAMPLE_NAME": "s0",
-  "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
-  "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
   "Giraffe.OUTPUT_GAF": true,
   "Giraffe.OUTPUT_CALLING_BAMS": true,
   "Giraffe.OUTPUT_SINGLE_BAM": true,
-  "Giraffe.MAP_MEM": 8
+  "Giraffe.MAP_MEM": 8,
+  "Giraffe.HAPLOTYPE_SAMPLING": false
 }
-

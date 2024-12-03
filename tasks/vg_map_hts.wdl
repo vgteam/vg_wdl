@@ -40,7 +40,7 @@ task runVGGIRAFFE {
         String in_giraffe_options
         String in_sample_name
         Int nb_cores = 16
-        String mem_gb = 120
+        String mem_gb = 120 + 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G'))
         Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G')) + 50
     }
 
@@ -85,7 +85,7 @@ task runVGGIRAFFE {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: "quay.io/vgteam/vg:v1.60.0"
     }
 }
 
@@ -110,7 +110,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: "quay.io/vgteam/vg:v1.60.0"
     }
 }
 
@@ -146,7 +146,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: "quay.io/vgteam/vg:v1.60.0"
     }
 }
 
@@ -212,7 +212,7 @@ task samplingHaplotypes {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.51.0"
+        docker: "quay.io/vgteam/vg:v1.60.0"
 
     }
 

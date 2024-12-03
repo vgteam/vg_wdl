@@ -4,12 +4,9 @@
   "Giraffe.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
   "Giraffe.REFERENCE_PREFIX": "chr",
   "Giraffe.SAMPLE_NAME": "s0",
-  "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
-  "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
   "Giraffe.OUTPUT_GAF": true,
   "Giraffe.OUTPUT_CALLING_BAMS": true,
   "Giraffe.OUTPUT_SINGLE_BAM": true,
   "Giraffe.MAP_MEM": 8,
-  "Giraffe.HAPLOTYPE_SAMPLING": true,
-  "Giraffe.MAP_CORES": 8
+  "Giraffe.HAPLOTYPE_SAMPLING": true
 }
