@@ -94,7 +94,8 @@ workflow HaplotypeSampling {
                 nb_cores=CORES,
                 kmer_length=KMER_LENGTH,
                 window_length=WINDOW_LENGTH,
-                subchain_length=SUBCHAIN_LENGTH
+                subchain_length=SUBCHAIN_LENGTH,
+                use_linear_structure=LINEAR_STRUCTURE
         }
     }
 

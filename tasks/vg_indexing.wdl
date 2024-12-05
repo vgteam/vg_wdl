@@ -77,6 +77,7 @@ task createHaplotypeIndex {
         Int kmer_length
         Int window_length
         Int subchain_length
+        Boolean use_linear_structure
         Int nb_cores = 16
         Int in_extract_mem = 160 + round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G"))
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G")) + 20
@@ -96,10 +97,17 @@ task createHaplotypeIndex {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
+        INCLUDE_LINEAR=""
+        if [ ~{use_linear_structure} == true ]
+        then
+            INCLUDE_LINEAR="--linear-structure"
+        fi
+
 
         vg haplotypes -v 2 --kmer-length ~{kmer_length} \
         --window-length ~{window_length} \
         --subchain-length ~{subchain_length} \
+        ${INCLUDE_LINEAR} \
         -t ~{nb_cores} -d ~{in_dist_index} \
         -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
 
