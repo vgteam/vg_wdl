@@ -85,7 +85,7 @@ task createHaplotypeIndex {
 
     String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -111,7 +111,7 @@ task createHaplotypeIndex {
         -t ~{nb_cores} -d ~{in_dist_index} \
         -r ~{in_R_index} -H ~{out_prefix_name}.hapl ~{in_gbz_file}
 
-    }
+    >>>
 
     output {
         File output_hap_index = "~{out_prefix_name}.hapl"
