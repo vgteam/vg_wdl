@@ -555,7 +555,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -584,7 +584,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -674,7 +674,7 @@ task runVGGIRAFFE {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -1329,7 +1329,7 @@ task bgzipMergedVCF {
         time: 30
         memory: in_call_mem + " GB"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 

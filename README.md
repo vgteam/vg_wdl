@@ -297,15 +297,15 @@ Workflow for creating a personalized pangenome with [haplotype sampling](https:/
 - [parameter file](https://github.com/vgteam/vg_wdl/raw/svpack/params/haplotype_sampling.json)
 
 Parameters  (semi-auto-generated from the *parameter_meta* section):
-- *IN_GBZ_FILE*: Path to .gbz index file
+- *GBZ_FILE*: Path to .gbz index file
 - *INPUT_READ_FILE_FIRST*: Input sample 1st read pair fastq.gz
 - *INPUT_READ_FILE_SECOND*: Input sample 2st read pair fastq.gz
 - *HAPL_FILE*: Path to .hapl file
-- *IN_DIST_FILE*: Path to .dist file
+- *DIST_FILE*: Path to .dist file
 - *R_INDEX_FILE*: Path to .ri file
 - *KFF_FILE*: Path to .kff file
-- *IN_OUTPUT_NAME_PREFIX*: Name of the output file (Default: haplotype_sampled_graph)
-- *IN_KMER_LENGTH*: Size of kmer using for sampling (Up to 31) (Default: 29)
+- *OUTPUT_NAME_PREFIX*: Name of the output file (Default: haplotype_sampled_graph)
+- *KMER_LENGTH*: Size of kmer using for sampling (Up to 31) (Default: 29)
 - *CORES*: Number of cores to use with commands. (Default: 16)
 - *WINDOW_LENGTH*: Window length used for building the minimizer index. (Default: 11)
 - *SUBCHAIN_LENGTH*: Target length (in bp) for subchains. (Default: 10000)
@@ -315,7 +315,12 @@ Parameters  (semi-auto-generated from the *parameter_meta* section):
 - *ABSENT_SCORE*: Score for absent kmers. (Default: 0.8)
 - *INCLUDE_REFERENCE*: Include reference paths and generic paths from the full graph in the sampled graph. (Default:
 true)
+- *SET_REFERENCE*: Name of single reference to include in sampled graph. (Default: all references)
 - *DIPLOID*: Activate diploid sampling. (Default: true)
+- *INDEX_MINIMIZER_K*: K-mer size of minimizer index to produce for sampled graph. Should be 29 for short read mapping and 31 for long read mapping. (Default: 29)
+- *INDEX_MINIMIZER_W*: Window size of minimizer index to produce for sampled graph. Should be 11 for short read mapping and 50 for long read mapping. (Default: 11)
+- *INDEX_MINIMIZER_WEIGHTED*: Whether to produce a weighted minimizer index for the sampled graph. (Default: true)
+- *VG_DOCKER*: Container image to use when running vg.
 
 [Test locally](#testing-locally) with:
 

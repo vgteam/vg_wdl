@@ -26,7 +26,7 @@ workflow vgDeepTrioCall {
         File REF_FILE                                               # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                         # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                          # Path to .dict file of the REF_FILE fasta reference
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"           # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.64.0"           # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.64.0)
         File? DEEPTRIO_CHILD_MODEL
         File? DEEPTRIO_PARENT_MODEL
         File? DEEPVAR_MODEL

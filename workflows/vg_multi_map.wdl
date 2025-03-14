@@ -15,7 +15,7 @@ workflow vgMultiMap {
         File INPUT_READ_FILE_1                          # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                          # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                              # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.34.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.64.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.64.0)
         Int READS_PER_CHUNK = 200000000                 # Number of reads contained in each mapping chunk (20000000 for wgs)
         File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                                    # Path to .xg index file

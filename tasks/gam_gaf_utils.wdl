@@ -6,7 +6,7 @@ task mergeGAMandSort {
         String in_sample_name = "sample"
         Int in_cores = 16
         Int in_mem = 120
-        String vg_docker = "quay.io/vgteam/vg:v1.50.1"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     Int disk_size = round(4 * size(in_gam_files, 'G')) + 20
     command <<<
@@ -37,7 +37,7 @@ task mergeGAFandSort {
         Int in_cores = 16
         Int in_mem = 120
         Int disk_size = 4 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 20
-        String vg_docker = "quay.io/vgteam/vg:v1.50.1"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     Int half_cores = if in_cores > 1 then floor(in_cores/2) else 1
@@ -68,7 +68,7 @@ task splitGAM {
 	    Int in_read_per_chunk
         Int in_mem = 30
         Int in_cores = 6
-        String vg_docker = "quay.io/vgteam/vg:v1.50.1"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     Int disk_size = 3 * round(size(in_gam_file, 'G')) + 20
 
@@ -131,7 +131,7 @@ task splitGAF {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -140,7 +140,7 @@ task mergeGAF {
         String in_sample_name
         Array[File] in_gaf_chunk_files
         Int in_disk = round(3*size(in_gaf_chunk_files, 'G')) + 20
-        String vg_docker = "quay.io/vgteam/vg:v1.50.1"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -184,7 +184,7 @@ task surjectGAFtoSortedBAM {
         Int nb_cores = 16
         String mem_gb = 120
         Int disk_size = 5 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 50
-        String vg_docker = "quay.io/vgteam/vg:v1.50.1"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     String out_prefix = sub(sub(sub(basename(in_gaf_file), "\\.gz$", ""), "\\.gaf$", ""), "\\.gam$", "")
     Int half_cores = nb_cores / 2
@@ -252,7 +252,7 @@ task surjectGAFtoBAM {
         Int nb_cores = 16
         String mem_gb = 120
         Int disk_size = 5 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 50
-        String vg_docker = "quay.io/vgteam/vg:v1.50.1"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     String out_prefix = sub(sub(sub(basename(in_gaf_file), "\\.gz$", ""), "\\.gaf$", ""), "\\.gam$", "")
     command <<<

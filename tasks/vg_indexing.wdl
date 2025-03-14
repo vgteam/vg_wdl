@@ -24,7 +24,7 @@ task createDistanceIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.64.0"
 
     }
 }
@@ -63,7 +63,7 @@ task createRIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.64.0"
 
     }
 
@@ -80,6 +80,7 @@ task createHaplotypeIndex {
         Int nb_cores = 16
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_dist_index, "G") + size(in_R_index, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     String out_prefix_name = sub( basename(in_gbz_file), "\\.gbz$", "")
@@ -113,7 +114,7 @@ task createHaplotypeIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
 
     }
 
@@ -124,6 +125,9 @@ task createMinimizerIndex {
     input {
         File in_gbz_file
         File in_dist_index
+        Int in_minimizer_k
+        Int in_minimizer_w
+        Boolean in_minimizer_weighted
         String out_name
         Int nb_cores = 16
         Int in_extract_mem = 120
@@ -142,7 +146,7 @@ task createMinimizerIndex {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        vg minimizer -p -t ~{nb_cores} -o ~{out_name}.min -z ~{out_name}.withzip.zipcodes -d ~{in_dist_index} ~{in_gbz_file}
+        vg minimizer -p -t ~{nb_cores} -k ~{in_minimizer_k} -w ~{in_minimizer_w} ~{if in_minimizer_weighted then "--weighted" else ""} -o ~{out_name}.min -z ~{out_name}.withzip.zipcodes -d ~{in_dist_index} ~{in_gbz_file}
 
     }
 
@@ -155,7 +159,7 @@ task createMinimizerIndex {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.64.0"
 
     }
 

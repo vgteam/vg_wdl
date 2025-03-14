@@ -10,7 +10,7 @@ task vg_map_hts {
         File gcsa_lcp
         File? gbwt
         String vg_map_options = ""
-        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     command <<<
@@ -44,7 +44,7 @@ task runVGGIRAFFE {
         Int nb_cores = 16
         String mem_gb = 120
         Int disk_size = 3 * round(size(fastq_file_1, 'G') + size(fastq_file_2, 'G') + size(in_gbz_file, 'G') + size(in_dist_file, 'G') + size(in_min_file, 'G') + size(in_zipcodes_file, 'G')) + 50
-        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     String out_prefix = sub(sub(sub(basename(fastq_file_1), "\\.gz$", ""), "\\.fastq$", ""), "\\.fq$", "")
@@ -101,7 +101,7 @@ task extractSubsetPathNames {
         String in_reference_prefix = ""
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
         Int in_extract_mem = 120
-        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     command <<<
@@ -151,7 +151,7 @@ task extractReference {
         String in_prefix_to_strip = ""
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
-        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     command {
@@ -192,11 +192,12 @@ task samplingHaplotypes {
         Float het_adjust
         Float absent_score
         Boolean include_reference
+        String? set_reference
         Boolean use_diploid_sampling
         Int nb_cores = 16
         Int in_extract_mem = 120
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G") + size(in_hap_index, "G") + size(in_kmer_info, "G")) + 20
-        String vg_docker = "quay.io/vgteam/vg:v1.51.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     command <<<
@@ -229,6 +230,7 @@ task samplingHaplotypes {
         --het-adjustment ~{het_adjust} \
         --absent-score ~{absent_score} \
         ${INCLUDE_REF} \
+        ~{"--set-reference " + set_reference} \
         ${INCLUDE_DIPL} \
         -i ~{in_hap_index} \
         -k ~{in_kmer_info} \

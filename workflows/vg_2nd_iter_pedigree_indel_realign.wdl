@@ -21,7 +21,7 @@ workflow vgTrioPipeline {
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         Array[String]+ SAMPLE_NAME_SIBLING_LIST             # Input list of sibling sample names. Must follow same order as SIBLING_BAM_FILE_LIST.
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.16.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.64.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.64.0)
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                                        # Path to .xg index file
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)

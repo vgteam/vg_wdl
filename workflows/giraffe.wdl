@@ -16,8 +16,8 @@ workflow Giraffe {
         CRAM_REF: "Genome fasta file associated with the CRAM file"
         CRAM_REF_INDEX: "Index of the fasta file associated with the CRAM file"
         GBZ_FILE: "Path to .gbz index file"
-        DIST_FILE: "Path to .dist index file"
-        MIN_FILE: "Path to .min index file"
+        DIST_FILE: "Path to .dist index file. Optional if using haplotype sampling."
+        MIN_FILE: "Path to .min index file. Optional if using haplotype sampling."
         ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignment, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? Default is 'true'."
@@ -42,11 +42,12 @@ workflow Giraffe {
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'"
-        IN_DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
+        DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
+        SET_REFERENCE:"(OPTIONAL) Name of the single reference to keep for haplotype sampling."
         HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
-        IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
-        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+        KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
+        HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
 
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
@@ -59,8 +60,8 @@ workflow Giraffe {
         File? CRAM_REF
         File? CRAM_REF_INDEX
         File GBZ_FILE
-        File DIST_FILE
-        File MIN_FILE
+        File? DIST_FILE
+        File? MIN_FILE
         File? ZIPCODES_FILE
         String SAMPLE_NAME
         Boolean OUTPUT_SINGLE_BAM = true
@@ -85,13 +86,14 @@ workflow Giraffe {
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = true
-        Boolean IN_DIPLOID = true
-        File? IN_HAPL_FILE
-        File? IN_R_INDEX_FILE
-        File? IN_KFF_FILE
-        Int IN_HAPLOTYPE_NUMBER = 4
+        Boolean DIPLOID = true
+        String? SET_REFERENCE
+        File? HAPL_FILE
+        File? R_INDEX_FILE
+        File? KFF_FILE
+        Int HAPLOTYPE_NUMBER = 4
         
-        String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
     }
@@ -114,16 +116,21 @@ workflow Giraffe {
     if (HAPLOTYPE_SAMPLING) {
         call hapl.HaplotypeSampling {
         input:
-            IN_GBZ_FILE=GBZ_FILE,
+            GBZ_FILE=GBZ_FILE,
             INPUT_READ_FILE_FIRST=read_1_file,
             INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2,
-            HAPL_FILE=IN_HAPL_FILE,
-            IN_DIST_FILE=DIST_FILE,
-            R_INDEX_FILE=IN_R_INDEX_FILE,
-            KFF_FILE=IN_KFF_FILE,
+            HAPL_FILE=HAPL_FILE,
+            DIST_FILE=DIST_FILE,
+            R_INDEX_FILE=R_INDEX_FILE,
+            KFF_FILE=KFF_FILE,
             CORES=MAP_CORES,
-            HAPLOTYPE_NUMBER=IN_HAPLOTYPE_NUMBER,
-            DIPLOID=IN_DIPLOID,
+            HAPLOTYPE_NUMBER=HAPLOTYPE_NUMBER,
+            DIPLOID=DIPLOID,
+            SET_REFERENCE=SET_REFERENCE,
+            INDEX_MINIMIZER_K = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 29 else 31,
+            INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50, 
+            INDEX_MINIMIZER_WEIGHTED = true,
+            VG_DOCKER=VG_DOCKER
         }
 
     }
@@ -131,7 +138,7 @@ workflow Giraffe {
     File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
     File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
     # The zipcode file is optional but we still have a priority list of places to get it from.
-    # But we can't select_first sicne they all might be null.
+    # But we can't select_first since they all might be null.
     Array[File] possible_zipcode_files = select_all([HaplotypeSampling.sampled_zipcodes, ZIPCODES_FILE])
     # We can't actually use None in WDL 1.0 so we need to use a nonexistent null file.
     File? NULL_FILE

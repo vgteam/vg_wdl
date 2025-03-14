@@ -131,7 +131,7 @@ workflow GiraffeDeepVariant {
         Int CALL_CORES = 8
         Int CALL_MEM = 50
         Int EVAL_MEM = 60
-        String VG_DOCKER = "quay.io/vgteam/vg:v1.51.0"
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
     }
