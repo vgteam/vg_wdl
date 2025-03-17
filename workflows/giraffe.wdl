@@ -10,8 +10,8 @@ workflow Giraffe {
         description: "## Giraffe workflow \n Core VG Giraffe mapping, usable for DeepVariant. Reads are mapped to a pangenome with vg giraffe and pre-processed (e.g. indel realignment). More information at [https://github.com/vgteam/vg_wdl/tree/gbz#giraffe-workflow](https://github.com/vgteam/vg_wdl/tree/gbz#giraffe-workflow)."
     }
     parameter_meta {
-        INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz"
-        INPUT_READ_FILE_2: "Input sample 2nd read pair fastq.gz"
+        INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz or fastq"
+        INPUT_READ_FILE_2: "Input sample 2nd read pair fastq.gz or fastq"
         INPUT_CRAM_FILE: "Input CRAM file"
         CRAM_REF: "Genome fasta file associated with the CRAM file"
         CRAM_REF_INDEX: "Index of the fasta file associated with the CRAM file"
