@@ -116,13 +116,18 @@ workflow Giraffe {
     }
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
+    if(PAIRED_READS){
+        # We need the second read in the pair, if paired, for hap sampling.
+        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
+    }
 
     if (HAPLOTYPE_SAMPLING) {
         call hapl.HaplotypeSampling {
         input:
             GBZ_FILE=GBZ_FILE,
             INPUT_READ_FILE_FIRST=read_1_file,
-            INPUT_READ_FILE_SECOND=INPUT_READ_FILE_2,
+            # If we're not doing paired reads the result here is probably null.
+            INPUT_READ_FILE_SECOND=if PAIRED_READS then read_2_file else INPUT_READ_FILE_2, 
             HAPL_FILE=HAPL_FILE,
             DIST_FILE=DIST_FILE,
             R_INDEX_FILE=R_INDEX_FILE,
@@ -213,10 +218,9 @@ workflow Giraffe {
     # Distribute vg mapping operation over each chunked read pair #
     ################################################################
     if(PAIRED_READS){
-        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
         call utils.splitReads as secondReadPair {
             input:
-            in_read_file=read_2_file,
+            in_read_file=select_first([read_2_file]),
             in_pair_id="2",
             in_reads_per_chunk=READS_PER_CHUNK,
             in_split_read_cores=SPLIT_READ_CORES

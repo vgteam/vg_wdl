@@ -169,7 +169,14 @@ task splitReads {
         #to turn off echo do 'set +o xtrace'
 
         CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
+        if [[ ~{in_read_file} == *.gz ]] ; then
+            DECOMPRESS_COMMAND=(gzip -cd)
+        else
+            # Support inputs that aren't actually compressed.
+            # TODO: Sniff for actual compressed data instead of by extension.
+            DECOMPRESS_COMMAND=(cat)
+        fi
+        "${DECOMPRESS_COMMAND[@]}" ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
     >>>
     output {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
