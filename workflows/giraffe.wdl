@@ -25,12 +25,12 @@ workflow Giraffe {
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'false'."
         PAIRED_READS: "Are the reads paired? Default is 'true'."
         READS_PER_CHUNK: "Number of reads contained in each mapping chunk. Default 20 000 000."
-        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
-        CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index."
+        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths. If using REFERENCE_PREFIX, contig names in here should have the prefix."
+        CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index. If using REFERENCE_PREFIX, contig names in here should have the prefix."
         REFERENCE_PREFIX: "Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)"
-        REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
-        REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
-        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set"
+        REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference. If using REFERENCE_PREFIX, contig names in here should not have the prefix."
+        REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file. If using REFERENCE_PREFIX, contig names in here should not have the prefix."
+        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set. If using REFERENCE_PREFIX, contig names in here should not have the prefix. This is used in BAM processing and not for choosing contigs for the surjection, which uses PATH_LIST_FILE."
         PRUNE_LOW_COMPLEXITY: "Whether or not to remove low-complexity or short in-tail anchors when surjecting and force tail realingment. Default is 'true'."  
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
@@ -186,7 +186,8 @@ workflow Giraffe {
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractSubsetPathNames.output_path_list_file, written_path_names_file])
     
     # To make sure that we have a FASTA reference with a contig set that
-    # exactly matches the graph, we generate it ourselves, from the graph.
+    # exactly matches the graph (except for removing the name prefix), we
+    # generate it ourselves, from the graph.
     if (!defined(REFERENCE_FILE)) {
         call map.extractReference {
             input:
