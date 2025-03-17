@@ -130,7 +130,7 @@ task createMinimizerIndex {
         Boolean in_minimizer_weighted
         String out_name
         Int nb_cores = 16
-        Int in_extract_mem = 120
+        Int in_extract_mem = 120 # Probably needs to be more like 320 GB if using weighted indexing
         Int in_extract_disk = 4 * round(size(in_gbz_file, "G") + size(in_dist_index, "G")) + 20
     }
 

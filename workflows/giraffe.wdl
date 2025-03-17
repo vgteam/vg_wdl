@@ -48,6 +48,8 @@ workflow Giraffe {
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
         HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+        INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
+        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)" 
 
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
@@ -92,6 +94,8 @@ workflow Giraffe {
         File? R_INDEX_FILE
         File? KFF_FILE
         Int HAPLOTYPE_NUMBER = 4
+        Boolean INDEX_MINIMIZER_WEIGHTED = true
+        Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
         
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
@@ -123,13 +127,14 @@ workflow Giraffe {
             DIST_FILE=DIST_FILE,
             R_INDEX_FILE=R_INDEX_FILE,
             KFF_FILE=KFF_FILE,
-            CORES=MAP_CORES,
             HAPLOTYPE_NUMBER=HAPLOTYPE_NUMBER,
             DIPLOID=DIPLOID,
             SET_REFERENCE=SET_REFERENCE,
             INDEX_MINIMIZER_K = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 29 else 31,
-            INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50, 
-            INDEX_MINIMIZER_WEIGHTED = true,
+            INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50,
+            INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
+            CORES=MAP_CORES,
+            INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
             VG_DOCKER=VG_DOCKER
         }
 
