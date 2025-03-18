@@ -1,5 +1,6 @@
 version 1.0
 
+import "../tasks/validation.wdl" as validation
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
@@ -102,6 +103,39 @@ workflow Giraffe {
         String? VG_SURJECT_DOCKER
     }
 
+    # Set up enough path list stuff to do validation as soon as possible.
+    # We don't just check the final path list because that could come from
+    # haplotype sampling and we want to check any provided path list before going
+    # into haplotype sampling.
+    if (defined(CONTIGS)) {
+        # Put the paths in a file to use later. We know the value is defined,
+        # but WDL is a bit low on unboxing calls for optionals so we use
+        # select_first.
+        File written_path_names_file = write_lines(select_first([CONTIGS]))
+        if (REFERENCE_PREFIX != "") {
+            call validation.checkPathList as checkWrittenPathList {
+                input:
+                    in_path_list_file=written_path_names_file,
+                    in_reference_prefix=REFERENCE_PREFIX
+            }
+        }
+    }
+    if (defined(PATH_LIST_FILE) && REFERENCE_PREFIX != "") {
+        call validation.checkPathList as checkProvidedPathList {
+            input:
+                in_path_list_file=select_first([PATH_LIST_FILE]),
+                in_reference_prefix=REFERENCE_PREFIX
+        }
+    }
+
+    # Validate the dict file if fed in.
+    if (defined(REFERENCE_DICT_FILE) && REFERENCE_PREFIX != "") {
+        call validation.checkDict as checkProvidedDict {
+            input:
+                in_dict_file=select_first([REFERENCE_DICT_FILE]),
+                in_reference_prefix=REFERENCE_PREFIX
+        }
+    }
 
 
     if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
@@ -180,16 +214,18 @@ workflow Giraffe {
                     in_extract_mem=MAP_MEM,
                     vg_docker=VG_DOCKER
             }
+            
+            if (REFERENCE_PREFIX != "") {
+                call validation.checkPathList as checkExtractedPathList {
+                    input:
+                        in_path_list_file=extractSubsetPathNames.output_path_list_file,
+                        in_reference_prefix=REFERENCE_PREFIX
+                }
+            }
         }
     } 
-    if (defined(CONTIGS)) {
-        # Put the paths in a file to use later. We know the value is defined,
-        # but WDL is a bit low on unboxing calls for optionals so we use
-        # select_first.
-        File written_path_names_file = write_lines(select_first([CONTIGS]))
-    }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractSubsetPathNames.output_path_list_file, written_path_names_file])
-    
+
     # To make sure that we have a FASTA reference with a contig set that
     # exactly matches the graph (except for removing the name prefix), we
     # generate it ourselves, from the graph.
