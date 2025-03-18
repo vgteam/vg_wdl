@@ -10,7 +10,7 @@ task checkPathList {
     }
 
     command <<<
-        set -eux -o pipefail
+        set -eu
 
         if [[ "~{in_reference_prefix}" == "" ]] ; then
             # No prefix used
@@ -48,7 +48,7 @@ task checkDict {
     }
 
     command <<<
-        set -eux -o pipefail
+        set -eu
 
         if [[ "~{in_reference_prefix}" == "" ]] ; then
             # No prefix used
