@@ -664,3 +664,4 @@ task kmerCountingKMC {
         docker: "quay.io/biocontainers/kmc:3.2.1--hf1761c0_2"
     }
 }
+
