@@ -136,32 +136,34 @@ task runDeepVariantMakeExamples {
         if [[ ~{length(in_model_files)} -gt 0 ]] ; then
             # Need to use a custom model
             mkdir model_dir
-            # Materialize the files so DV can't claim they don't exist.
-            cp -L ~{sep=" " in_model_files} model_dir/
+            ln -s ~{sep=" " in_model_files} model_dir/
             if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
                 # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
                 # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
                 mkdir model_dir/variables
-                cp -L ~{sep=" " in_model_variables_files} model_dir/variables/
+                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
             fi
         else
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
         ls -lah model_dir >&2
-        # Hackily list where Toil puts the inputs
-        ls -lah /mnt/miniwdl_task_container/work/_miniwdl_inputs/0 >&2 || true
-        if [[ "$(find model_dir -xtype l | wc -l)" != "0" ]] ; then
-            echo >&2 "Broken symlinks in model checkpoint!"
-            find >&2 model_dir -xtype l
-        fi
-        CHECKPOINT_INDEX_FILES=("$(pwd)"/model_dir/*.ckpt.index)
-        if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
-            # This is a checkpoint-format model and we need to name it by passing this path without the .index
-            CHECKPOINT_NAME="${CHECKPOINT_INDEX_FILES[0]%.index}"
-        else
+        if [[ -e model_dir/saved_model.pb ]] ; then
+            # "If checkpoint is a directory containing saved_model.pb then it is a saved model."
             # This is a savedmodel-format model and is named just by the directory
-            CHECKPOINT_NAME="$(pwd)/model_dir"
+            CHECKPOINT_NAME="model_dir"
+        else
+            # Try and guess which file in the list is the actual checkpoint file.
+            # Usually it is named with .ckpt, but it *can* be named anything.
+            # TODO: Can we actually find it by index name like this?
+            INDEX_FILES=(model_dir/*.index)
+            if [[ -e "${INDEX_FILES[0]}" ]] ; then
+                # This is a checkpoint-format model and we need to name it by passing this path without the .index
+                CHECKPOINT_NAME="${INDEX_FILES[0]%.index}"
+            else
+                echo >&2 "Could not determine model name. Make sure you have a saved_mdel.pb or a .index file."
+                exit 1
+            fi
         fi
         CHECKPOINT_ARGS=()
         if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
@@ -245,32 +247,34 @@ task runDeepVariantCallVariants {
         if [[ ~{length(in_model_files)} -gt 0 ]] ; then
             # Need to use a custom model
             mkdir model_dir
-            # Materialize the files so DV can't claim they don't exist.
-            cp -L ~{sep=" " in_model_files} model_dir/
+            ln -s ~{sep=" " in_model_files} model_dir/
             if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
                 # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
                 # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
                 mkdir model_dir/variables
-                cp -L ~{sep=" " in_model_variables_files} model_dir/variables/
+                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
             fi
         else
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
         fi
         ls -lah model_dir >&2
-        # Hackily list where Toil puts the inputs
-        ls -lah /mnt/miniwdl_task_container/work/_miniwdl_inputs/0 >&2 || true
-        if [[ "$(find model_dir -xtype l | wc -l)" != "0" ]] ; then
-            echo >&2 "Broken symlinks in model checkpoint!"
-            find >&2 model_dir -xtype l
-        fi
-        CHECKPOINT_INDEX_FILES=("$(pwd)"/model_dir/*.ckpt.index)
-        if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
-            # This is a checkpoint-format model and we need to name it by passing this path without the .index
-            CHECKPOINT_NAME="${CHECKPOINT_INDEX_FILES[0]%.index}"
-        else
+        if [[ -e model_dir/saved_model.pb ]] ; then
+            # "If checkpoint is a directory containing saved_model.pb then it is a saved model."
             # This is a savedmodel-format model and is named just by the directory
-            CHECKPOINT_NAME="$(pwd)/model_dir"
+            CHECKPOINT_NAME="model_dir"
+        else
+            # Try and guess which file in the list is the actual checkpoint file.
+            # Usually it is named with .ckpt, but it *can* be named anything.
+            # TODO: Can we actually find it by index name like this?
+            INDEX_FILES=(model_dir/*.index)
+            if [[ -e "${INDEX_FILES[0]}" ]] ; then
+                # This is a checkpoint-format model and we need to name it by passing this path without the .index
+                CHECKPOINT_NAME="${INDEX_FILES[0]%.index}"
+            else
+                echo >&2 "Could not determine model name. Make sure you have a saved_mdel.pb or a .index file."
+                exit 1
+            fi
         fi
         
         /opt/deepvariant/bin/call_variants \
