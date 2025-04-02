@@ -154,13 +154,13 @@ task runDeepVariantMakeExamples {
             echo >&2 "Broken symlinks in model checkpoint!"
             find >&2 -xtype l model_dir
         fi
-        CHECKPOINT_INDEX_FILES=(model_dir/*.ckpt.index)
+        CHECKPOINT_INDEX_FILES=("$(pwd)"/model_dir/*.ckpt.index)
         if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
             # This is a checkpoint-format model and we need to name it by passing this path without the .index
             CHECKPOINT_NAME="${CHECKPOINT_INDEX_FILES[0]%.index}"
         else
             # This is a savedmodel-format model and is named just by the directory
-            CHECKPOINT_NAME="./model_dir"
+            CHECKPOINT_NAME="$(pwd)/model_dir"
         fi
         CHECKPOINT_ARGS=()
         if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
@@ -262,13 +262,13 @@ task runDeepVariantCallVariants {
             echo >&2 "Broken symlinks in model checkpoint!"
             find >&2 -xtype l model_dir
         fi
-        CHECKPOINT_INDEX_FILES=(model_dir/*.ckpt.index)
+        CHECKPOINT_INDEX_FILES=("$(pwd)"/model_dir/*.ckpt.index)
         if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
             # This is a checkpoint-format model and we need to name it by passing this path without the .index
             CHECKPOINT_NAME="${CHECKPOINT_INDEX_FILES[0]%.index}"
         else
             # This is a savedmodel-format model and is named just by the directory
-            CHECKPOINT_NAME="./model_dir"
+            CHECKPOINT_NAME="$(pwd)/model_dir"
         fi
         
         /opt/deepvariant/bin/call_variants \
