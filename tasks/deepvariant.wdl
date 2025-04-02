@@ -136,12 +136,13 @@ task runDeepVariantMakeExamples {
         if [[ ~{length(in_model_files)} -gt 0 ]] ; then
             # Need to use a custom model
             mkdir model_dir
-            ln -s ~{sep=" " in_model_files} model_dir/
+            # Materialize the files so DV can't claim they don't exist.
+            cp -L ~{sep=" " in_model_files} model_dir/
             if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
                 # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
                 # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
                 mkdir model_dir/variables
-                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
+                cp -L ~{sep=" " in_model_variables_files} model_dir/variables/
             fi
         else
             # Use default models for type
@@ -244,12 +245,13 @@ task runDeepVariantCallVariants {
         if [[ ~{length(in_model_files)} -gt 0 ]] ; then
             # Need to use a custom model
             mkdir model_dir
-            ln -s ~{sep=" " in_model_files} model_dir/
+            # Materialize the files so DV can't claim they don't exist.
+            cp -L ~{sep=" " in_model_files} model_dir/
             if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
                 # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
                 # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
                 mkdir model_dir/variables
-                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
+                cp -L ~{sep=" " in_model_variables_files} model_dir/variables/
             fi
         else
             # Use default models for type
