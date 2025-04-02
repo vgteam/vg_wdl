@@ -150,9 +150,9 @@ task runDeepVariantMakeExamples {
         ls -lah model_dir >&2
         # Hackily list where Toil puts the inputs
         ls -lah /mnt/miniwdl_task_container/work/_miniwdl_inputs/0 >&2 || true
-        if [[ "$(find -xtype l model_dir | wc -l)" != "0" ]] ; then
+        if [[ "$(find model_dir -xtype l | wc -l)" != "0" ]] ; then
             echo >&2 "Broken symlinks in model checkpoint!"
-            find >&2 -xtype l model_dir
+            find >&2 model_dir -xtype l
         fi
         CHECKPOINT_INDEX_FILES=("$(pwd)"/model_dir/*.ckpt.index)
         if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
@@ -258,9 +258,9 @@ task runDeepVariantCallVariants {
         ls -lah model_dir >&2
         # Hackily list where Toil puts the inputs
         ls -lah /mnt/miniwdl_task_container/work/_miniwdl_inputs/0 >&2 || true
-        if [[ "$(find -xtype l model_dir | wc -l)" != "0" ]] ; then
+        if [[ "$(find model_dir -xtype l | wc -l)" != "0" ]] ; then
             echo >&2 "Broken symlinks in model checkpoint!"
-            find >&2 -xtype l model_dir
+            find >&2 model_dir -xtype l
         fi
         CHECKPOINT_INDEX_FILES=("$(pwd)"/model_dir/*.ckpt.index)
         if [[ -e "${CHECKPOINT_INDEX_FILES[0]}" ]] ; then
