@@ -71,7 +71,7 @@ task indexReference {
         cpu: 1
         memory: in_index_mem + " GB"
         disks: "local-disk " + in_index_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -176,7 +176,7 @@ task splitReads {
             # TODO: Sniff for actual compressed data instead of by extension.
             DECOMPRESS_COMMAND=(cat)
         fi
-        "${DECOMPRESS_COMMAND[@]}" ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
+        "${DECOMPRESS_COMMAND[@]}" ~{in_read_file} | split -l $CHUNK_LINES --filter='bgzip --threads ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
     >>>
     output {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
@@ -187,7 +187,7 @@ task splitReads {
         cpu: in_split_read_cores
         memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: "quay.io/glennhickey/pigz:2.3.1"
+        docker: "quay.io/parsaeskandar/bgzip:1.17"
     }
 }
 
@@ -278,7 +278,7 @@ task sortBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -324,7 +324,7 @@ task leftShiftBAMFile {
         memory: "20 GB"
         cpu: 1
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/jmonlong/freebayes-samtools:1.2.0_1.10"
+        docker: "quay.io/parsaeskandar/freebayes-samtools:1.3.9_1.13"
     }
 }
 
@@ -534,7 +534,7 @@ task splitBAMbyPath {
         memory: mem_gb + " GB"
         cpu: thread_count
         disks: "local-disk " + disk_size + " SSD"
-        docker: "staphb/samtools:1.20"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -575,7 +575,7 @@ task mergeAlignmentBAMChunks {
         memory: mem_gb + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "staphb/samtools:1.20"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -659,7 +659,7 @@ task convertBAMtoFASTQ {
         cpu: in_cores
         memory: in_memory + " GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "staphb/samtools:1.20"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }    
 }
 
