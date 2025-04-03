@@ -85,7 +85,7 @@ task runVGGIRAFFE {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.60.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -110,7 +110,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.60.0"
+        docker: "quay.io/vgteam/vg:v1.63.1"
     }
 }
 
@@ -146,7 +146,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.60.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -157,6 +157,7 @@ task samplingHaplotypes {
         File in_hap_index
         File in_kmer_info
         String output_file_name
+        String set_reference
         Int haplotype_number
         Float present_discount
         Float het_adjust
@@ -193,11 +194,19 @@ task samplingHaplotypes {
             INCLUDE_DIPL="--diploid-sampling"
         fi
 
+        SET_REF=""
+        if [ "~{set_reference}" != "" ]
+        then
+            SET_REF="--set-reference ~{set_reference}"
+        fi
+
         INCLUDE_LINEAR=""
         if [ ~{use_linear_structure} == true ]
         then
             INCLUDE_LINEAR="--linear-structure"
         fi
+
+
 
         vg haplotypes -v 2 -t ~{nb_cores} \
         --num-haplotypes ~{haplotype_number} \
@@ -205,6 +214,7 @@ task samplingHaplotypes {
         --het-adjustment ~{het_adjust} \
         --absent-score ~{absent_score} \
         ${INCLUDE_REF} \
+        ${SET_REF} \
         ${INCLUDE_DIPL} \
         ${INCLUDE_LINEAR} \
         -i ~{in_hap_index} \
@@ -220,7 +230,7 @@ task samplingHaplotypes {
         cpu: nb_cores
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.60.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
 
     }
 

@@ -44,7 +44,9 @@ workflow Giraffe {
         IN_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         IN_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
-        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+        IN_HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 32)"
+        IN_SET_REFERENCE: "Use sample X as a reference sample (may repeat - Default: '')"
+        LINEAR_STRUCTURE: "Include linear structure in haplotype sampling. Default is 'false'"
 
 
     }
@@ -71,6 +73,7 @@ workflow Giraffe {
         File? REFERENCE_DICT_FILE
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
+        Boolean LINEAR_STRUCTURE = false
         Int REALIGNMENT_EXPANSION_BASES = 160
         Int MAX_FRAGMENT_LENGTH = 3000
         String GIRAFFE_OPTIONS = ""
@@ -82,7 +85,8 @@ workflow Giraffe {
         File? IN_HAPL_FILE
         File? IN_R_INDEX_FILE
         File? IN_KFF_FILE
-        Int IN_HAPLOTYPE_NUMBER = 4
+        Int IN_HAPLOTYPE_NUMBER = 32
+        String? IN_SET_REFERENCE
 
     }
 
@@ -101,10 +105,7 @@ workflow Giraffe {
 
     File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
 
-
-
-
-	
+#    String SET_REF = select_first([IN_SET_REFERENCE, ""])
     if (HAPLOTYPE_SAMPLING) {
         call hapl.HaplotypeSampling {
             input:
@@ -118,6 +119,7 @@ workflow Giraffe {
                 CORES=MAP_CORES,
                 HAPLOTYPE_NUMBER=IN_HAPLOTYPE_NUMBER,
                 DIPLOID=IN_DIPLOID,
+                SET_REFERENCE=IN_SET_REFERENCE
         }
 
         File file_gbz1 = HaplotypeSampling.sampled_graph

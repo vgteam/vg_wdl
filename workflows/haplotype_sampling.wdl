@@ -30,7 +30,7 @@ workflow HaplotypeSampling {
         ABSENT_SCORE: "Score for absent kmers. (Default: 0.8)"
         INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)"
         DIPLOID: "Activate diploid sampling. (Default: true)"
-        LINEAR_STRUCTURE: "Use linear structure for the sampled graph. (Default: false)"
+        SET_REFERENCE: "Use sample X as a reference sample (may repeat)"
     }
     input {
         File IN_GBZ_FILE
@@ -42,7 +42,8 @@ workflow HaplotypeSampling {
         File? KFF_FILE
         String? IN_OUTPUT_NAME_PREFIX
         Int? IN_KMER_LENGTH
-        Int CORES = 16
+        String? SET_REFERENCE
+        Int CORES = 8
         Int WINDOW_LENGTH = 11
         Int SUBCHAIN_LENGTH = 10000
         Int HAPLOTYPE_NUMBER = 4
@@ -51,7 +52,7 @@ workflow HaplotypeSampling {
         Float ABSENT_SCORE = 0.8
         Boolean INCLUDE_REFERENCE = true
         Boolean DIPLOID = true
-        Boolean LINEAR_STRUCTURE = false
+        Boolean USE_LINEAR_STRUCTURE = false
 
 
     }
@@ -95,7 +96,7 @@ workflow HaplotypeSampling {
                 kmer_length=KMER_LENGTH,
                 window_length=WINDOW_LENGTH,
                 subchain_length=SUBCHAIN_LENGTH,
-                use_linear_structure=LINEAR_STRUCTURE
+                use_linear_structure=USE_LINEAR_STRUCTURE
         }
     }
 
@@ -116,6 +117,7 @@ workflow HaplotypeSampling {
 
     File kmer_information = select_first([KFF_FILE, kmerCountingKMC.kff_file])
 
+    String SET_REFERENCE_NAME = select_first([SET_REFERENCE, ""])
     call map.samplingHaplotypes {
         input:
             in_gbz_file=IN_GBZ_FILE,
@@ -129,7 +131,8 @@ workflow HaplotypeSampling {
             include_reference = INCLUDE_REFERENCE,
             nb_cores=CORES,
             use_diploid_sampling=DIPLOID,
-            use_linear_structure=LINEAR_STRUCTURE
+            set_reference=SET_REFERENCE_NAME,
+            use_linear_structure=USE_LINEAR_STRUCTURE
 
 
     }
