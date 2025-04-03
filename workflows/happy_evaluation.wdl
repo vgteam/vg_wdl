@@ -20,6 +20,7 @@ workflow HappyEvaluation {
         EVALUATION_REGIONS_BED: "(Optional) BED to restrict comparison against TRUTH_VCF to"
         REFERENCE_PREFIX: "(Optional) Remove this off the beginning of sequence names in the VCF"
         REMOVE_HOM_REFS: "(Optional) Should homozygous ref calls be removed? (might help if hap.py segfaults). Default 'false'."
+        RUN_STANDALONE_VCFEVAL: "whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)"
     }
     
     input {
@@ -32,6 +33,7 @@ workflow HappyEvaluation {
         File? EVALUATION_REGIONS_BED
         String REFERENCE_PREFIX = ""
         Boolean REMOVE_HOM_REFS = false
+        Boolean RUN_STANDALONE_VCFEVAL = true
     }
     
     # To evaluate the VCF we need a template of the reference
@@ -89,19 +91,22 @@ workflow HappyEvaluation {
         }
     }
     File truth_vcf_index = select_first([TRUTH_VCF_INDEX, indexTruthVcf.vcf_index_file])
-
-    # Direct vcfeval comparison makes an archive with FP and FN VCFs
-    call eval.compareCalls {
-        input:
-        in_sample_vcf_file=vcf_file,
-        in_sample_vcf_index_file=vcf_index,
-        in_truth_vcf_file=TRUTH_VCF,
-        in_truth_vcf_index_file=truth_vcf_index,
-        in_template_archive=buildReferenceTemplate.output_template_archive,
-        in_evaluation_regions_file=EVALUATION_REGIONS_BED
+    
+    if (RUN_STANDALONE_VCFEVAL) {
+        # Direct vcfeval comparison makes an archive with FP and FN VCFs
+        call eval.compareCalls {
+            input:
+            in_sample_vcf_file=vcf_file,
+            in_sample_vcf_index_file=vcf_index,
+            in_truth_vcf_file=TRUTH_VCF,
+            in_truth_vcf_index_file=truth_vcf_index,
+            in_template_archive=buildReferenceTemplate.output_template_archive,
+            in_evaluation_regions_file=EVALUATION_REGIONS_BED
+        }
     }
     
-    # Hap.py comparison makes accuracy results stratified by SNPs and indels
+    # Hap.py comparison makes accuracy results stratified by SNPs and indels,
+    # and also an archive with FP and FN VCFs.
     call eval.compareCallsHappy {
         input:
         in_sample_vcf_file=vcf_file,
@@ -114,8 +119,8 @@ workflow HappyEvaluation {
     }
     
     output {
-        File output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
-        File output_vcfeval_evaluation_summary = compareCalls.output_evaluation_summary
+        File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
+        File? output_vcfeval_evaluation_summary = compareCalls.output_evaluation_summary
         File output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
         File output_happy_evaluation_summary = compareCallsHappy.output_evaluation_summary
     }   
