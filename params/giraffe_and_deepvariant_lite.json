@@ -7,6 +7,6 @@
   "GiraffeDeepVariantLite.GGBWT_FILE": "tests/small_sim_graph/graph.gg",
   "GiraffeDeepVariantLite.MIN_FILE": "tests/small_sim_graph/graph.min",
   "GiraffeDeepVariantLite.DIST_FILE": "tests/small_sim_graph/graph.dist",
-  "GiraffeDeepVariantLite.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.3.0"
+  "GiraffeDeepVariantLite.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.8.0"
 }
 

@@ -15,10 +15,9 @@ task runDeepVariantMakeExamples {
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
         String in_other_makeexamples_arg = ""
-        Boolean in_dv_is_1_7_or_newer = false # Needs to be True for DV 1.7+
         Int in_call_cores
         Int in_call_mem
-        String in_dv_container = "google/deepvariant:1.5.0"
+        String in_dv_container = "google/deepvariant:1.8.0"
     }
     Int disk_size = round(2 * size(in_bam_file, 'G')) + 20
     command <<<
@@ -61,9 +60,6 @@ task runDeepVariantMakeExamples {
         # Except instead of building a channel list we load it form the model.
         case ${MODEL_TYPE} in
             WGS)
-                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
-                    MODEL_TYPE_ARGS+=(--channels insert_size)
-                fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
@@ -71,9 +67,6 @@ task runDeepVariantMakeExamples {
                 ;;
 
             WES)
-                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
-                    MODEL_TYPE_ARGS+=(--channels insert_size)
-                fi
                 if [ ~{defined(in_min_mapq)} == true ]; then
                     # Add our min MAPQ override
                     MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
@@ -81,11 +74,47 @@ task runDeepVariantMakeExamples {
                 ;;
 
             PACBIO)
-                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
-                    MODEL_TYPE_ARGS+=(--add_hp_channel)
-                fi
                 MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
                 MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
+                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                MODEL_TYPE_ARGS+=(--partition_size 25000)
+                MODEL_TYPE_ARGS+=(--phase_reads)
+                MODEL_TYPE_ARGS+=(--pileup_image_width 147)
+                MODEL_TYPE_ARGS+=(--norealign_reads)
+                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                MODEL_TYPE_ARGS+=(--track_ref_reads)
+                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                ;;
+
+            ONT_R104)
+                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
+                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                MODEL_TYPE_ARGS+=(--partition_size 25000)
+                MODEL_TYPE_ARGS+=(--phase_reads)
+                MODEL_TYPE_ARGS+=(--pileup_image_width 99)
+                MODEL_TYPE_ARGS+=(--norealign_reads)
+                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                MODEL_TYPE_ARGS+=(--track_ref_reads)
+                MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
+                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                ;;
+            
+            HYBRID_PACBIO_ILLUMINA)
+                if [ ~{defined(in_min_mapq)} == true ]; then
+                    # Add our min MAPQ override
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                fi
+                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                ;;
+
+            MASSEQ)
+                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                MODEL_TYPE_ARGS+=(--max_reads_per_partition 0)
                 MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
                 MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
                 MODEL_TYPE_ARGS+=(--partition_size 25000)
@@ -95,40 +124,8 @@ task runDeepVariantMakeExamples {
                 MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
                 MODEL_TYPE_ARGS+=(--track_ref_reads)
                 MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
-                if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
-                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                fi
-                ;;
-
-            ONT_R104)
-                if [[ ~{in_dv_is_1_7_or_newer} == false ]] ; then
-                    MODEL_TYPE_ARGS+=(--add_hp_channel)
-                fi
-                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
-                MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
-                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
-                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
-                MODEL_TYPE_ARGS+=(--partition_size 25000)
-                MODEL_TYPE_ARGS+=(--phase_reads)
-                MODEL_TYPE_ARGS+=(--pileup_image_width 199)
-                MODEL_TYPE_ARGS+=(--norealign_reads)
-                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
-                MODEL_TYPE_ARGS+=(--track_ref_reads)
-                MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
-                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
-                if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
-                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                fi
-                ;;
-            
-            HYBRID_PACBIO_ILLUMINA)
-                if [ ~{defined(in_min_mapq)} == true ]; then
-                    # Add our min MAPQ override
-                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
-                fi
-                if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
-                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                fi
+                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                MODEL_TYPE_ARGS+=(--max_reads_for_dynamic_bases_per_region 1500)
                 ;;
         esac
 
@@ -165,11 +162,7 @@ task runDeepVariantMakeExamples {
                 exit 1
             fi
         fi
-        CHECKPOINT_ARGS=()
-        if [[ ~{in_dv_is_1_7_or_newer} == true ]] ; then
-            # We only actually show the model to DV if we want to use the channels from it. Older DV can't take it here.
-            CHECKPOINT_ARGS+=(--checkpoint "${CHECKPOINT_NAME}")
-        fi
+        CHECKPOINT_ARGS=(--checkpoint "${CHECKPOINT_NAME}")
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
@@ -218,7 +211,7 @@ task runDeepVariantCallVariants {
         Int in_call_cores
         Int in_call_mem
         Boolean in_use_gpus = true
-        String in_dv_gpu_container = "google/deepvariant:1.5.0-gpu"
+        String in_dv_gpu_container = "google/deepvariant:1.8.0-gpu"
     }
     Int disk_size = 5 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 50
     command <<<
