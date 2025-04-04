@@ -5,6 +5,6 @@
   "GiraffeDeepVariant.SAMPLE_NAME": "s0",
   "GiraffeDeepVariant.MIN_FILE": "tests/small_sim_graph/graph.min",
   "GiraffeDeepVariant.DIST_FILE": "tests/small_sim_graph/graph.dist",
-  "GiraffeDeepVariant.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.8.0"
+  "GiraffeDeepVariant.DV_GPU_DOCKER": "google/deepvariant:1.8.0-gpu",
+  "GiraffeDeepVariant.VG_DOCKER": "quay.io/vgteam/vg:v1.64.0"
 }
-
