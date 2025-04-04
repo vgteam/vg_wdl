@@ -86,7 +86,7 @@ task compareCallsHappy {
         File? in_restrict_regions_file
         String? in_target_region
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G") + size(in_reference_file, "G")) + 20
-        Int in_mem = 16
+        Int in_mem = 32
         Int in_cores = 8
     }
     command <<<
