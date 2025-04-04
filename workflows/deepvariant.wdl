@@ -1,8 +1,8 @@
 version 1.0
 
-import "../tasks/variant_evaluation.wdl" as eval
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/deepvariant.wdl" as dv
+import "happy_evaluation.wdl" as happy
 
 workflow DeepVariant {
 
@@ -212,43 +212,21 @@ workflow DeepVariant {
     }
 
     if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
-    
-        # To evaluate the VCF we need a template of the reference
-        call eval.buildReferenceTemplate {
+        call happy.HappyEvaluation {
             input:
-                in_reference_file=reference_file
-        }
-        
-        if (RUN_STANDALONE_VCFEVAL) {
-            # Direct vcfeval comparison makes an archive with FP and FN VCFs
-            call eval.compareCalls {
-                input:
-                    in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                    in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                    in_truth_vcf_file=select_first([TRUTH_VCF]),
-                    in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                    in_template_archive=buildReferenceTemplate.output_template_archive,
-                    in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                    in_restrict_regions_file=RESTRICT_REGIONS_BED,
-                    in_target_region=TARGET_REGION,
-                    in_mem=EVAL_MEM
-            }
-        }
-        
-        # Hap.py comparison makes accuracy results stratified by SNPs and indels
-        call eval.compareCallsHappy {
-            input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_template_archive=buildReferenceTemplate.output_template_archive,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_restrict_regions_file=RESTRICT_REGIONS_BED,
-                in_target_region=TARGET_REGION,
-                in_mem=EVAL_MEM
+                VCF=concatClippedVCFChunks.output_merged_vcf,
+                VCF_INDEX=concatClippedVCFChunks.output_merged_vcf_index,
+                TRUTH_VCF=select_first([TRUTH_VCF]),
+                TRUTH_VCF_INDEX=TRUTH_VCF_INDEX,
+                REFERENCE_FILE=reference_file,
+                REFERENCE_INDEX_FILE=reference_index_file,
+                EVALUATION_REGIONS_BED=EVALUATION_REGIONS_BED,
+                RESTRICT_REGIONS_BED=RESTRICT_REGIONS_BED,
+                TARGET_REGION=TARGET_REGION,
+                # Don't forward the reference prefix; we did it already on the BAMs.
+                REMOVE_HOM_REFS=false,
+                RUN_STANDALONE_VCFEVAL=RUN_STANDALONE_VCFEVAL,
+                EVAL_MEM=EVAL_MEM
         }
     }
 
@@ -270,8 +248,8 @@ workflow DeepVariant {
     }
 
     output {
-        File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
-        File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
+        File? output_vcfeval_evaluation_archive = HappyEvaluation.output_vcfeval_evaluation_archive
+        File? output_happy_evaluation_archive = HappyEvaluation.output_happy_evaluation_archive
         File output_vcf = concatClippedVCFChunks.output_merged_vcf
         File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
         File output_gvcf = concatClippedGVCFChunks.output_merged_vcf
