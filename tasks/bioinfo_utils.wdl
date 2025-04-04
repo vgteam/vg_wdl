@@ -21,7 +21,7 @@ task uncompressReferenceIfNeeded {
 
         if [[ ~{in_reference_file} == *.gz ]] ; then
             # Decompress
-            pigz -d -c -p ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
+            bgzip -d -c -@ ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
             echo "decompressed" > control.txt
         else 
             # It wasn't compressed. Link through.
@@ -38,7 +38,7 @@ task uncompressReferenceIfNeeded {
         cpu: in_uncompress_cores
         memory: "2 GB"
         disks: "local-disk " + in_uncompress_disk + " SSD"
-        docker: "quay.io/glennhickey/pigz:2.3.1"
+        docker: "quay.io/parsaeskandar/bgzip:1.17"
     }
 }
 
