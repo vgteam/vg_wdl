@@ -15,10 +15,10 @@ task runDeepVariantMakeExamples {
         Boolean in_keep_legacy_ac
         Boolean in_norm_reads
         String in_other_makeexamples_arg = ""
-        Boolean in_dv_is_1_7_or_newer = false # Needs to be True for DV 1.7+
+        Boolean in_dv_is_1_7_or_newer = true # Needs to be True for DV 1.7+
         Int in_call_cores
         Int in_call_mem
-        String in_dv_container = "google/deepvariant:1.5.0"
+        String in_dv_container = "google/deepvariant:1.8.0"
     }
     Int disk_size = round(2 * size(in_bam_file, 'G')) + 20
     command <<<
@@ -218,7 +218,7 @@ task runDeepVariantCallVariants {
         Int in_call_cores
         Int in_call_mem
         Boolean in_use_gpus = true
-        String in_dv_gpu_container = "google/deepvariant:1.5.0-gpu"
+        String in_dv_gpu_container = "google/deepvariant:1.8.0-gpu"
     }
     Int disk_size = 5 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 50
     command <<<

@@ -23,7 +23,6 @@ workflow HaplotypeSampling {
         KMER_LENGTH: "Size of kmer using for sampling (Up to 31) (Default: 29)"
         CORES: "Number of cores to use with commands. (Default: 16)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320)"
-
         WINDOW_LENGTH: "Window length used for building the minimizer index for sampling haplotypes. (Default: 11)"
         SUBCHAIN_LENGTH: "Target length (in bp) for subchains. (Default: 10000)"
         HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes. (Default: 4)"
