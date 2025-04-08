@@ -50,7 +50,7 @@ workflow Giraffe {
         HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
-        HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)"
+        HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 32)"
         INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)" 
 
@@ -98,7 +98,7 @@ workflow Giraffe {
         File? HAPL_FILE
         File? R_INDEX_FILE
         File? KFF_FILE
-        Int HAPLOTYPE_NUMBER = 4
+        Int HAPLOTYPE_NUMBER = 32
         Boolean INDEX_MINIMIZER_WEIGHTED = true
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
         

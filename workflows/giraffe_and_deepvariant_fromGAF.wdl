@@ -27,16 +27,25 @@ workflow GiraffeDeepVariantFromGAF {
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
         MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1"
         MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
+        DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads."
         DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
+        DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
+        DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
+        DV_IS_1_7_OR_NEWER: "Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one."
+        DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs"
+        DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs"
+        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'."
+        DV_NORM_READS: "Should DV normalize reads itself? Default is 'fasle'."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         VG_CORES: "Number of cores to use when projecting the reads. Default is 16."
         VG_MEM: "Memory, in GB, to use when projecting the reads. Default is 120."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
+        VG_DOCKER: "Container image to use when running vg"
     }
 
     input {
@@ -56,16 +65,25 @@ workflow GiraffeDeepVariantFromGAF {
         Int REALIGNMENT_EXPANSION_BASES = 160
         Int MIN_MAPQ = 1
         Int MAX_FRAGMENT_LENGTH = 3000
+        String DV_MODEL_TYPE = "WGS"
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
         File? DV_MODEL_DATA
         Boolean? DV_KEEP_LEGACY_AC
         Boolean? DV_NORM_READS
+        Array[File]? DV_MODEL_FILES
+        Array[File]? DV_MODEL_VARIABLES_FILES
+        Boolean? DV_IS_1_7_OR_NEWER
+        String? DV_NO_GPU_DOCKER
+        String? DV_GPU_DOCKER
+        Boolean DV_KEEP_LEGACY_AC = true
+        Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
         Int VG_CORES = 16
         Int VG_MEM = 120
         Int CALL_CORES = 8
         Int CALL_MEM = 50
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
     }
 
     # Which path names to work on?
@@ -79,7 +97,8 @@ workflow GiraffeDeepVariantFromGAF {
             call map.extractSubsetPathNames {
                 input:
                     in_gbz_file=GBZ_FILE,
-                    in_extract_mem=VG_MEM
+                    in_extract_mem=VG_MEM,
+                    vg_docker=VG_DOCKER
             }
         }
     } 
@@ -99,7 +118,8 @@ workflow GiraffeDeepVariantFromGAF {
             in_gbz_file=GBZ_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_prefix_to_strip=REFERENCE_PREFIX,
-            in_extract_mem=VG_MEM
+            in_extract_mem=VG_MEM,
+            vg_docker=VG_DOCKER
         }
     }
     File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
@@ -122,7 +142,8 @@ workflow GiraffeDeepVariantFromGAF {
         in_max_fragment_length=MAX_FRAGMENT_LENGTH,
         in_paired_reads=PAIRED_READS,
         nb_cores=VG_CORES,
-        mem_gb=VG_MEM
+        mem_gb=VG_MEM,
+        vg_docker=VG_DOCKER
     }
 
     call utils.sortBAM {
@@ -180,7 +201,7 @@ workflow GiraffeDeepVariantFromGAF {
         }
         File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
         File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-        
+
         ## DeepVariant calling
         call dv.runDeepVariantMakeExamples {
             input:
@@ -194,7 +215,13 @@ workflow GiraffeDeepVariantFromGAF {
                 in_norm_reads=DV_NORM_READS,
                 in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
                 in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
+                in_call_mem=CALL_MEM,
+                in_dv_is_1_7_or_newer=DV_IS_1_7_OR_NEWER,
+                in_dv_container=DV_NO_GPU_DOCKER,
+                in_model_type=DV_MODEL_TYPE,
+                in_model_files=DV_MODEL_FILES,
+                in_model_variables_files=DV_MODEL_VARIABLES_FILES
+
         }
         call dv.runDeepVariantCallVariants {
             input:
@@ -203,11 +230,12 @@ workflow GiraffeDeepVariantFromGAF {
                 in_reference_index_file=reference_index_file,
                 in_examples_file=runDeepVariantMakeExamples.examples_file,
                 in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
-                in_model_meta_file=DV_MODEL_META,
-                in_model_index_file=DV_MODEL_INDEX,
-                in_model_data_file=DV_MODEL_DATA,
                 in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
+                in_call_mem=CALL_MEM,
+                in_dv_gpu_container=DV_GPU_DOCKER,
+                in_model_type=DV_MODEL_TYPE,
+                in_model_files=DV_MODEL_FILES,
+                in_model_variables_files=DV_MODEL_VARIABLES_FILES
         }
     }
 
