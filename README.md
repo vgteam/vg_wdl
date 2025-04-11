@@ -293,8 +293,8 @@ Workflow for mapping short reads and genotyping the structural variants in a pan
 
 Workflow for creating a personalized pangenome with [haplotype sampling](https://github.com/vgteam/vg/wiki/Haplotype-Sampling).
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/svpack/workflows/haplotype_sampling.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/svpack/params/haplotype_sampling.json)
+- [workflow file](https://github.com/vgteam/vg_wdl/blob/master/workflows/haplotype_sampling.wdl)
+- [parameter file](https://github.com/vgteam/vg_wdl/blob/master/params/haplotype_sampling.json)
 
 Parameters  (semi-auto-generated from the *parameter_meta* section):
 - *IN_GBZ_FILE*: Path to .gbz index file
