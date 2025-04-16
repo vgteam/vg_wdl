@@ -1,6 +1,32 @@
 version 1.0
 
-task indexReference {
+workflow indexReference {
+    # This used to be one task, but is split up into two tasks (and one workflow) so we don't need
+    # to get samtools and picard in one image
+    input {
+        File in_reference_file
+        Int in_index_mem = 4
+        Int in_index_disk = 2 * round(size(in_reference_file, "G")) + 10
+    }
+    call indexReferenceFasta {
+        input:
+            in_reference_file = in_reference_file,
+            in_index_mem = in_index_mem,
+            in_index_disk = in_index_disk
+    }
+    call indexReferenceSequenceDictionary {
+        input:
+            in_reference_file = in_reference_file,
+            in_index_mem = in_index_mem,
+            in_index_disk = in_index_disk
+    }
+    output {
+        File reference_index_file = indexReferenceFasta.reference_index_file
+        File reference_dict_file = indexReferenceSequenceDictionary.reference_dict_file
+    }
+}
+
+task indexReferenceFasta {
     input {
         File in_reference_file
         Int in_index_mem = 4
@@ -12,16 +38,40 @@ task indexReference {
         
         ln -s ~{in_reference_file} ref.fa
                 
-        # Index the subset reference
-        samtools faidx ref.fa 
-        
-        # Save a reference copy by making the dict now
-        java -jar /usr/picard/picard.jar CreateSequenceDictionary \
-          R=ref.fa \
-          O=ref.dict
+        # Index the subset reference and save it
+        samtools faidx ref.fa
     >>>
+
     output {
         File reference_index_file = "ref.fa.fai"
+    }
+
+    runtime {
+        preemptible: 2
+        cpu: 1
+        memory: in_index_mem + " GB"
+        disks: "local-disk " + in_index_disk + " SSD"
+        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
+    }
+}
+
+task indexReferenceSequenceDictionary {
+    input {
+        File in_reference_file
+        Int in_index_mem = 4
+        Int in_index_disk = 2 * round(size(in_reference_file, "G")) + 10
+    }
+    command <<<
+        set -eux -o pipefail
+        
+        ln -s ~{in_reference_file} ref.fa
+        
+        # Make a dict from the reference
+        java -jar /usr/picard/picard.jar CreateSequenceDictionary \
+          -R ref.fa \
+          -O ref.dict
+    >>>
+    output {
         File reference_dict_file = "ref.dict"
     }
     runtime {
@@ -29,7 +79,7 @@ task indexReference {
         cpu: 1
         memory: in_index_mem + " GB"
         disks: "local-disk " + in_index_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: "broadinstitute/picard:3.2.0"
     }
 }
 
@@ -230,7 +280,7 @@ task sortBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
     }
 }
 
@@ -458,7 +508,7 @@ task splitBAMbyPath {
         memory: mem_gb + " GB"
         cpu: thread_count
         disks: "local-disk " + disk_size + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
     }
 }
 
@@ -499,7 +549,7 @@ task mergeAlignmentBAMChunks {
         memory: mem_gb + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
     }
 }
 
