@@ -274,7 +274,8 @@ workflow Giraffe {
         in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
         in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
         in_path_list_file=pipeline_path_list_file,
-        in_prefix_to_strip=REFERENCE_PREFIX
+        in_prefix_to_strip=REFERENCE_PREFIX,
+        mem_gb=if MAP_MEM < 20 then MAP_MEM else 20
     }
 
     ##
