@@ -279,6 +279,7 @@ task runDeepVariantCallVariants {
         --infile call_variants_output.tfrecord.gz \
         --nonvariant_site_tfrecord_path "gvcf.tfrecord@~{in_call_cores}.gz" \
         --outfile "~{in_sample_name}_deepvariant.vcf.gz" \
+        --cpus ~{in_call_cores} \
         ~{if length(in_haploid_contigs) > 0 then "--haploid_contigs" else ""} ~{sep=',' in_haploid_contigs} \
         ~{"--par_regions_bed " + in_par_regions_bed_file} \
         --gvcf_outfile "~{in_sample_name}_deepvariant.g.vcf.gz"
