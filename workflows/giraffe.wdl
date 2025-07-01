@@ -13,9 +13,10 @@ workflow Giraffe {
     parameter_meta {
         INPUT_READ_FILE_1: "Input sample 1st read pair fastq.gz or fastq"
         INPUT_READ_FILE_2: "Input sample 2nd read pair fastq.gz or fastq"
-        INPUT_CRAM_FILE: "Input CRAM file"
+        INPUT_CRAM_FILE: "Input CRAM file to realign"
         CRAM_REF: "Genome fasta file associated with the CRAM file"
         CRAM_REF_INDEX: "Index of the fasta file associated with the CRAM file"
+        INPUT_BAM_FILE: "Input BAM file to realign"
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file. Optional if using haplotype sampling."
         MIN_FILE: "Path to .min index file. Optional if using haplotype sampling."
@@ -40,6 +41,7 @@ workflow Giraffe {
         GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10)"  
         GIRAFFE_OPTIONS: "(OPTIONAL) extra command line options for Giraffe mapper"
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
+        SPLIT_READ_MEM: "Memory, in GB, to use when splitting the reads into chunks. Default is 50."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'"
@@ -62,6 +64,7 @@ workflow Giraffe {
         File? INPUT_CRAM_FILE
         File? CRAM_REF
         File? CRAM_REF_INDEX
+        File? INPUT_BAM_FILE
         File GBZ_FILE
         File? DIST_FILE
         File? MIN_FILE
@@ -86,6 +89,7 @@ workflow Giraffe {
         String GIRAFFE_PRESET = "default"
         String GIRAFFE_OPTIONS = ""
         Int SPLIT_READ_CORES = 8
+        Int SPLIT_READ_MEM = 50
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = true
@@ -145,14 +149,25 @@ workflow Giraffe {
             in_ref_file=CRAM_REF,
             in_ref_index_file=CRAM_REF_INDEX,
             in_paired_reads=PAIRED_READS,
-            in_cores=SPLIT_READ_CORES
+            in_cores=SPLIT_READ_CORES,
+            in_memory=SPLIT_READ_MEM
 	    }
     }
 
-    File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
+    if(defined(INPUT_BAM_FILE)) {
+	    call utils.convertBAMtoFASTQ {
+            input:
+            in_bam_file=INPUT_BAM_FILE,
+            in_paired_reads=PAIRED_READS,
+            in_cores=SPLIT_READ_CORES,
+            in_memory=SPLIT_READ_MEM
+	    }
+    }
+
+    File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file, convertBAMtoFASTQ.output_fastq_1_file])
     if(PAIRED_READS){
-        # We need the second read in the pair, if paired, for hap sampling.
-        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
+        # We also need the second read in the pair, if paired, for hap sampling.
+        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file, convertBAMtoFASTQ.output_fastq_2_file])
     }
 
     if (HAPLOTYPE_SAMPLING) {

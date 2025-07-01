@@ -587,6 +587,7 @@ task convertCRAMtoFASTQ {
         Boolean in_paired_reads = true
 	    Int in_cores
         Int disk_size = round(5 * size(in_cram_file, 'G')) + 50
+        Int in_memory = 50
     }
     Int half_cores = in_cores / 2
     command <<<
@@ -615,7 +616,48 @@ task convertCRAMtoFASTQ {
     runtime {
         preemptible: 2
         cpu: in_cores
-        memory: "50 GB"
+        memory: in_memory + " GB"
+        disks: "local-disk " + disk_size + " SSD"
+        docker: "staphb/samtools:1.20"
+    }    
+}
+
+task convertBAMtoFASTQ {
+    input {
+	    File? in_bam_file
+        Boolean in_paired_reads = true
+	    Int in_cores
+        Int disk_size = round(5 * size(in_bam_file, 'G')) + 50
+        Int in_memory = 50
+    }
+    Int half_cores = in_cores / 2
+    command <<<
+    # Set the exit code of a pipeline to that of the rightmost command
+    # to exit with a non-zero status, or zero if all commands of the pipeline exit
+    set -o pipefail
+    # cause a bash script to exit immediately when a command fails
+    set -e
+    # cause the bash shell to treat unset variables as an error and exit immediately
+    set -u
+    # echo each line of the script to stdout so we can see what is happening
+    set -o xtrace
+    #to turn off echo do 'set +o xtrace'
+
+    if [ ~{in_paired_reads} == true ]
+    then
+        samtools collate -@ ~{half_cores} -Ouf ~{in_bam_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+    else
+        samtools fastq -@ ~{in_cores} -o reads.R1.fastq.gz -c 1 ~{in_bam_file}
+    fi
+    >>>
+    output {
+        File output_fastq_1_file = "reads.R1.fastq.gz"
+        File? output_fastq_2_file = "reads.R2.fastq.gz"
+    }
+    runtime {
+        preemptible: 2
+        cpu: in_cores
+        memory: in_memory + " GB"
         disks: "local-disk " + disk_size + " SSD"
         docker: "staphb/samtools:1.20"
     }    
