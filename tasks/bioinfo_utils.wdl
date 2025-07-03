@@ -703,7 +703,7 @@ task kmerCountingKMC {
         cpu: nb_cores
         memory: max_ram + " GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/biocontainers/kmc:3.2.1--hf1761c0_2"
+        docker: "quay.io/biocontainers/kmc:3.2.4--h5ca1c30_4"
     }
 }
 
