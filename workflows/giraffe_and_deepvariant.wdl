@@ -57,11 +57,11 @@ workflow GiraffeDeepVariant {
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
         DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
-        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi."
-        DV_NORM_READS: "Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi."
+        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? If unspecified this is done, unless the model is responsible for the setting."
+        DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless the model is responsible for the setting."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
-        DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8."
-        DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8."
+        DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
+        DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
@@ -120,8 +120,8 @@ workflow GiraffeDeepVariant {
         File? DV_MODEL_DATA
         Array[File]? DV_MODEL_FILES
         Array[File]? DV_MODEL_VARIABLES_FILES
-        Boolean DV_KEEP_LEGACY_AC = true
-        Boolean DV_NORM_READS = false
+        Boolean? DV_KEEP_LEGACY_AC
+        Boolean? DV_NORM_READS
         String OTHER_MAKEEXAMPLES_ARG = ""
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER

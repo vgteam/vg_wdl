@@ -30,8 +30,8 @@ workflow GiraffeDeepVariantFromGAF {
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
-        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'."
-        DV_NORM_READS: "Should DV normalize reads itself? Default is 'fasle'."
+        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? If unspecified this is done, unless the model is responsible for the setting."
+        DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless the model is responsible for the setting."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         VG_CORES: "Number of cores to use when projecting the reads. Default is 16."
         VG_MEM: "Memory, in GB, to use when projecting the reads. Default is 120."
@@ -59,8 +59,8 @@ workflow GiraffeDeepVariantFromGAF {
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
         File? DV_MODEL_DATA
-        Boolean DV_KEEP_LEGACY_AC = true
-        Boolean DV_NORM_READS = false
+        Boolean? DV_KEEP_LEGACY_AC
+        Boolean? DV_NORM_READS
         String OTHER_MAKEEXAMPLES_ARG = ""
         Int VG_CORES = 16
         Int VG_MEM = 120

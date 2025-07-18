@@ -12,8 +12,10 @@ task runDeepVariantMakeExamples {
         Array[File] in_model_files = []
         Array[File] in_model_variables_files = []
         Int? in_min_mapq
-        Boolean in_keep_legacy_ac
-        Boolean in_norm_reads
+        # If undefined legacy AC is kept, unless the model is responsible for the setting.
+        Boolean? in_keep_legacy_ac
+        # If undefined reads are not normalized, unless the model is responsible for the setting.
+        Boolean? in_norm_reads
         String in_other_makeexamples_arg = ""
         Int in_call_cores
         Int in_call_mem
@@ -43,91 +45,7 @@ task runDeepVariantMakeExamples {
         ln -f -s ~{in_reference_file} reference.fa
         ln -f -s ~{in_reference_index_file} reference.fa.fai
                 
-        NORM_READS_ARG=""
-        if [ ~{in_norm_reads} == true ]; then
-          NORM_READS_ARG="--normalize_reads"
-        fi
-
-        KEEP_LEGACY_AC_ARG=""
-        if [ ~{in_keep_legacy_ac} == true ]; then
-          KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
-        fi
-
         MODEL_TYPE=~{in_model_type}
-        MODEL_TYPE_ARGS=()
-        # Determine extra make_example arguments for the given model type just like in DeepVariant's main wrapper script.
-        # See <https://github.com/google/deepvariant/blob/ab068c4588a02e2167051bd9e74c0c9579462b51/scripts/run_deepvariant.py#L243-L276>
-        # Except instead of building a channel list we load it form the model.
-        case ${MODEL_TYPE} in
-            WGS)
-                if [ ~{defined(in_min_mapq)} == true ]; then
-                    # Add our min MAPQ override
-                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
-                fi
-                ;;
-
-            WES)
-                if [ ~{defined(in_min_mapq)} == true ]; then
-                    # Add our min MAPQ override
-                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
-                fi
-                ;;
-
-            PACBIO)
-                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
-                MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
-                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
-                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
-                MODEL_TYPE_ARGS+=(--partition_size 25000)
-                MODEL_TYPE_ARGS+=(--phase_reads)
-                MODEL_TYPE_ARGS+=(--pileup_image_width 147)
-                MODEL_TYPE_ARGS+=(--norealign_reads)
-                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
-                MODEL_TYPE_ARGS+=(--track_ref_reads)
-                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
-                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                ;;
-
-            ONT_R104)
-                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
-                MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
-                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
-                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
-                MODEL_TYPE_ARGS+=(--partition_size 25000)
-                MODEL_TYPE_ARGS+=(--phase_reads)
-                MODEL_TYPE_ARGS+=(--pileup_image_width 99)
-                MODEL_TYPE_ARGS+=(--norealign_reads)
-                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
-                MODEL_TYPE_ARGS+=(--track_ref_reads)
-                MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
-                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
-                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                ;;
-            
-            HYBRID_PACBIO_ILLUMINA)
-                if [ ~{defined(in_min_mapq)} == true ]; then
-                    # Add our min MAPQ override
-                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
-                fi
-                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                ;;
-
-            MASSEQ)
-                MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
-                MODEL_TYPE_ARGS+=(--max_reads_per_partition 0)
-                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
-                MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
-                MODEL_TYPE_ARGS+=(--partition_size 25000)
-                MODEL_TYPE_ARGS+=(--phase_reads)
-                MODEL_TYPE_ARGS+=(--pileup_image_width 199)
-                MODEL_TYPE_ARGS+=(--norealign_reads)
-                MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
-                MODEL_TYPE_ARGS+=(--track_ref_reads)
-                MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
-                MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                MODEL_TYPE_ARGS+=(--max_reads_for_dynamic_bases_per_region 1500)
-                ;;
-        esac
 
         # Set up the model so DV can read the channels out of it
         if [[ ~{length(in_model_files)} -gt 0 ]] ; then
@@ -163,6 +81,116 @@ task runDeepVariantMakeExamples {
             fi
         fi
         CHECKPOINT_ARGS=(--checkpoint "${CHECKPOINT_NAME}")
+
+        MODEL_TYPE_ARGS=()
+        if [[ ! -e model_dir/model.example_info.json ]] ; then
+            # Determine extra make_example arguments for the given model type just like in DeepVariant's main wrapper script.
+            # See <https://github.com/google/deepvariant/blob/ab068c4588a02e2167051bd9e74c0c9579462b51/scripts/run_deepvariant.py#L243-L276>
+            # Except instead of building a channel list we load it from the model.
+            case ${MODEL_TYPE} in
+                WGS)
+                    if [ ~{defined(in_min_mapq)} == true ]; then
+                        # Add our min MAPQ override
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    ;;
+
+                WES)
+                    if [ ~{defined(in_min_mapq)} == true ]; then
+                        # Add our min MAPQ override
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    ;;
+
+                PACBIO)
+                    MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                    MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
+                    MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                    MODEL_TYPE_ARGS+=(--partition_size 25000)
+                    MODEL_TYPE_ARGS+=(--phase_reads)
+                    MODEL_TYPE_ARGS+=(--pileup_image_width 147)
+                    MODEL_TYPE_ARGS+=(--norealign_reads)
+                    MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                    MODEL_TYPE_ARGS+=(--track_ref_reads)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    ;;
+
+                ONT_R104)
+                    MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                    MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
+                    MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                    MODEL_TYPE_ARGS+=(--partition_size 25000)
+                    MODEL_TYPE_ARGS+=(--phase_reads)
+                    MODEL_TYPE_ARGS+=(--pileup_image_width 99)
+                    MODEL_TYPE_ARGS+=(--norealign_reads)
+                    MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                    MODEL_TYPE_ARGS+=(--track_ref_reads)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    ;;
+                
+                HYBRID_PACBIO_ILLUMINA)
+                    if [ ~{defined(in_min_mapq)} == true ]; then
+                        # Add our min MAPQ override
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    ;;
+
+                MASSEQ)
+                    MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                    MODEL_TYPE_ARGS+=(--max_reads_per_partition 0)
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
+                    MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                    MODEL_TYPE_ARGS+=(--partition_size 25000)
+                    MODEL_TYPE_ARGS+=(--phase_reads)
+                    MODEL_TYPE_ARGS+=(--pileup_image_width 199)
+                    MODEL_TYPE_ARGS+=(--norealign_reads)
+                    MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                    MODEL_TYPE_ARGS+=(--track_ref_reads)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    MODEL_TYPE_ARGS+=(--max_reads_for_dynamic_bases_per_region 1500)
+                    ;;
+            esac
+        else
+            if [ ~{defined(in_min_mapq)} == true ]; then
+                # Add our min MAPQ override
+                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+            fi
+        fi
+
+        NORM_READS_ARG=""
+        if [[ ~{defined(in_norm_reads)} == true ]] ; then
+            if [[ ~{in_norm_reads} == true ]]; then
+                # TODO: Does this actually work if it contradicts a model example_info JSON?
+                NORM_READS_ARG="--normalize_reads"
+            elif [[ -e model_dir/model.example_info.json ]] ; then
+                # We need to turn off read normalization, but the model
+                # example_info might have it on, and we can't flag it off.
+                echo >&2 "Error: cannot turn off read normalization when a model.example_info.json is used to define it."
+                exit 1
+            fi
+        fi
+
+        KEEP_LEGACY_AC_ARG=""
+        if [[ ~{defined(in_keep_legacy_ac)} == true ]] ; then
+            if [[ ~{in_keep_legacy_ac} == true ]]; then
+                KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
+            elif [[ -e model_dir/model.example_info.json ]] ; then
+                # We need to turn off legacy allele counts, but the model
+                # example_info might have it on, and we can't flag it off.
+                echo >&2 "Error: cannot turn off legacy allele counts when a model.example_info.json is used to define it."
+                exit 1
+            fi
+        elif [[ ! -e model_dir/model.example_info.json ]] ; then
+            # No value sent in, and the model isn't responsible for the setting, so turn it on.
+            KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
+        fi
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \

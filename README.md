@@ -93,8 +93,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *DV_MODEL_META*: (OPTIONAL) .meta file for a custom DeepVariant calling model
 - *DV_MODEL_INDEX*: (OPTIONAL) .index file for a custom DeepVariant calling model
 - *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
-- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'.
-- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'false'.
+- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is done, unless the model is responsible for the setting.
+- *DV_NORM_READS*: Should DV normalize reads itself? If unspecified this is not done, unless the model is responsible for the setting.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
 - *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
@@ -215,8 +215,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *DV_MODEL_META*: (OPTIONAL) .meta file for a custom DeepVariant calling model
 - *DV_MODEL_INDEX*: (OPTIONAL) .index file for a custom DeepVariant calling model
 - *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
-- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'.
-- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'fasle'.
+- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is done, unless the model is responsible for the setting.
+- *DV_NORM_READS*: Should DV normalize reads itself? If unspecified this is not done, unless the model is responsible for the setting.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
 - *VG_CORES*: Number of cores to use when projecting the reads. Default is 16.
 - *VG_MEM*: Memory, in GB, to use when projecting the reads. Default is 120.
