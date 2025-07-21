@@ -89,14 +89,14 @@ task runDeepVariantMakeExamples {
             # Except instead of building a channel list we load it from the model.
             case ${MODEL_TYPE} in
                 WGS)
-                    if [ ~{defined(in_min_mapq)} == true ]; then
+                    if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
                         # Add our min MAPQ override
                         MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
                     fi
                     ;;
 
                 WES)
-                    if [ ~{defined(in_min_mapq)} == true ]; then
+                    if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
                         # Add our min MAPQ override
                         MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
                     fi
@@ -134,7 +134,7 @@ task runDeepVariantMakeExamples {
                     ;;
                 
                 HYBRID_PACBIO_ILLUMINA)
-                    if [ ~{defined(in_min_mapq)} == true ]; then
+                    if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
                         # Add our min MAPQ override
                         MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
                     fi
@@ -158,15 +158,15 @@ task runDeepVariantMakeExamples {
                     ;;
             esac
         else
-            if [ ~{defined(in_min_mapq)} == true ]; then
+            if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
                 # Add our min MAPQ override
                 MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
             fi
         fi
 
         NORM_READS_ARG=""
-        if [[ ~{defined(in_norm_reads)} == true ]] ; then
-            if [[ ~{in_norm_reads} == true ]]; then
+        if [[ "~{defined(in_norm_reads)}" == "true" ]] ; then
+            if [[ "~{in_norm_reads}" == "true" ]] ; then
                 # TODO: Does this actually work if it contradicts a model example_info JSON?
                 NORM_READS_ARG="--normalize_reads"
             elif [[ -e model_dir/model.example_info.json ]] ; then
@@ -178,8 +178,8 @@ task runDeepVariantMakeExamples {
         fi
 
         KEEP_LEGACY_AC_ARG=""
-        if [[ ~{defined(in_keep_legacy_ac)} == true ]] ; then
-            if [[ ~{in_keep_legacy_ac} == true ]]; then
+        if [[ "~{defined(in_keep_legacy_ac)}" == "true" ]] ; then
+            if [[ "~{in_keep_legacy_ac}" == "true" ]]; then
                 KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
             elif [[ -e model_dir/model.example_info.json ]] ; then
                 # We need to turn off legacy allele counts, but the model
@@ -265,11 +265,11 @@ task runDeepVariantCallVariants {
         MODEL_TYPE=~{in_model_type}
 
         # Set up the model
-        if [[ ~{length(in_model_files)} -gt 0 ]] ; then
+        if [[ "~{length(in_model_files)}" -gt "0" ]] ; then
             # Need to use a custom model
             mkdir model_dir
             ln -s ~{sep=" " in_model_files} model_dir/
-            if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
+            if [[ "~{length(in_model_variables_files)}" -gt "0" ]] ; then
                 # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
                 # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
                 mkdir model_dir/variables
