@@ -12,9 +12,9 @@ task runDeepVariantMakeExamples {
         Array[File] in_model_files = []
         Array[File] in_model_variables_files = []
         Int? in_min_mapq
-        # If undefined legacy AC is kept, unless the model is responsible for the setting.
+        # If undefined, uses the model's or DV's default.
         Boolean? in_keep_legacy_ac
-        # If undefined reads are not normalized, unless the model is responsible for the setting.
+        # If undefined, uses the model's or DV's default.
         Boolean? in_norm_reads
         String in_other_makeexamples_arg = ""
         Int in_call_cores
@@ -167,13 +167,10 @@ task runDeepVariantMakeExamples {
         NORM_READS_ARG=""
         if [[ "~{defined(in_norm_reads)}" == "true" ]] ; then
             if [[ "~{in_norm_reads}" == "true" ]] ; then
-                # TODO: Does this actually work if it contradicts a model example_info JSON?
                 NORM_READS_ARG="--normalize_reads"
-            elif [[ -e model_dir/model.example_info.json ]] ; then
-                # We need to turn off read normalization, but the model
-                # example_info might have it on, and we can't flag it off.
-                echo >&2 "Error: cannot turn off read normalization when a model.example_info.json is used to define it."
-                exit 1
+            else
+                # If not true, and defined, it's false.
+                NORM_READS_ARG="--nonormalize_reads"
             fi
         fi
 
@@ -181,15 +178,10 @@ task runDeepVariantMakeExamples {
         if [[ "~{defined(in_keep_legacy_ac)}" == "true" ]] ; then
             if [[ "~{in_keep_legacy_ac}" == "true" ]]; then
                 KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
-            elif [[ -e model_dir/model.example_info.json ]] ; then
-                # We need to turn off legacy allele counts, but the model
-                # example_info might have it on, and we can't flag it off.
-                echo >&2 "Error: cannot turn off legacy allele counts when a model.example_info.json is used to define it."
-                exit 1
+            else
+                # If not true, and defined, it's false
+                KEEP_LEGACY_AC_ARG="--nokeep_legacy_allele_counter_behavior"
             fi
-        elif [[ ! -e model_dir/model.example_info.json ]] ; then
-            # No value sent in, and the model isn't responsible for the setting, so turn it on.
-            KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
         fi
 
         seq 0 $((~{in_call_cores}-1)) | \
