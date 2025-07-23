@@ -76,7 +76,7 @@ task runDeepVariantMakeExamples {
                 # This is a checkpoint-format model and we need to name it by passing this path without the .index
                 CHECKPOINT_NAME="${INDEX_FILES[0]%.index}"
             else
-                echo >&2 "Could not determine model name. Make sure you have a saved_mdel.pb or a .index file."
+                echo >&2 "Could not determine model name. Make sure you have a saved_model.pb or a .index file."
                 exit 1
             fi
         fi
@@ -285,7 +285,7 @@ task runDeepVariantCallVariants {
                 # This is a checkpoint-format model and we need to name it by passing this path without the .index
                 CHECKPOINT_NAME="${INDEX_FILES[0]%.index}"
             else
-                echo >&2 "Could not determine model name. Make sure you have a saved_mdel.pb or a .index file."
+                echo >&2 "Could not determine model name. Make sure you have a saved_model.pb or a .index file."
                 exit 1
             fi
         fi
