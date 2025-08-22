@@ -30,13 +30,5 @@
   "vgMultiMapCall.CHUNK_GAM_MEM": 20,
   "vgMultiMapCall.VGCALL_CORES": 32,
   "vgMultiMapCall.VGCALL_DISK": 100,
-  "vgMultiMapCall.VGCALL_MEM": 50,
-  "vgMultiMapCall.DRAGEN_REF_INDEX_NAME": "hs37d5_v7",
-  "vgMultiMapCall.HELIX_USERNAME": "markellocj",
-  "vgMultiMapCall.RUN_VGMPMAP_ALGORITHM": "true",
-  "vgMultiMapCall.RUN_LINEAR_CALLER": "true",
-  "vgMultiMapCall.RUN_DRAGEN_CALLER": "false",
-  "vgMultiMapCall.RUN_GVCF_OUTPUT": "false",
-  "vgMultiMapCall.RUN_SNPEFF_ANNOTATION": "true",
-  "vgMultiMapCall.RUN_SV_CALLER": "false"
+  "vgMultiMapCall.VGCALL_MEM": 50
 }
