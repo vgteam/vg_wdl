@@ -59,8 +59,8 @@ task indexReference {
         
         # Save a reference copy by making the dict now
         java -jar /usr/picard/picard.jar CreateSequenceDictionary \
-          R=ref.fa \
-          O=ref.dict
+          -R ref.fa \
+          -O ref.dict
     >>>
     output {
         File reference_index_file = "ref.fa.fai"
