@@ -16,7 +16,9 @@ declare -A WDL_MAP
 #WDL_MAP["happy_evaluation.json"]="happy_evaluation.wdl"
 #WDL_MAP["sort_graph_aligned_reads.gaf.json"]="sort_graph_aligned_reads.wdl"
 # WDL_MAP["vg_multi_map_call.inputs_tiny.json"]="vg_multi_map_call.wdl"
-WDL_MAP["vg_multi_map_call.inputs_21_22.test.json"]="vg_multi_map_call.wdl"
+# WDL_MAP["vg_multi_map_call.inputs_21_22.test.json"]="vg_multi_map_call.wdl"
+WDL_MAP["giraffe_and_deeptrio.inputs_tiny.json"]="giraffe_and_deeptrio.wdl"
+# WDL_MAP["vg_trio_multi_map_call.inputs_tiny.http_url.json"]="vg_trio_multi_map_call.wdl"
 
 # Track failures
 FAILURES=()
