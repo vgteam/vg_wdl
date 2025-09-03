@@ -334,7 +334,7 @@ task combine_graphs {
     String in_mem = if in_small_resources then "20" else "40"
     
     Boolean decoy_contigs_exist = defined(decoy_contigs_vg)
-    Array[File] decoy_contigs_vg_resolved = if decoy_contigs_exist then decoy_contigs_vg else []
+    Array[File] decoy_contigs_vg_resolved = select_first([decoy_contigs_vg, []])
     
     command {
         set -exu -o pipefail

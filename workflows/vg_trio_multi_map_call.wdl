@@ -13,6 +13,7 @@ workflow vgTrioPipeline {
     meta {
         author: "Charles Markello"
         email: "cmarkell@ucsc.edu"
+        Updated: "Parsa Eskandar"
         description: "Core VG mapping and variant calling workflow for pedigree datasets."
     }
     input {
