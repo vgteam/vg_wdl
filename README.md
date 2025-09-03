@@ -53,7 +53,7 @@ The full workflow to go from sequencing reads (FASTQs, CRAM) to small variant ca
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariant:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *INPUT_READ_FILE_1*: Input sample 1st read pair fastq.gz  
 - *INPUT_READ_FILE_2*: Input sample 2nd read pair fastq.gz  
@@ -137,7 +137,7 @@ realignment).
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/Giraffe:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *INPUT_READ_FILE_1*: Input sample 1st read pair fastq.gz
 - *INPUT_READ_FILE_2*: Input sample 2nd read pair fastq.gz
@@ -201,7 +201,7 @@ with [DeepVariant](https://github.com/google/deepvariant).
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAF:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *INPUT_GAF*: Input gzipped GAF file
 - *GBZ_FILE*: Path to .gbz index file
@@ -254,7 +254,7 @@ Evaluation of the small variant calls using [hap.py](https://github.com/Illumina
 - workflow file: [workflows/happy_evaluation.wdl](workflows/happy_evaluation.wdl)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/HappyEvaluation:gbz?tab=info)
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *VCF*: bgzipped VCF with variant calls
 - *VCF_INDEX*: (Optional) If specified, use this tabix index for the VCF instead of indexing it
@@ -280,7 +280,7 @@ This workflow converts reads aligned to a pangenome in a GAF file to a sorted an
 - workflow file: [workflows/sort_graph_aligned_reads.wdl](workflows/sort_graph_aligned_reads.wdl)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/sortGraphAlignedReads:gbz?tab=info)
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *GAF_FILE*: GAF file to convert and sort.
 - *GBZ_FILE*: the GBZ index of the graph
@@ -298,8 +298,8 @@ miniwdl run --as-me workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_
 
 Workflow for mapping short reads and genotyping the structural variants in a pangenome.
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/svpack/workflows/vg_map_call_sv.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/svpack/params/vg_map_call_sv_test.inputs.json)
+- workflow file: [workflows/vg_map_call_sv.wdl](workflows/vg_map_call_sv.wdl)
+- parameter file: [params/vg_map_call_sv_test.json](params/vg_map_call_sv_test.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/vg_map_call_sv:svpack?tab=info)
 - If you use this workflow, please cite [the Giraffe-SV article](#cite-giraffe-sv).
 
@@ -307,10 +307,10 @@ Workflow for mapping short reads and genotyping the structural variants in a pan
 
 Workflow for creating a personalized pangenome with [haplotype sampling](https://github.com/vgteam/vg/wiki/Haplotype-Sampling).
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/svpack/workflows/haplotype_sampling.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/svpack/params/haplotype_sampling.json)
+- workflow file: [workflows/haplotype_sampling.wdl](workflows/haplotype_sampling.wdl)
+- parameter file: [params/haplotype_sampling.json](params/haplotype_sampling.json)
 
-Parameters  (semi-auto-generated from the *parameter_meta* section):
+Parameters  (semi-auto-generated from the parameter_meta section):
 - *GBZ_FILE*: Path to .gbz index file
 - *INPUT_READ_FILE_FIRST*: Input sample 1st read pair fastq.gz
 - *INPUT_READ_FILE_SECOND*: Input sample 2st read pair fastq.gz
@@ -344,14 +344,14 @@ miniwdl run --as-me workflows/haplotype_sampling.wdl -i params/haplotype_samplin
 
 ### Map-call workflow
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map_call.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/master/params/vg_multi_map_call.inputs_tiny.http_url.json)
+- workflow file: [workflows/vg_multi_map_call.wdl](workflows/vg_multi_map_call.wdl)
+- parameter file: [params/vg_multi_map_call.inputs_tiny.json](params/vg_multi_map_call.inputs_tiny.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/vg-pipeline-workingexample:master?tab=info)
 
 ### Map-call Pedigree workflow
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_trio_multi_map_call.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/master/params/vg_trio_multi_map_call.inputs_tiny.http_url.json)
+- workflow file: [workflows/vg_trio_multi_map_call.wdl](workflows/vg_trio_multi_map_call.wdl)
+- parameter file: [params/vg_trio_multi_map_call.inputs_tiny.json](params/vg_trio_multi_map_call.inputs_tiny.json)
 - If you use this workflow, please cite the [Pedigree-VG article](#Cite-Pedigree-VG).
 
 ### Going further

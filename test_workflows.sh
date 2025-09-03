@@ -4,22 +4,21 @@ set -euo pipefail
 declare -A WDL_MAP
 
 # Manually define JSON → WDL mappings
-#WDL_MAP["giraffe.json"]="giraffe.wdl"
-#WDL_MAP["giraffe.singleended.cram.json"]="giraffe.wdl"
-#WDL_MAP["giraffe_and_deepvariant.json"]="giraffe_and_deepvariant.wdl"
-#WDL_MAP["giraffe_and_deepvariant_cram.json"]="giraffe_and_deepvariant.wdl"
-#WDL_MAP["giraffe_and_deepvariant_gaf.json"]="giraffe_and_deepvariant_fromGAF.wdl"
-#WDL_MAP["giraffe_and_deepvariant_gaf_single_end.json"]="giraffe_and_deepvariant_fromGAF.wdl"
-#WDL_MAP["giraffe_and_deepvariant_single_end.json"]="giraffe_and_deepvariant.wdl"
-#WDL_MAP["giraffe_and_haplotype_sampling.json"]="giraffe.wdl"
-#WDL_MAP["haplotype_sampling.json"]="haplotype_sampling.wdl"
-#WDL_MAP["happy_evaluation.json"]="happy_evaluation.wdl"
-#WDL_MAP["sort_graph_aligned_reads.gaf.json"]="sort_graph_aligned_reads.wdl"
+# WDL_MAP["giraffe.json"]="giraffe.wdl"
+# WDL_MAP["giraffe.singleended.cram.json"]="giraffe.wdl"
+# WDL_MAP["giraffe_and_deepvariant.json"]="giraffe_and_deepvariant.wdl"
+# WDL_MAP["giraffe_and_deepvariant_cram.json"]="giraffe_and_deepvariant.wdl"
+# WDL_MAP["giraffe_and_deepvariant_gaf.json"]="giraffe_and_deepvariant_fromGAF.wdl"
+# WDL_MAP["giraffe_and_deepvariant_gaf_single_end.json"]="giraffe_and_deepvariant_fromGAF.wdl"
+# WDL_MAP["giraffe_and_deepvariant_single_end.json"]="giraffe_and_deepvariant.wdl"
+# WDL_MAP["giraffe_and_haplotype_sampling.json"]="giraffe.wdl"
+# WDL_MAP["haplotype_sampling.json"]="haplotype_sampling.wdl"
+# WDL_MAP["happy_evaluation.json"]="happy_evaluation.wdl"
+# WDL_MAP["sort_graph_aligned_reads.gaf.json"]="sort_graph_aligned_reads.wdl"
 # WDL_MAP["vg_multi_map_call.inputs_tiny.json"]="vg_multi_map_call.wdl"
-# WDL_MAP["vg_multi_map_call.inputs_21_22.test.json"]="vg_multi_map_call.wdl"
-WDL_MAP["giraffe_and_deeptrio.inputs_tiny.json"]="giraffe_and_deeptrio.wdl"
-# WDL_MAP["vg_trio_multi_map_call.inputs_tiny.http_url.json"]="vg_trio_multi_map_call.wdl"
-
+# WDL_MAP["giraffe_and_deeptrio.inputs_tiny.json"]="giraffe_and_deeptrio.wdl"
+# WDL_MAP["vg_trio_multi_map_call.inputs_tiny.json"]="vg_trio_multi_map_call.wdl"
+WDL_MAP["vg_map_call_sv_test.json"]="vg_map_call_sv.wdl"
 # Track failures
 FAILURES=()
 

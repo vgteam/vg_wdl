@@ -2,7 +2,7 @@
   "GiraffeDeepVariantFromGAF.INPUT_GAF": "tests/small_sim_graph/reads.gaf.gz",
   "GiraffeDeepVariantFromGAF.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
   "GiraffeDeepVariantFromGAF.SAMPLE_NAME": "s0",
-  "GiraffeDeepVariantFromGAF.runDeepVariantCallVariants.in_dv_gpu_container": "google/deepvariant:1.8.0",
+  "GiraffeDeepVariantFromGAF.DV_GPU_DOCKER": "google/deepvariant:1.8.0-gpu",
   "GiraffeDeepVariantFromGAF.PAIRED_READS": false,
   "GiraffeDeepVariantFromGAF.REFERENCE_PREFIX": "chr"
 }
