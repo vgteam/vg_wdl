@@ -231,8 +231,8 @@ workflow vgGiraffeDeeptrio {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_keep_legacy_ac=select_first([DV_KEEP_LEGACY_AC, false]),
+                    in_norm_reads=select_first([DV_NORM_READS, false]),
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
                     in_call_mem=CALL_MEM
@@ -259,8 +259,8 @@ workflow vgGiraffeDeeptrio {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_keep_legacy_ac=select_first([DV_KEEP_LEGACY_AC, false]),
+                    in_norm_reads=select_first([DV_NORM_READS, false]),
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
                     in_call_mem=CALL_MEM
@@ -287,8 +287,8 @@ workflow vgGiraffeDeeptrio {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_keep_legacy_ac=select_first([DV_KEEP_LEGACY_AC, false]),
+                    in_norm_reads=select_first([DV_NORM_READS, false]),
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
                     in_call_mem=CALL_MEM

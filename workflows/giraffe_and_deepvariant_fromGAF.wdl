@@ -35,11 +35,8 @@ workflow GiraffeDeepVariantFromGAF {
         DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
         DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
-        DV_IS_1_7_OR_NEWER: "Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs"
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs"
-        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'."
-        DV_NORM_READS: "Should DV normalize reads itself? Default is 'fasle'."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         VG_CORES: "Number of cores to use when projecting the reads. Default is 16."
         VG_MEM: "Memory, in GB, to use when projecting the reads. Default is 120."
@@ -73,11 +70,8 @@ workflow GiraffeDeepVariantFromGAF {
         Boolean? DV_NORM_READS
         Array[File]? DV_MODEL_FILES
         Array[File]? DV_MODEL_VARIABLES_FILES
-        Boolean? DV_IS_1_7_OR_NEWER
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
-        Boolean DV_KEEP_LEGACY_AC = true
-        Boolean DV_NORM_READS = false
         String OTHER_MAKEEXAMPLES_ARG = ""
         Int VG_CORES = 16
         Int VG_MEM = 120
@@ -216,7 +210,6 @@ workflow GiraffeDeepVariantFromGAF {
                 in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM,
-                in_dv_is_1_7_or_newer=DV_IS_1_7_OR_NEWER,
                 in_dv_container=DV_NO_GPU_DOCKER,
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
