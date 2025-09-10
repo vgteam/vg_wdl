@@ -21,7 +21,7 @@ workflow vgTrioPipeline {
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         String SAMPLE_NAME_PROBAND                          # Sample name for the proband
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.64.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.64.0)
         Int READS_PER_CHUNK = 20000000                      # Number of reads contained in each mapping chunk (20000000 for wgs)
         File? PATH_LIST_FILE                                # (OPTIONAL) Text file where each line is a path name in the XG index
         File XG_FILE                                        # Path to .xg index file

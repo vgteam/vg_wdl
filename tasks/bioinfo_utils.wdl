@@ -1,5 +1,47 @@
 version 1.0
 
+task uncompressReferenceIfNeeded {
+    input {
+        File in_reference_file
+        Int in_uncompress_cores = 4
+        Int in_uncompress_disk = 5 * round(size(in_reference_file, "G")) + 20
+    }
+
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        if [[ ~{in_reference_file} == *.gz ]] ; then
+            # Decompress
+            bgzip -d -c -@ ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
+            echo "decompressed" > control.txt
+        else 
+            # It wasn't compressed. Link through.
+            echo "pass-through" > control.txt
+        fi
+    >>>
+    output {
+        # Pass through the input if we said we want to.
+        File reference_file = if read_lines("control.txt")[0] == "pass-through" then in_reference_file else "ref.fa"
+    }
+    runtime {
+        preemptible: 2
+        time: 20
+        cpu: in_uncompress_cores
+        memory: "2 GB"
+        disks: "local-disk " + in_uncompress_disk + " SSD"
+        docker: "quay.io/parsaeskandar/bgzip:1.17"
+    }
+}
+
 task indexReference {
     input {
         File in_reference_file
@@ -17,8 +59,8 @@ task indexReference {
         
         # Save a reference copy by making the dict now
         java -jar /usr/picard/picard.jar CreateSequenceDictionary \
-          R=ref.fa \
-          O=ref.dict
+          -R ref.fa \
+          -O ref.dict
     >>>
     output {
         File reference_index_file = "ref.fa.fai"
@@ -29,7 +71,7 @@ task indexReference {
         cpu: 1
         memory: in_index_mem + " GB"
         disks: "local-disk " + in_index_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -127,7 +169,14 @@ task splitReads {
         #to turn off echo do 'set +o xtrace'
 
         CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
+        if [[ ~{in_read_file} == *.gz ]] ; then
+            DECOMPRESS_COMMAND=(gzip -cd)
+        else
+            # Support inputs that aren't actually compressed.
+            # TODO: Sniff for actual compressed data instead of by extension.
+            DECOMPRESS_COMMAND=(cat)
+        fi
+        "${DECOMPRESS_COMMAND[@]}" ~{in_read_file} | split -l $CHUNK_LINES --filter='bgzip --threads ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
     >>>
     output {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
@@ -138,7 +187,7 @@ task splitReads {
         cpu: in_split_read_cores
         memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: "quay.io/glennhickey/pigz:2.3.1"
+        docker: "quay.io/parsaeskandar/bgzip:1.17"
     }
 }
 
@@ -202,8 +251,7 @@ task sortBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        if [ ~{in_prefix_to_strip} != "" ]
-        then
+        if [ ! -z "~{in_prefix_to_strip}" ] ; then
             # patch the SQ fields from the dict into a new header
             samtools view -H ~{in_bam_file} | grep ^@HD > new_header.sam
             grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
@@ -230,7 +278,7 @@ task sortBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -276,7 +324,7 @@ task leftShiftBAMFile {
         memory: "20 GB"
         cpu: 1
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/jmonlong/freebayes-samtools:1.2.0_1.10"
+        docker: "quay.io/parsaeskandar/freebayes-samtools:1.3.9_1.13"
     }
 }
 
@@ -378,6 +426,7 @@ task prepareRealignTargets {
           --remove_program_records \
           -drf DuplicateRead \
           --disable_bam_indexing \
+          -allowPotentiallyMisencodedQuals \
           -nt ~{thread_count} \
           -R reference.fa \
           -L ${CONTIG_ID} \
@@ -411,6 +460,7 @@ task splitBAMbyPath {
         File in_merged_bam_file_index
         File in_path_list_file
         String in_prefix_to_strip = ""
+        Boolean strip_from_bam = false
         Int thread_count = 16
         Int disk_size = round(3 * size(in_merged_bam_file, 'G')) + 20
         Int mem_gb = 20
@@ -422,31 +472,57 @@ task splitBAMbyPath {
         ln -s ~{in_merged_bam_file} input_bam_file.bam
         ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
 
-        if [ ~{in_prefix_to_strip} != "" ]
-        then
+        if [[ ! -z "~{in_prefix_to_strip}" ]] ; then
             sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_list_file} > paths.txt
         else
             cp ~{in_path_list_file} paths.txt
         fi
         
-        while read -r contig; do
-            samtools view \
-              -@ ~{thread_count} \
-              -h -O BAM \
-              input_bam_file.bam ${contig} \
-              -o ~{in_sample_name}.${contig}.bam \
-            && samtools index \
-              ~{in_sample_name}.${contig}.bam
-        done < paths.txt
+        while read -r CONTIG; do
+            if [[ ! -z "~{in_prefix_to_strip}" ]] ; then
+                PROCESSED_CONTIG="$(echo "${CONTIG}" | sed -e "s/~{in_prefix_to_strip}//g")"
+            else
+                PROCESSED_CONTIG="${CONTIG}"
+            fi
+            if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
+                # The contigs in the BAM are with the prefix
+                LOOKUP_CONTIG="${CONTIG}"
+                # We're going to run the extracted BAM through a pass of header modification
+                samtools view \
+                  -@ ~{thread_count} \
+                  -h -O BAM \
+                  input_bam_file.bam "${LOOKUP_CONTIG}" | \
+                samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" - >"~{in_sample_name}.${PROCESSED_CONTIG}.bam"
+            else
+                # The contigs in the BAM lack the prefix
+                LOOKUP_CONTIG="${PROCESSED_CONTIG}"
+                samtools view \
+                  -@ ~{thread_count} \
+                  -h -O BAM \
+                  input_bam_file.bam "${LOOKUP_CONTIG}" >"~{in_sample_name}.${PROCESSED_CONTIG}.bam"
+            fi
+            
+            samtools index "~{in_sample_name}.${PROCESSED_CONTIG}.bam"
+        done < ~{in_path_list_file}
 
         ## get unmapped reads
         mkdir unmapped
-        samtools view \
-                 -@ ~{thread_count} \
-                 -h -O BAM \
-                 -f 4 \
-                 input_bam_file.bam \
-                 -o unmapped/~{in_sample_name}.unmapped.bam \
+        if  [[ ! -z "~{in_prefix_to_strip}" && ~{strip_from_bam} == true ]] ; then
+            samtools view \
+                -@ ~{thread_count} \
+                -h -O BAM \
+                -f 4 \
+                input_bam_file.bam | \
+            samtools reheader --command 'sed '"'"'s/^\(@SQ.*\)\(\tSN:\)~{in_prefix_to_strip}/\1\2/g'"'" - >unmapped/~{in_sample_name}.unmapped.bam
+        else
+            samtools view \
+                -@ ~{thread_count} \
+                -h -O BAM \
+                -f 4 \
+                input_bam_file.bam \
+                -o "unmapped/~{in_sample_name}.unmapped.bam"
+        fi
+
     >>>
     output {
         Array[File] bam_contig_files = glob("~{in_sample_name}.*.bam")
@@ -458,7 +534,7 @@ task splitBAMbyPath {
         memory: mem_gb + " GB"
         cpu: thread_count
         disks: "local-disk " + disk_size + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -499,7 +575,7 @@ task mergeAlignmentBAMChunks {
         memory: mem_gb + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }
 }
 
@@ -511,6 +587,7 @@ task convertCRAMtoFASTQ {
         Boolean in_paired_reads = true
 	    Int in_cores
         Int disk_size = round(5 * size(in_cram_file, 'G')) + 50
+        Int in_memory = 50
     }
     Int half_cores = in_cores / 2
     command <<<
@@ -529,7 +606,7 @@ task convertCRAMtoFASTQ {
     then
         samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
     else
-        samtools fastq -@ ~{in_cores} -o reads.R1.fastq.gz -c 1 --reference ~{in_ref_file} ~{in_cram_file}
+        samtools fastq -@ ~{in_cores} -0 reads.R1.fastq.gz -o reads.R1.fastq.gz -c 1 --reference ~{in_ref_file} ~{in_cram_file} >/dev/null
     fi
     >>>
     output {
@@ -539,9 +616,50 @@ task convertCRAMtoFASTQ {
     runtime {
         preemptible: 2
         cpu: in_cores
-        memory: "50 GB"
+        memory: in_memory + " GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/biocontainers/samtools:1.14--hb421002_0"
+        docker: "staphb/samtools:1.20"
+    }    
+}
+
+task convertBAMtoFASTQ {
+    input {
+	    File? in_bam_file
+        Boolean in_paired_reads = true
+	    Int in_cores
+        Int disk_size = round(5 * size(in_bam_file, 'G')) + 50
+        Int in_memory = 50
+    }
+    Int half_cores = in_cores / 2
+    command <<<
+    # Set the exit code of a pipeline to that of the rightmost command
+    # to exit with a non-zero status, or zero if all commands of the pipeline exit
+    set -o pipefail
+    # cause a bash script to exit immediately when a command fails
+    set -e
+    # cause the bash shell to treat unset variables as an error and exit immediately
+    set -u
+    # echo each line of the script to stdout so we can see what is happening
+    set -o xtrace
+    #to turn off echo do 'set +o xtrace'
+
+    if [ ~{in_paired_reads} == true ]
+    then
+        samtools collate -@ ~{half_cores} -Ouf ~{in_bam_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+    else
+        samtools fastq -@ ~{in_cores} -0 reads.R1.fastq.gz -o reads.R1.fastq.gz -c 1 ~{in_bam_file} >/dev/null
+    fi
+    >>>
+    output {
+        File output_fastq_1_file = "reads.R1.fastq.gz"
+        File? output_fastq_2_file = "reads.R2.fastq.gz"
+    }
+    runtime {
+        preemptible: 2
+        cpu: in_cores
+        memory: in_memory + " GB"
+        disks: "local-disk " + disk_size + " SSD"
+        docker: "quay.io/parsaeskandar/samtools-picard:2.27.4"
     }    
 }
 
@@ -585,6 +703,7 @@ task kmerCountingKMC {
         cpu: nb_cores
         memory: max_ram + " GB"
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/biocontainers/kmc:3.2.1--hf1761c0_2"
+        docker: "quay.io/biocontainers/kmc:3.2.4--h5ca1c30_4"
     }
 }
+

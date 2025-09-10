@@ -9,6 +9,8 @@
   "Giraffe.OUTPUT_GAF": true,
   "Giraffe.OUTPUT_CALLING_BAMS": true,
   "Giraffe.OUTPUT_SINGLE_BAM": true,
-  "Giraffe.MAP_MEM": 8
+  "Giraffe.MAP_MEM": 8,
+  "Giraffe.MAP_CORES": 8,
+  "Giraffe.VG_DOCKER": "quay.io/vgteam/vg:v1.64.0"
 }
 

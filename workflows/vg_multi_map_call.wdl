@@ -1,5 +1,7 @@
 version 1.0
 
+import "../tasks/bioinfo_utils.wdl" as utils
+
 ### vg_multi_map_call.wdl ###
 workflow vgMultiMapCall {
     meta {
@@ -7,20 +9,20 @@ workflow vgMultiMapCall {
         email: "cmarkell@ucsc.edu"
         description: "Core VG mapping and variant calling workflow for single sample datasets."
     }
-    
+
     input {
-        String MAPPER = "GIRAFFE"               # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
+        String MAPPER = "GIRAFFE"                   # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
         Boolean DEEPVARIANT_MODE = false        # Set to 'true' to use the DeepVariant variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.
         Boolean SNPEFF_ANNOTATION = true        # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean SV_CALLER_MODE = false          # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
         Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
-        Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        Boolean GOOGLE_CLEANUP_MODE = true     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.28.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.64.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.64.0)
         String PCR_INDEL_MODEL = "CONSERVATIVE" # PCR indel model used in GATK Haplotypecaller (NONE, HOSTILE, AGGRESSIVE, CONSERVATIVE)
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int CHUNK_BASES = 50000000              # Number of bases to chunk .gam alignment files for variant calling
@@ -37,6 +39,7 @@ workflow vgMultiMapCall {
         File REF_FILE                           # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                     # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                      # Path to .dict file of the REF_FILE fasta reference
+        String REFERENCE_PREFIX = ""            # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
         File? SNPEFF_DATABASE                   # Path to snpeff database .zip file for snpEff annotation functionality.
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 10
@@ -54,7 +57,7 @@ workflow vgMultiMapCall {
         Int VGCALL_DISK = 40
         Int VGCALL_MEM = 80
     }
-    
+
     # Split input reads into chunks for parallelized mapping
     call splitReads as firstReadPair {
         input:
@@ -74,7 +77,7 @@ workflow vgMultiMapCall {
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
     }
-    
+
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
     if (!defined(PATH_LIST_FILE)) {
         call extractPathNames {
@@ -84,7 +87,7 @@ workflow vgMultiMapCall {
         }
     }
     File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
-    
+
     ################################################################
     # Distribute vg mapping opperation over each chunked read pair #
     ################################################################
@@ -108,7 +111,7 @@ workflow vgMultiMapCall {
                     in_map_disk=MAP_DISK,
                     in_map_mem=MAP_MEM
             }
-        } 
+        }
         if (MAPPER == "MAP") {
             call runVGMAP {
                 input:
@@ -146,7 +149,7 @@ workflow vgMultiMapCall {
                     in_map_mem=MAP_MEM
             }
         }
-        
+
         # Surject GAM alignment files to BAM if SURJECT_MODE set to true
         File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file, runVGGIRAFFE.chunk_gam_file])
         # Cleanup input reads after use
@@ -167,43 +170,50 @@ workflow vgMultiMapCall {
             }
         }
         if (SURJECT_MODE) {
-            call sortMDTagBAMFile {
+            call utils.sortBAM {
                 input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_bam_chunk_file=vg_map_algorithm_chunk_gam_output,
-                    in_reference_file=REF_FILE,
-                    in_reference_index_file=REF_INDEX_FILE,
-                    in_reference_dict_file=REF_DICT_FILE,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM,
+                in_bam_file=vg_map_algorithm_chunk_gam_output,
+                in_ref_dict=REF_DICT_FILE,
+                in_prefix_to_strip=REFERENCE_PREFIX
             }
+
+#            call sortMDTagBAMFile {
+#                input:
+#                    in_sample_name=SAMPLE_NAME,
+#                    in_bam_chunk_file=vg_map_algorithm_chunk_gam_output,
+#                    in_reference_file=REF_FILE,
+#                    in_reference_index_file=REF_INDEX_FILE,
+#                    in_reference_dict_file=REF_DICT_FILE,
+#                    in_map_cores=MAP_CORES,
+#                    in_map_disk=MAP_DISK,
+#                    in_map_mem=MAP_MEM,
+#            }
             # Cleanup intermediate surject files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
                     call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                         input:
                             previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
-                            current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
+                            current_task_output = sortBAM.sorted_bam
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
                     call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                         input:
                             previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
-                            current_task_output = sortMDTagBAMFile.mark_dupped_reordered_bam
+                            current_task_output = sortBAM.sorted_bam
                     }
                 }
             }
         }
     }
-    
+
     ##############################################
     # Run the linear alignment calling procedure #
     ##############################################
     if (SURJECT_MODE) {
         # Merge chunked alignments from surjected GAM files
-        Array[File?] alignment_chunk_bam_files_maybes = sortMDTagBAMFile.mark_dupped_reordered_bam
+        Array[File?] alignment_chunk_bam_files_maybes = sortBAM.sorted_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
         call mergeAlignmentBAMChunks {
             input:
@@ -231,7 +241,7 @@ workflow vgMultiMapCall {
                 }
             }
         }
-         
+
         # Run VCF variant calling procedure
         # Split merged alignment by contigs list
         call splitBAMbyPath {
@@ -245,7 +255,7 @@ workflow vgMultiMapCall {
                 in_map_mem=MAP_MEM
         }
         # Run distributed GATK linear variant calling
-        scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) { 
+        scatter (gatk_caller_input_files in splitBAMbyPath.bams_and_indexes_by_contig) {
             if (!GVCF_MODE) {
                 # Run regular VCF genotypers
                 if (!DEEPVARIANT_MODE) {
@@ -311,7 +321,7 @@ workflow vgMultiMapCall {
                         }
                     }
                 }
-            }    
+            }
             # Run GVCF variant calling procedure
             if (GVCF_MODE) {
                 # Run GVCF genotypers
@@ -391,18 +401,18 @@ workflow vgMultiMapCall {
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
         }
-        call bgzipMergedVCF as bgzipLinearCalledVCF { 
-            input: 
-                in_sample_name=SAMPLE_NAME, 
+        call bgzipMergedVCF as bgzipLinearCalledVCF {
+            input:
+                in_sample_name=SAMPLE_NAME,
                 in_merged_vcf_file=concatLinearVCFChunks.output_merged_vcf,
-                in_vg_container=VG_CONTAINER, 
+                in_vg_container=VG_CONTAINER,
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
         }
-        
+
         File final_vcf_output = bgzipLinearCalledVCF.output_merged_vcf
     }
-    
+
     ################################
     # Run the VG calling procedure #
     ################################
@@ -453,31 +463,31 @@ workflow vgMultiMapCall {
             in_chunk_gam_disk=CHUNK_GAM_DISK,
             in_chunk_gam_mem=CHUNK_GAM_MEM
         }
-        Array[Pair[File,File]] vg_caller_input_files_list = zip(chunkAlignmentsByPathNames.output_vg_chunks, chunkAlignmentsByPathNames.output_gam_chunks) 
+        Array[Pair[File,File]] vg_caller_input_files_list = zip(chunkAlignmentsByPathNames.output_vg_chunks, chunkAlignmentsByPathNames.output_gam_chunks)
         # Run distributed graph-based variant calling
-        scatter (vg_caller_input_files in vg_caller_input_files_list) { 
-            call runVGCaller { 
-                input: 
-                    in_sample_name=SAMPLE_NAME, 
-                    in_chunk_bed_file=chunkAlignmentsByPathNames.output_bed_chunk_file, 
-                    in_vg_file=vg_caller_input_files.left, 
-                    in_gam_file=vg_caller_input_files.right, 
-                    in_chunk_bases=CHUNK_BASES, 
-                    in_overlap=OVERLAP, 
+        scatter (vg_caller_input_files in vg_caller_input_files_list) {
+            call runVGCaller {
+                input:
+                    in_sample_name=SAMPLE_NAME,
+                    in_chunk_bed_file=chunkAlignmentsByPathNames.output_bed_chunk_file,
+                    in_vg_file=vg_caller_input_files.left,
+                    in_gam_file=vg_caller_input_files.right,
+                    in_chunk_bases=CHUNK_BASES,
+                    in_overlap=OVERLAP,
                     in_vg_container=VG_CONTAINER,
                     in_vgcall_cores=VGCALL_CORES,
                     in_vgcall_disk=VGCALL_DISK,
                     in_vgcall_mem=VGCALL_MEM,
                     in_sv_mode=SV_CALLER_MODE
-            } 
-            call runVCFClipper { 
-                input: 
-                    in_chunk_vcf=runVGCaller.output_vcf, 
-                    in_chunk_vcf_index=runVGCaller.output_vcf_index, 
+            }
+            call runVCFClipper {
+                input:
+                    in_chunk_vcf=runVGCaller.output_vcf,
+                    in_chunk_vcf_index=runVGCaller.output_vcf_index,
                     in_chunk_clip_string=runVGCaller.clip_string,
                     in_vgcall_disk=VGCALL_DISK,
                     in_vgcall_mem=VGCALL_MEM
-            } 
+            }
             # Cleanup vg call input files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
@@ -495,15 +505,15 @@ workflow vgMultiMapCall {
                     }
                 }
             }
-        } 
+        }
         # Merge distributed variant called VCFs
-        call concatClippedVCFChunks as concatVCFChunksVGCall { 
-            input: 
-                in_sample_name=SAMPLE_NAME, 
+        call concatClippedVCFChunks as concatVCFChunksVGCall {
+            input:
+                in_sample_name=SAMPLE_NAME,
                 in_clipped_vcf_chunk_files=runVCFClipper.output_clipped_vcf,
                 in_vgcall_disk=VGCALL_DISK,
                 in_vgcall_mem=VGCALL_MEM
-        } 
+        }
         # Extract either the normal or structural variant based VCFs and compress them
         call bgzipMergedVCF as bgzipVGCalledVCF {
             input:
@@ -514,7 +524,7 @@ workflow vgMultiMapCall {
                 in_vgcall_mem=VGCALL_MEM
         }
     }
-    
+
     # Extract either the linear-based or graph-based VCF
     File variantcaller_vcf_output = select_first([bgzipVGCalledVCF.output_merged_vcf, final_vcf_output])
     # Run snpEff annotation on final VCF as desired
@@ -553,12 +563,20 @@ workflow vgMultiMapCall {
 # Tasks for intermediate file cleanup
 task cleanUpUnixFilesystem {
     input {
-        Array[String] previous_task_outputs
-        String current_task_output
+        Array[File] previous_task_outputs
+        File current_task_output
     }
     command <<<
-        set -eux -o pipefail
-        cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
+        set -euo pipefail
+
+        while IFS= read -r path; do
+            if [ -e "$path" ]; then
+                inode="$(stat -c %i "$path" 2>/dev/null || true)"
+                if [ -n "$inode" ]; then
+                    find ../../../ -xdev -inum "$inode" -exec rm -v {} + 2>/dev/null || true
+                fi
+            fi
+        done < ~{write_lines(previous_task_outputs)}
     >>>
     runtime {
         docker: "ubuntu@sha256:2695d3e10e69cc500a16eae6d6629c803c43ab075fa5ce60813a0fc49c47e859"
@@ -590,8 +608,8 @@ task splitReads {
         Int in_split_read_cores
         Int in_split_read_disk
     }
-    
-    command <<< 
+
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -657,10 +675,10 @@ task runVGMAP {
         Int in_map_disk
         String in_map_mem
     }
-    
+
     Boolean gbwt_options = defined(in_gbwt_file)
-    
-    command <<< 
+
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -688,7 +706,7 @@ task runVGMAP {
               ${GBWT_OPTION_STRING} \
               -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
               -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
-        else    
+        else
            vg map \
               --ref-paths ~{in_ref_dict} \
               --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
@@ -730,11 +748,11 @@ task runVGMPMAP {
         Int in_map_disk
         String in_map_mem
     }
-    
+
     Boolean gbwt_options = defined(in_gbwt_file)
     Boolean snarl_options = defined(in_snarls_file)
-    
-    command <<< 
+
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -745,7 +763,7 @@ task runVGMPMAP {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
         GBWT_OPTION_STRING=""
         if [ ~{gbwt_options} == true ] && [ ~{snarl_options} == false ]; then
@@ -765,7 +783,7 @@ task runVGMPMAP {
               -g input_gcsa_file.gcsa \
               ${GBWT_OPTION_STRING} \
               -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
-        else    
+        else
             vg mpmap \
               --ref-paths ~{in_ref_dict} \
               --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
@@ -807,8 +825,8 @@ task runVGGIRAFFE {
         Int in_map_disk
         String in_map_mem
     }
-    
-    command <<< 
+
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -819,7 +837,7 @@ task runVGGIRAFFE {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
         if [ ~{surject_output} == false ]; then
             vg giraffe \
@@ -832,7 +850,7 @@ task runVGGIRAFFE {
               --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
               --sample "~{in_sample_name}" \
               -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
-        else    
+        else
             vg giraffe \
               --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
               --sample "~{in_sample_name}" \
@@ -963,13 +981,13 @@ task splitBAMbyPath {
         Int in_map_disk
         String in_map_mem
     }
-    
+
     command <<<
         set -eux -o pipefail
-        
+
         ln -s ~{in_merged_bam_file} input_bam_file.bam
         ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
-        
+
         while IFS=$'\t' read -ra path_list_line; do
             path_name="${path_list_line[0]}"
             samtools view \
@@ -983,7 +1001,7 @@ task splitBAMbyPath {
     >>>
     output {
         Array[File] bam_contig_files = glob("~{in_sample_name}.*.bam")
-        Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai") 
+        Array[File] bam_contig_files_index = glob("~{in_sample_name}.*.bam.bai")
         Array[Pair[File, File]] bams_and_indexes_by_contig = zip(bam_contig_files, bam_contig_files_index)
     }
     runtime {
@@ -1007,7 +1025,7 @@ task runGATKHaplotypeCaller {
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1019,7 +1037,7 @@ task runGATKHaplotypeCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
@@ -1056,7 +1074,7 @@ task runGATKHaplotypeCallerGVCF {
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1068,7 +1086,7 @@ task runGATKHaplotypeCallerGVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
@@ -1105,7 +1123,7 @@ task runDeepVariantCaller {
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1117,16 +1135,17 @@ task runDeepVariantCaller {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
-        
+
         /opt/deepvariant/bin/run_deepvariant \
         --num_shards ~{in_vgcall_cores} \
         --model_type WGS \
         --regions ${CONTIG_ID} \
         --ref ~{in_reference_file} \
+        --sample_name ~{in_sample_name} \
         --reads input_bam_file.bam \
         --output_vcf ~{in_sample_name}.vcf \
         && bgzip ~{in_sample_name}.vcf
@@ -1154,7 +1173,7 @@ task runDeepVariantCallerGVCF {
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1166,21 +1185,24 @@ task runDeepVariantCallerGVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         ln -s ~{in_bam_file} input_bam_file.bam
         ln -s ~{in_bam_file_index} input_bam_file.bam.bai
         CONTIG_ID=($(ls ~{in_bam_file} | awk -F'.' '{print $(NF-1)}'))
-        
+
         /opt/deepvariant/bin/run_deepvariant \
         --num_shards ~{in_vgcall_cores} \
         --model_type WGS \
         --regions ${CONTIG_ID} \
         --ref ~{in_reference_file} \
+        --sample_name ~{in_sample_name} \
         --reads input_bam_file.bam \
         --output_gvcf ~{in_sample_name}.rawLikelihoods.gvcf \
+        --output_vcf ~{in_sample_name}.rawLikelihoods.vcf \
         && bgzip ~{in_sample_name}.rawLikelihoods.gvcf
     >>>
     output {
+        File genotyped_vcf = "~{in_sample_name}.rawLikelihoods.vcf.gz"
         File genotyped_gvcf = "~{in_sample_name}.rawLikelihoods.gvcf.gz"
     }
     runtime {
@@ -1201,7 +1223,7 @@ task mergeAlignmentGAMChunks {
         Int in_merge_gam_mem
         Int in_merge_gam_time
     }
-    
+
     command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1213,7 +1235,7 @@ task mergeAlignmentGAMChunks {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         cat ${sep=" " in_alignment_gam_chunk_files} > ${in_sample_name}_merged.gam \
         && vg gamsort \
             ${in_sample_name}_merged.gam \
@@ -1248,8 +1270,8 @@ task chunkAlignmentsByPathNames {
         Int in_chunk_gam_disk
         Int in_chunk_gam_mem
     }
-    
-    command { 
+
+    command {
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -1260,7 +1282,7 @@ task chunkAlignmentsByPathNames {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-    
+
         vg chunk \
             -x ${in_xg_file} \
             -a ${in_merged_sorted_gam} \
@@ -1276,14 +1298,14 @@ task chunkAlignmentsByPathNames {
         Array[File] output_vg_chunks = glob("call_chunk*.vg")
         Array[File] output_gam_chunks = glob("call_chunk*.gam")
         File output_bed_chunk_file = "output_bed_chunks.bed"
-    }   
+    }
     runtime {
         time: 900
         memory: in_chunk_gam_mem + " GB"
         cpu: in_chunk_gam_cores
         disks: "local-disk " + in_chunk_gam_disk + " SSD"
         docker: in_vg_container
-    }   
+    }
 }
 
 task runVGCaller {
@@ -1304,19 +1326,8 @@ task runVGCaller {
     String chunk_tag = basename(in_vg_file, ".vg")
     command <<<
         set -eux -o pipefail
-
-        VG_INDEX_XG_COMMAND=""
-        VG_FILTER_COMMAND=""
-        VG_AUGMENT_SV_OPTIONS=""
         VG_CALL_SV_OPTIONS=""
-        if [ ~{in_sv_mode} == false ]; then
-            VG_INDEX_XG_COMMAND="vg index ~{in_vg_file} -x ~{chunk_tag}.xg -t ~{in_vgcall_cores} && \\"
-            VG_FILTER_COMMAND="vg filter ~{in_gam_file} -t 1 -r 0.9 -fu -s 1000 -m 1 -q 15 -D 999 -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam && \\"
-            VG_AUGMENT_SV_OPTIONS="~{chunk_tag}.filtered_gam"
-        else
-            VG_AUGMENT_SV_OPTIONS="~{in_gam_file} --recall"
-            VG_CALL_SV_OPTIONS="-u -n 0 -e 1000 -G 3"
-        fi
+        
 
         PATH_NAME="$(echo ~{chunk_tag} | cut -f 4 -d '_')"
         OFFSET=""
@@ -1343,28 +1354,23 @@ task runVGCaller {
                 CHR_LENGTH="${bed_chunk_line[2]}"
             fi
         done < ~{in_chunk_bed_file}
-        
-        ${VG_INDEX_XG_COMMAND}
-        ${VG_FILTER_COMMAND}
-        vg augment \
-            ~{in_vg_file} \
-            ${VG_AUGMENT_SV_OPTIONS} \
+
+        vg index -x ~{chunk_tag}.xg -t ~{in_vgcall_cores} ~{in_vg_file} && \
+        vg filter ~{in_gam_file} -t 1 -q 15 -r 0.9 -fu -s 1000 -D 999 -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam
+
+        vg pack \
+            -x ~{chunk_tag}.xg \
             -t ~{in_vgcall_cores} \
-            -a pileup \
-            -Z ~{chunk_tag}.trans \
-            -S ~{chunk_tag}.support > ~{chunk_tag}.aug.vg && \
+            -g ~{chunk_tag}.filtered.gam -Q 5 -o ~{chunk_tag}.pack && \
+            
         vg call \
-            ~{chunk_tag}.aug.vg \
+            ~{chunk_tag}.xg \
             -t ~{in_vgcall_cores} \
-            -S ~{in_sample_name} \
-            -z ~{chunk_tag}.trans \
-            -s ~{chunk_tag}.support \
-            -b ~{in_vg_file} \
-            -r ${PATH_NAME} \
-            -c ${PATH_NAME} \
+            -k ~{chunk_tag}.pack \
+            -p ${PATH_NAME} \
+            -o ${OFFSET} \
             -l ${CHR_LENGTH} \
-            ${VG_CALL_SV_OPTIONS} \
-            -o ${OFFSET} > ~{chunk_tag}.vcf && \
+            ${VG_CALL_SV_OPTIONS} > ~{chunk_tag}.vcf && \
         head -10000 ~{chunk_tag}.vcf | grep "^#" >> ~{chunk_tag}.sorted.vcf && \
         if [ "$(cat ~{chunk_tag}.vcf | grep -v '^#')" ]; then
             cat ~{chunk_tag}.vcf | grep -v "^#" | sort -k1,1d -k2,2n >> ~{chunk_tag}.sorted.vcf
@@ -1515,7 +1521,7 @@ task normalizeVCF {
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1550,7 +1556,7 @@ task snpEffAnnotateVCF {
         Int in_vgcall_disk
         Int in_vgcall_mem
     }
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -1562,7 +1568,7 @@ task snpEffAnnotateVCF {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
-        
+
         unzip ~{in_snpeff_database}
         snpEff -Xmx40g -i VCF -o VCF -noLof -noHgvs -formatEff -classic -dataDir ${PWD}/data GRCh37.75 ~{in_normalized_vcf_file} > ~{in_sample_name}.snpeff.unrolled.vcf
     >>>
@@ -1576,4 +1582,5 @@ task snpEffAnnotateVCF {
         docker: "quay.io/biocontainers/snpeff:4.3.1t--2"
     }
 }
+
 

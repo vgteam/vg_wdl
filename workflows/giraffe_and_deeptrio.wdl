@@ -5,12 +5,15 @@ version 1.0
 ## Description: Core VG Giraffe mapping and DeepTrio calling workflow for maternal-paternal-child sample datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-import "./giraffe_and_deeptrio.mapper.wdl" as vgGiraffeMapWorkflow
+import "./giraffe.wdl" as GiraffeWorkflow
+import "../tasks/vg_map_hts.wdl" as map
+import "../tasks/bioinfo_utils.wdl" as utils
 
 workflow vgGiraffeDeeptrio {
     meta {
         author: "Charles Markello"
         email: "cmarkell@ucsc.edu"
+        Updated: "Parsa Eskandar"
         description: "Core VG Giraffe mapping and DeepTrio calling workflow for maternal-paternal-child sample datasets. It takes as inputs reads in FASTQ and graphs containing the population-based haplotypes to genotype. The graphs files required include the XG, GCSA, GBWT, graph GBWT, Distance and Minimizer indexes. It outputs a VCF file and BAM file for the child along with optional RTG and hap.py vcf evaluation if the user provides benchmark truth-set VCFs."
     }
     input {
@@ -25,14 +28,13 @@ workflow vgGiraffeDeeptrio {
         String PATERNAL_NAME                            # The paternal sample name
         Int READS_PER_CHUNK = 20000000                  # Number of reads contained in each mapping chunk (20000000 for wgs)
         String? GIRAFFE_OPTIONS                         # (OPTIONAL) extra command line options for Giraffe mapper
-        Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the XG index.
-        File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the XG index, to use instead of CONTIGS. If neither is given, paths are extracted from the XG and subset to chromosome-looking paths.
+        Array[String]+? CONTIGS                         # (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.
+        File? PATH_LIST_FILE                            # (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS.
         String REFERENCE_PREFIX = ""                    # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
-        File XG_FILE                                    # Path to .xg index file
-        File GBWT_FILE                                  # Path to .gbwt index file
-        File GGBWT_FILE                                 # Path to .gg index file
-        File DIST_FILE                                  # Path to .dist index file
-        File MIN_FILE                                   # Path to .min index file
+        File GBZ_FILE                                   # Path to .gbz graph file
+        File? DIST_FILE                                 # Path to .dist index file
+        File? MIN_FILE                                  # Path to .min index file
+        File? ZIPCODES_FILE                             # (OPTIONAL) Zipcodes index file
         File? TRUTH_VCF                                 # Path to .vcf.gz to compare against
         File? TRUTH_VCF_INDEX                           # Path to Tabix index for TRUTH_VCF
         File? EVALUATION_REGIONS_BED                    # BED to restrict comparison against TRUTH_VCF to
@@ -49,8 +51,8 @@ workflow vgGiraffeDeeptrio {
         Boolean REALIGN_INDELS = false                  # Whether or not to realign reads near indels
         Int REALIGNMENT_EXPANSION_BASES = 160           # Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions.
         Int MIN_MAPQ = 1                                # Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong.
-        Boolean DV_KEEP_LEGACY_AC = true                # Should DV use the legacy allele counter behavior?
-        Boolean DV_NORM_READS = true                    # Should DV normalize reads?
+        Boolean? DV_KEEP_LEGACY_AC                      # Should DV use the legacy allele counter behavior?
+        Boolean? DV_NORM_READS                          # Should DV normalize reads?
         Int SPLIT_READ_CORES = 8
         Int SPLIT_READ_DISK = 10
         Int MAP_CORES = 16
@@ -62,145 +64,112 @@ workflow vgGiraffeDeeptrio {
         File? REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
         File? REFERENCE_DICT_FILE
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
+        String DEEPTRIO_DOCKER = "google/deepvariant:deeptrio-1.9.0"
+        Boolean MERGE_TRIO_GVCFS = false                 # Optionally merge trio gVCFs using GLnexus
     }
 
     # Which path names to work on?
     if (!defined(CONTIGS)) {
         if (!defined(PATH_LIST_FILE)) {
-            # Extract path names to call against from xg file if PATH_LIST_FILE input not provided
-            # Filter down to major paths, because GRCh38 includes thousands of
-            # decoys and unplaced/unlocalized contigs, and we can't efficiently
-            # scatter across them, nor do we care about accuracy on them, and also
-            # calling on the decoys is semantically meaningless.
-            call extractSubsetPathNames {
+            # Extract path names to call against from GBZ file if PATH_LIST_FILE input not provided
+            call map.extractSubsetPathNames as extractSubsetPathNamesGBZ {
                 input:
-                    in_xg_file=XG_FILE,
-                    in_extract_disk=MAP_DISK,
-                    in_extract_mem=MAP_MEM
+                    in_gbz_file=GBZ_FILE,
+                    in_reference_prefix=REFERENCE_PREFIX,
+                    in_extract_mem=MAP_MEM,
+                    vg_docker=VG_DOCKER
             }
         }
-    } 
+    }
     if (defined(CONTIGS)) {
-        # Put the paths in a file to use later. We know the value is defined,
-        # but WDL is a bit low on unboxing calls for optionals so we use
-        # select_first.
         File written_path_names_file = write_lines(select_first([CONTIGS]))
     }
-    File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractSubsetPathNames.output_path_list_file, written_path_names_file])
+    File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractSubsetPathNamesGBZ.output_path_list_file, written_path_names_file])
     
-    # To make sure that we have a FASTA reference with a contig set that
-    # exactly matches the graph, we generate it ourselves, from the graph.
+    # Generate reference FASTA from GBZ to match chosen paths
     if (!defined(REFERENCE_FILE)) {
-        call extractReference {
+        call map.extractReference as extractReferenceFromGBZ {
             input:
-                in_xg_file=XG_FILE,
+                in_gbz_file=GBZ_FILE,
                 in_path_list_file=pipeline_path_list_file,
-                in_extract_disk=MAP_DISK,
-                in_extract_mem=MAP_MEM
+                in_prefix_to_strip=REFERENCE_PREFIX,
+                in_extract_mem=MAP_MEM,
+                vg_docker=VG_DOCKER
         }
     }
-    File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
+    File reference_file = select_first([REFERENCE_FILE, extractReferenceFromGBZ.reference_file])
     
     if (!defined(REFERENCE_INDEX_FILE)) {
-        call indexReference {
+        call utils.indexReference as buildRefIndex {
             input:
                 in_reference_file=reference_file,
                 in_index_disk=MAP_DISK,
                 in_index_mem=MAP_MEM
         }
     }
-    File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
-    File reference_dict_file = select_first([REFERENCE_DICT_FILE, indexReference.reference_dict_file])
+    File reference_index_file = select_first([REFERENCE_INDEX_FILE, buildRefIndex.reference_index_file])
+    File reference_dict_file = select_first([REFERENCE_DICT_FILE, buildRefIndex.reference_dict_file])
 
     #######################################################
     ############ Run mapping workflows on Trio ############
     #######################################################
-    call vgGiraffeMapWorkflow.vgGiraffeMap as maternalMapWorkflow {
+    call GiraffeWorkflow.Giraffe as maternalMapWorkflow {
         input:
             INPUT_READ_FILE_1=MATERNAL_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=MATERNAL_INPUT_READ_FILE_2,
             SAMPLE_NAME=MATERNAL_NAME,
             READS_PER_CHUNK=READS_PER_CHUNK,
-            GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
-            PATH_LIST_FILE=pipeline_path_list_file,
-            REFERENCE_PREFIX=REFERENCE_PREFIX,
-            XG_FILE=XG_FILE,
-            GBWT_FILE=GBWT_FILE,
-            GGBWT_FILE=GGBWT_FILE,
+            GBZ_FILE=GBZ_FILE,
             DIST_FILE=DIST_FILE,
             MIN_FILE=MIN_FILE,
-            LEFTALIGN_BAM=LEFTALIGN_BAM,
-            REALIGN_INDELS=REALIGN_INDELS,
-            REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,
-            REFERENCE_FILE=reference_file,
-            REFERENCE_INDEX_FILE=reference_index_file,
-            REFERENCE_DICT_FILE=reference_dict_file,
+            ZIPCODES_FILE=ZIPCODES_FILE,
+            PATH_LIST_FILE=pipeline_path_list_file,
+            REFERENCE_PREFIX=REFERENCE_PREFIX,
+            VG_DOCKER=VG_DOCKER,
+            OUTPUT_SINGLE_BAM=true,
+            OUTPUT_CALLING_BAMS=true,
             SPLIT_READ_CORES=SPLIT_READ_CORES,
-            SPLIT_READ_DISK=SPLIT_READ_DISK,
             MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM,
-            CALL_CORES=CALL_CORES,
-            CALL_DISK=CALL_DISK,
-            CALL_MEM=CALL_MEM
+            MAP_MEM=MAP_MEM
     }
-    call vgGiraffeMapWorkflow.vgGiraffeMap as paternalMapWorkflow {
+    call GiraffeWorkflow.Giraffe as paternalMapWorkflow {
         input:
             INPUT_READ_FILE_1=PATERNAL_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=PATERNAL_INPUT_READ_FILE_2,
             SAMPLE_NAME=PATERNAL_NAME,
             READS_PER_CHUNK=READS_PER_CHUNK,
-            GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
-            PATH_LIST_FILE=pipeline_path_list_file,
-            REFERENCE_PREFIX=REFERENCE_PREFIX,
-            XG_FILE=XG_FILE,
-            GBWT_FILE=GBWT_FILE,
-            GGBWT_FILE=GGBWT_FILE,
+            GBZ_FILE=GBZ_FILE,
             DIST_FILE=DIST_FILE,
             MIN_FILE=MIN_FILE,
-            LEFTALIGN_BAM=LEFTALIGN_BAM,
-            REALIGN_INDELS=REALIGN_INDELS,
-            REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,
-            REFERENCE_FILE=reference_file,
-            REFERENCE_INDEX_FILE=reference_index_file,
-            REFERENCE_DICT_FILE=reference_dict_file,
+            ZIPCODES_FILE=ZIPCODES_FILE,
+            PATH_LIST_FILE=pipeline_path_list_file,
+            REFERENCE_PREFIX=REFERENCE_PREFIX,
+            VG_DOCKER=VG_DOCKER,
+            OUTPUT_SINGLE_BAM=true,
+            OUTPUT_CALLING_BAMS=true,
             SPLIT_READ_CORES=SPLIT_READ_CORES,
-            SPLIT_READ_DISK=SPLIT_READ_DISK,
             MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM,
-            CALL_CORES=CALL_CORES,
-            CALL_DISK=CALL_DISK,
-            CALL_MEM=CALL_MEM
+            MAP_MEM=MAP_MEM
     }
-    call vgGiraffeMapWorkflow.vgGiraffeMap as childMapWorkflow {
+    call GiraffeWorkflow.Giraffe as childMapWorkflow {
         input:
             INPUT_READ_FILE_1=CHILD_INPUT_READ_FILE_1,
             INPUT_READ_FILE_2=CHILD_INPUT_READ_FILE_2,
             SAMPLE_NAME=SAMPLE_NAME,
             READS_PER_CHUNK=READS_PER_CHUNK,
-            GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
-            PATH_LIST_FILE=pipeline_path_list_file,
-            REFERENCE_PREFIX=REFERENCE_PREFIX,
-            XG_FILE=XG_FILE,
-            GBWT_FILE=GBWT_FILE,
-            GGBWT_FILE=GGBWT_FILE,
+            GBZ_FILE=GBZ_FILE,
             DIST_FILE=DIST_FILE,
             MIN_FILE=MIN_FILE,
-            LEFTALIGN_BAM=LEFTALIGN_BAM,
-            REALIGN_INDELS=REALIGN_INDELS,
-            REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,
-            REFERENCE_FILE=reference_file,
-            REFERENCE_INDEX_FILE=reference_index_file,
-            REFERENCE_DICT_FILE=reference_dict_file,
+            ZIPCODES_FILE=ZIPCODES_FILE,
+            PATH_LIST_FILE=pipeline_path_list_file,
+            REFERENCE_PREFIX=REFERENCE_PREFIX,
+            VG_DOCKER=VG_DOCKER,
+            OUTPUT_SINGLE_BAM=true,
+            OUTPUT_CALLING_BAMS=true,
             SPLIT_READ_CORES=SPLIT_READ_CORES,
-            SPLIT_READ_DISK=SPLIT_READ_DISK,
             MAP_CORES=MAP_CORES,
-            MAP_DISK=MAP_DISK,
-            MAP_MEM=MAP_MEM,
-            CALL_CORES=CALL_CORES,
-            CALL_DISK=CALL_DISK,
-            CALL_MEM=CALL_MEM
+            MAP_MEM=MAP_MEM
     }
 
 
@@ -213,9 +182,16 @@ workflow vgGiraffeDeeptrio {
     ##
     
     # Run distributed DeepTrio linear variant calling for each chromosomal contig
-    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = zip(maternalMapWorkflow.output_calling_bams, maternalMapWorkflow.output_calling_bam_indexes)
-    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(paternalMapWorkflow.output_calling_bams, paternalMapWorkflow.output_calling_bam_indexes)
-    Array[Pair[File, File]] child_bams_and_indexes_by_contig = zip(childMapWorkflow.output_calling_bams, childMapWorkflow.output_calling_bam_indexes)
+    Array[File] maternal_calling_bams = select_first([maternalMapWorkflow.output_calling_bams, []])
+    Array[File] maternal_calling_bam_indexes = select_first([maternalMapWorkflow.output_calling_bam_indexes, []])
+    Array[File] paternal_calling_bams = select_first([paternalMapWorkflow.output_calling_bams, []])
+    Array[File] paternal_calling_bam_indexes = select_first([paternalMapWorkflow.output_calling_bam_indexes, []])
+    Array[File] child_calling_bams = select_first([childMapWorkflow.output_calling_bams, []])
+    Array[File] child_calling_bam_indexes = select_first([childMapWorkflow.output_calling_bam_indexes, []])
+
+    Array[Pair[File, File]] maternal_bams_and_indexes_by_contig = zip(maternal_calling_bams, maternal_calling_bam_indexes)
+    Array[Pair[File, File]] paternal_bams_and_indexes_by_contig = zip(paternal_calling_bams, paternal_calling_bam_indexes)
+    Array[Pair[File, File]] child_bams_and_indexes_by_contig = zip(child_calling_bams, child_calling_bam_indexes)
     Array[Pair[Pair[File,File],Pair[Pair[File,File],Pair[File,File]]]] trio_bam_index_by_contigs_pair = zip(child_bams_and_indexes_by_contig, zip(maternal_bams_and_indexes_by_contig, paternal_bams_and_indexes_by_contig))
     #              trio_bam_index_by_contigs_pair
     #           _________________|_________________
@@ -233,7 +209,19 @@ workflow vgGiraffeDeeptrio {
         File paternal_bam_file_index = deeptrio_caller_input_files.right.right.right
 
         ## DeepTrio calling
-        String contig_name = sub(sub(sub(basename(child_bam_file), "\\.indel_realigned.bam", ""), SAMPLE_NAME, ""), "\\.", "")
+        String contig_name = sub(
+            sub(
+                sub(
+                    sub(
+                        sub(basename(child_bam_file), "\\.bam$", ""),
+                        "\\.indel_realigned$", ""
+                    ),
+                    "\\.left_shifted$", ""
+                ),
+                "^" + SAMPLE_NAME + "\\.", ""
+            ),
+            "^\\.", ""
+        )
         if ((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT")) {
             call runDeepVariantMakeExamples as callDeepVariantMakeExamplesChild {
                 input:
@@ -243,8 +231,8 @@ workflow vgGiraffeDeeptrio {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_keep_legacy_ac=select_first([DV_KEEP_LEGACY_AC, false]),
+                    in_norm_reads=select_first([DV_NORM_READS, false]),
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
                     in_call_mem=CALL_MEM
@@ -271,8 +259,8 @@ workflow vgGiraffeDeeptrio {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_keep_legacy_ac=select_first([DV_KEEP_LEGACY_AC, false]),
+                    in_norm_reads=select_first([DV_NORM_READS, false]),
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
                     in_call_mem=CALL_MEM
@@ -299,8 +287,8 @@ workflow vgGiraffeDeeptrio {
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
                     in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_keep_legacy_ac=select_first([DV_KEEP_LEGACY_AC, false]),
+                    in_norm_reads=select_first([DV_NORM_READS, false]),
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
                     in_call_mem=CALL_MEM
@@ -321,7 +309,7 @@ workflow vgGiraffeDeeptrio {
             }
         }
         if (!((contig_name == "chrX")||(contig_name == "X")||(contig_name == "chrY")||(contig_name == "Y")||(contig_name == "chrM")||(contig_name == "MT"))) {
-            call runDeepTrioMakeExamples {
+            call runDeepTrioOneCommand as trioCall {
                 input:
                     in_child_name=SAMPLE_NAME,
                     in_maternal_name=MATERNAL_NAME,
@@ -334,62 +322,16 @@ workflow vgGiraffeDeeptrio {
                     in_paternal_bam_file_index=paternal_bam_file_index,
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
-                    in_min_mapq=MIN_MAPQ,
-                    in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                    in_norm_reads=DV_NORM_READS,
+                    in_region=contig_name,
                     in_call_cores=CALL_CORES,
                     in_call_disk=CALL_DISK,
-                    in_call_mem=CALL_MEM
-            }
-            call runDeepTrioCallVariants as callVariantsChild {
-                input:
-                    in_sample_name=SAMPLE_NAME,
-                    in_sample_type="child",
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    in_examples_file=runDeepTrioMakeExamples.child_examples_file,
-                    in_nonvariant_site_tf_file=runDeepTrioMakeExamples.child_nonvariant_site_tf_file,
-                    in_model_meta_file=CHILD_DT_MODEL_META,
-                    in_model_index_file=CHILD_DT_MODEL_INDEX,
-                    in_model_data_file=CHILD_DT_MODEL_DATA,
-                    in_call_cores=CALL_CORES,
-                    in_call_disk=CALL_DISK,
-                    in_call_mem=CALL_MEM
-            }
-            call runDeepTrioCallVariants as callVariantsMaternal {
-                input:
-                    in_sample_name=MATERNAL_NAME,
-                    in_sample_type="parent2",
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    in_examples_file=runDeepTrioMakeExamples.maternal_examples_file,
-                    in_nonvariant_site_tf_file=runDeepTrioMakeExamples.maternal_nonvariant_site_tf_file,
-                    in_model_meta_file=PARENT_DT_MODEL_META,
-                    in_model_index_file=PARENT_DT_MODEL_INDEX,
-                    in_model_data_file=PARENT_DT_MODEL_DATA,
-                    in_call_cores=CALL_CORES,
-                    in_call_disk=CALL_DISK,
-                    in_call_mem=CALL_MEM
-            }
-            call runDeepTrioCallVariants as callVariantsPaternal {
-                input:
-                    in_sample_name=PATERNAL_NAME,
-                    in_sample_type="parent1",
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    in_examples_file=runDeepTrioMakeExamples.paternal_examples_file,
-                    in_nonvariant_site_tf_file=runDeepTrioMakeExamples.paternal_nonvariant_site_tf_file,
-                    in_model_meta_file=PARENT_DT_MODEL_META,
-                    in_model_index_file=PARENT_DT_MODEL_INDEX,
-                    in_model_data_file=PARENT_DT_MODEL_DATA,
-                    in_call_cores=CALL_CORES,
-                    in_call_disk=CALL_DISK,
-                    in_call_mem=CALL_MEM
+                    in_call_mem=CALL_MEM,
+                    in_deeptrio_docker=DEEPTRIO_DOCKER
             }
         }
     }
     Array[File] childDeepVarGVCF = select_all(callDeepVariantCallVariantsChild.output_gvcf_file)
-    Array[File] childDeepTrioGVCF = select_all(callVariantsChild.output_gvcf_file)
+    Array[File] childDeepTrioGVCF = select_all(trioCall.output_child_gvcf_file)
     Array[File] child_contig_gvcf_output_list = select_all(flatten([childDeepTrioGVCF, childDeepVarGVCF]))
     # Merge distributed variant called VCFs
     call concatClippedVCFChunks as concatVCFChunksChild {
@@ -408,7 +350,7 @@ workflow vgGiraffeDeeptrio {
             in_call_mem=CALL_MEM
     }
     Array[File] maDeepVarGVCF = select_all(callDeepVariantCallVariantsMaternal.output_gvcf_file)
-    Array[File] maDeepTrioGVCF = select_all(callVariantsMaternal.output_gvcf_file)
+    Array[File] maDeepTrioGVCF = select_all(trioCall.output_parent2_gvcf_file)
     Array[File] maternal_contig_gvcf_output_list = select_all(flatten([maDeepTrioGVCF, maDeepVarGVCF]))
     # Merge distributed variant called VCFs
     call concatClippedVCFChunks as concatVCFChunksMaternal {
@@ -427,7 +369,7 @@ workflow vgGiraffeDeeptrio {
             in_call_mem=CALL_MEM
     }
     Array[File] paDeepVarGVCF = select_all(callDeepVariantCallVariantsPaternal.output_gvcf_file)
-    Array[File] paDeepTrioGVCF = select_all(callVariantsPaternal.output_gvcf_file)
+    Array[File] paDeepTrioGVCF = select_all(trioCall.output_parent1_gvcf_file)
     Array[File] paternal_contig_gvcf_output_list = select_all(flatten([paDeepTrioGVCF, paDeepVarGVCF]))
     # Merge distributed variant called VCFs
     call concatClippedVCFChunks as concatVCFChunksPaternal {
@@ -444,6 +386,24 @@ workflow vgGiraffeDeeptrio {
             in_merged_vcf_file=concatVCFChunksPaternal.output_merged_vcf,
             in_call_disk=CALL_DISK,
             in_call_mem=CALL_MEM
+    }
+    if (MERGE_TRIO_GVCFS) {
+        call glnexusMergeTrioBCF {
+            input:
+                in_child_gvcf_file=bgzipVGCalledChildVCF.output_merged_vcf,
+                in_parent1_gvcf_file=bgzipVGCalledPaternalVCF.output_merged_vcf,
+                in_parent2_gvcf_file=bgzipVGCalledMaternalVCF.output_merged_vcf,
+                in_call_disk=CALL_DISK,
+                in_call_mem=CALL_MEM
+        }
+        call convertBCFtoVCF as convertMergedTrioBCFtoVCF {
+            input:
+                in_sample_name=SAMPLE_NAME,
+                in_bcf_file=glnexusMergeTrioBCF.output_bcf_file,
+                in_call_disk=CALL_DISK,
+                in_call_mem=CALL_MEM,
+                in_call_cores=CALL_CORES
+        }
     }
     if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
     
@@ -486,8 +446,10 @@ workflow vgGiraffeDeeptrio {
         File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
         File output_vcf = bgzipVGCalledChildVCF.output_merged_vcf
         File output_vcf_index = bgzipVGCalledChildVCF.output_merged_vcf_index
-        Array[File] output_calling_bams = childMapWorkflow.output_calling_bams
-        Array[File] output_calling_bam_indexes = childMapWorkflow.output_calling_bam_indexes
+        Array[File] output_calling_bams = child_calling_bams
+        Array[File] output_calling_bam_indexes = child_calling_bam_indexes
+        File? output_trio_merged_vcf = convertMergedTrioBCFtoVCF.output_vcf_file
+        File? output_trio_merged_vcf_index = convertMergedTrioBCFtoVCF.output_vcf_index
     }   
 }
 
@@ -555,7 +517,7 @@ task extractSubsetPathNames {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -584,7 +546,7 @@ task extractReference {
         preemptible: 2
         memory: in_extract_mem + " GB"
         disks: "local-disk " + in_extract_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -674,7 +636,7 @@ task runVGGIRAFFE {
         memory: in_map_mem + " GB"
         cpu: in_map_cores
         disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -1295,6 +1257,77 @@ task concatClippedVCFChunks {
     }
 }
 
+task glnexusMergeTrioBCF {
+    input {
+        File in_child_gvcf_file
+        File in_parent1_gvcf_file
+        File in_parent2_gvcf_file
+        Int in_call_disk
+        Int in_call_mem
+    }
+    command <<<'
+        set -eux -o pipefail
+
+        glnexus_cli \
+            --config DeepVariant_unfiltered \
+            "~{in_child_gvcf_file}" \
+            "~{in_parent1_gvcf_file}" \
+            "~{in_parent2_gvcf_file}" > merged_trio.bcf
+    '>>>
+    output {
+        File output_bcf_file = "merged_trio.bcf"
+    }
+    runtime {
+        preemptible: 2
+        time: 60
+        memory: in_call_mem + " GB"
+        disks: "local-disk " + in_call_disk + " SSD"
+        docker: "quay.io/mlin/glnexus:v1.2.7"
+    }
+}
+
+task convertBCFtoVCF {
+    input {
+        String in_sample_name
+        File in_bcf_file
+        Int in_call_cores
+        Int in_call_disk
+        Int in_call_mem
+    }
+    command {
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        set -o xtrace
+        #to turn off echo do 'set +o xtrace'
+
+        bcftools view \
+          --threads ~{in_call_cores} \
+          -O z \
+          -o "~{in_sample_name}_trio_merged.vcf.gz" \
+          "~{in_bcf_file}"
+
+        bcftools index -t "~{in_sample_name}_trio_merged.vcf.gz"
+    }
+    output {
+        File output_vcf_file = "~{in_sample_name}_trio_merged.vcf.gz"
+        File output_vcf_index = "~{in_sample_name}_trio_merged.vcf.gz.tbi"
+    }
+    runtime {
+        preemptible: 2
+        time: 60
+        memory: in_call_mem + " GB"
+        cpu: in_call_cores
+        disks: "local-disk " + in_call_disk + " SSD"
+        docker: "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
+    }
+}
+
 task bgzipMergedVCF {
     input {
         String in_sample_name
@@ -1329,7 +1362,7 @@ task bgzipMergedVCF {
         time: 30
         memory: in_call_mem + " GB"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.38.0"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -1470,6 +1503,7 @@ task runDeepTrioMakeExamples {
         Int in_call_cores
         Int in_call_disk
         Int in_call_mem
+        String in_deeptrio_docker
     }
     
     command <<<
@@ -1506,13 +1540,12 @@ task runDeepTrioMakeExamples {
           KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
         fi
 
-        seq 0 $((~{in_call_cores}-1)) | \
-        parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/deeptrio/make_examples \
+        /opt/deepvariant/bin/deeptrio/make_examples \
         --mode calling \
         --ref ref.fna \
+        --reads input_bam_file.child.bam \
         --reads_parent1 input_bam_file.paternal.bam \
         --reads_parent2 input_bam_file.maternal.bam \
-        --reads input_bam_file.child.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
         --sample_name ~{in_child_name} \
         --sample_name_parent1 ~{in_paternal_name} \
@@ -1521,7 +1554,7 @@ task runDeepTrioMakeExamples {
         --min_mapping_quality ~{in_min_mapq} \
         ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} \
         --regions ${CONTIG_ID} \
-        --task {} 
+        --num_shards ~{in_call_cores}
         #--pileup_image_height_child 60 \
         #--pileup_image_height_parent 40 \
         ls | grep 'make_examples_child.tfrecord-' | tar -czf 'make_examples_child.tfrecord.tar.gz' -T -
@@ -1545,7 +1578,7 @@ task runDeepTrioMakeExamples {
         memory: in_call_mem + " GB"
         cpu: in_call_cores 
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.3.0"
+        docker: in_deeptrio_docker
     }
 }
 
@@ -1563,6 +1596,7 @@ task runDeepTrioCallVariants {
         Int in_call_cores
         Int in_call_disk
         Int in_call_mem
+        String DEEPTRIO_DOCKER
     }
 
     command <<<
@@ -1632,7 +1666,109 @@ task runDeepTrioCallVariants {
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
         disks: "local-disk " + in_call_disk + " SSD"
-        docker: "google/deepvariant:deeptrio-1.3.0-gpu"
+        docker: DEEPTRIO_DOCKER
+    }
+}
+
+task runDeepTrioOneCommand {
+    input {
+        String in_child_name
+        String in_maternal_name
+        String in_paternal_name
+        File in_child_bam_file
+        File in_child_bam_file_index
+        File in_maternal_bam_file
+        File in_maternal_bam_file_index
+        File in_paternal_bam_file
+        File in_paternal_bam_file_index
+        File in_reference_file
+        File in_reference_index_file
+        String in_region
+        Int in_call_cores
+        Int in_call_disk
+        Int in_call_mem
+        String in_deeptrio_docker
+    }
+    command <<<
+        set -eux -o pipefail
+
+        ln -f -s ~{in_child_bam_file} input_bam_file.child.bam
+        ln -f -s ~{in_child_bam_file_index} input_bam_file.child.bam.bai
+        ln -f -s ~{in_maternal_bam_file} input_bam_file.maternal.bam
+        ln -f -s ~{in_maternal_bam_file_index} input_bam_file.maternal.bam.bai
+        ln -f -s ~{in_paternal_bam_file} input_bam_file.paternal.bam
+        ln -f -s ~{in_paternal_bam_file_index} input_bam_file.paternal.bam.bai
+        ln -f -s ~{in_reference_file} reference.fa
+        ln -f -s ~{in_reference_index_file} reference.fa.fai
+
+        mkdir -p intermediate_results_dir
+
+        # Validate required inputs are present and non-empty
+        for f in \
+          input_bam_file.child.bam \
+          input_bam_file.child.bam.bai \
+          input_bam_file.paternal.bam \
+          input_bam_file.paternal.bam.bai \
+          input_bam_file.maternal.bam \
+          input_bam_file.maternal.bam.bai \
+          reference.fa reference.fa.fai; do
+          if [ ! -s "$f" ]; then
+            echo "Missing or empty required file: $f" >&2
+            ls -lah || true
+            exit 1
+          fi
+        done
+
+        # Find DeepTrio runner (script may or may not be executable)
+        RUNNER=""
+        if [ -x "/opt/deepvariant/bin/deeptrio/run_deeptrio" ]; then
+          RUNNER="/opt/deepvariant/bin/deeptrio/run_deeptrio"
+        elif [ -f "/opt/deepvariant/bin/deeptrio/run_deeptrio" ]; then
+          RUNNER="python3 /opt/deepvariant/bin/deeptrio/run_deeptrio"
+        elif [ -x "/opt/deepvariant/bin/deeptrio/run_deeptrio.py" ]; then
+          RUNNER="/opt/deepvariant/bin/deeptrio/run_deeptrio.py"
+        elif [ -f "/opt/deepvariant/bin/deeptrio/run_deeptrio.py" ]; then
+          RUNNER="python3 /opt/deepvariant/bin/deeptrio/run_deeptrio.py"
+        else
+          echo "Could not locate DeepTrio runner under /opt/deepvariant/bin/deeptrio" >&2
+          ls -lah /opt/deepvariant/bin/deeptrio || true
+          exit 1
+        fi
+
+        eval "$RUNNER" \
+          --model_type WGS \
+          --ref reference.fa \
+          --reads_child input_bam_file.child.bam \
+          --reads_parent1 input_bam_file.paternal.bam \
+          --reads_parent2 input_bam_file.maternal.bam \
+          --output_vcf_child child_deeptrio.vcf.gz \
+          --output_vcf_parent1 parent1_deeptrio.vcf.gz \
+          --output_vcf_parent2 parent2_deeptrio.vcf.gz \
+          --sample_name_child ~{in_child_name} \
+          --sample_name_parent1 ~{in_paternal_name} \
+          --sample_name_parent2 ~{in_maternal_name} \
+          --num_shards ~{in_call_cores} \
+          --regions ~{in_region} \
+          --intermediate_results_dir intermediate_results_dir \
+          --output_gvcf_child child_deeptrio.g.vcf.gz \
+          --output_gvcf_parent1 parent1_deeptrio.g.vcf.gz \
+          --output_gvcf_parent2 parent2_deeptrio.g.vcf.gz
+    >>>
+    output {
+        File output_child_vcf_file = "child_deeptrio.vcf.gz"
+        File output_parent1_vcf_file = "parent1_deeptrio.vcf.gz"
+        File output_parent2_vcf_file = "parent2_deeptrio.vcf.gz"
+        File output_child_gvcf_file = "child_deeptrio.g.vcf.gz"
+        File output_parent1_gvcf_file = "parent1_deeptrio.g.vcf.gz"
+        File output_parent2_gvcf_file = "parent2_deeptrio.g.vcf.gz"
+    }
+    runtime {
+        preemptible: 5
+        maxRetries: 5
+        memory: in_call_mem + " GB"
+        cpu: in_call_cores
+        disks: "local-disk " + in_call_disk + " SSD"
+        docker: in_deeptrio_docker
     }
 }
 

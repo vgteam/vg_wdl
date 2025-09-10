@@ -28,6 +28,17 @@ workflows:
         email: anovak@soe.ucsc.edu
       - name: Charles Markello
         email: cmarkell@ucsc.edu
+  - name: DeepVariant
+    subclass: WDL
+    description: Call variants with DeepVariant.
+    primaryDescriptorPath: /workflows/deepvariant.wdl
+    authors:
+      - name: Jean Monlong
+        email: jmonlong@ucsc.edu
+      - name: Adam Novak
+        email: anovak@soe.ucsc.edu
+      - name: Charles Markello
+        email: cmarkell@ucsc.edu
   - name: GiraffeDeepVariantFromGAF
     subclass: WDL
     description: Starts from an aligned GAF file, surject to a linear genome and call variants with DeepVariant.

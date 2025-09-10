@@ -30,6 +30,8 @@ task compareCalls {
         File in_truth_vcf_index_file
         File in_template_archive
         File? in_evaluation_regions_file
+        File? in_restrict_regions_file
+        String? in_target_region
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G")) + 20
         Int in_mem = 16
         Int in_cores = 8
@@ -50,6 +52,8 @@ task compareCalls {
             --baseline truth.vcf.gz \
             --calls sample.vcf.gz \
             ~{"--evaluation-regions=" + in_evaluation_regions_file} \
+            ~{"--bed-regions=" + in_restrict_regions_file} \
+            ~{"--region=" + in_target_region} \
             --template template.sdf \
             --threads ~{in_cores} \
             --output vcfeval_results
@@ -77,20 +81,30 @@ task compareCallsHappy {
         File in_truth_vcf_index_file
         File in_reference_file
         File in_reference_index_file
+        File? in_template_archive
         File? in_evaluation_regions_file
+        File? in_restrict_regions_file
+        String? in_target_region
         Int in_disk = 3 * round(size(in_sample_vcf_file, "G") + size(in_truth_vcf_file, "G") + size(in_reference_file, "G")) + 20
-        Int in_mem = 16
+        Int in_mem = 32
         Int in_cores = 8
     }
     command <<<
         set -eux -o pipefail
-    
+        
+        TEMPLATE_ARGS=()
+        if [ ~{defined(in_template_archive)} == true ]; then
+            # Set up RTG template; we assume it drops a "template.sdf"
+            tar -xf "~{in_template_archive}"
+            TEMPLATE_ARGS+=(--engine-vcfeval-template template.sdf)
+        fi
+
         # Put sample and truth near their indexes
         ln -s "~{in_sample_vcf_file}" sample.vcf.gz
         ln -s "~{in_sample_vcf_index_file}" sample.vcf.gz.tbi
         ln -s "~{in_truth_vcf_file}" truth.vcf.gz
         ln -s "~{in_truth_vcf_index_file}" truth.vcf.gz.tbi
-        
+
         # Reference and its index must be adjacent and not at arbitrary paths
         # the runner gives.
         ln -f -s "~{in_reference_file}" reference.fa
@@ -102,9 +116,13 @@ task compareCallsHappy {
             truth.vcf.gz \
             sample.vcf.gz \
             ~{"-f " + in_evaluation_regions_file} \
+            ~{"-R " + in_restrict_regions_file} \
+            ~{"-l " + in_target_region} \
+            --pass-only \
             --reference reference.fa \
             --threads ~{in_cores} \
             --engine=vcfeval \
+            "${TEMPLATE_ARGS[@]}" \
             -o happy_results/eval
     
         tar -czf happy_results.tar.gz happy_results/
@@ -115,7 +133,7 @@ task compareCallsHappy {
     }
     runtime {
         preemptible: 2
-        docker: "jmcdani20/hap.py:v0.3.12"
+        docker: "quay.io/adamnovak/hap.py:v0.3.15"
         cpu: in_cores
         disks: "local-disk " + in_disk + " SSD"
         memory: in_mem + " GB"

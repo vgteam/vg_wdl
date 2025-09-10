@@ -1,10 +1,10 @@
 version 1.0
 
-import "../tasks/variant_evaluation.wdl" as eval
 import "../tasks/bioinfo_utils.wdl" as utils
-import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
-import "../tasks/deepvariant.wdl" as dv
+import "./deepvariant.wdl" as dv_wf
+import "./giraffe.wdl" as giraffe_wf
+
 
 workflow GiraffeDeepVariant {
 
@@ -21,37 +21,58 @@ workflow GiraffeDeepVariant {
         GBZ_FILE: "Path to .gbz index file"
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
+        ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignment, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'true'."
-        OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed. Default is 'true'."
+        OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed by default. Default is 'false'."
+        OUTPUT_CALLING_BAMS: "Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM."
+        OUTPUT_UNMAPPED_BAM: "Should an unmapped reads BAM be saved? Default is false."
         PAIRED_READS: "Are the reads paired? Default is 'true'."
         READS_PER_CHUNK: "Number of reads contained in each mapping chunk. Default 20 000 000."
-        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
         CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index."
+        PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
         REFERENCE_PREFIX: "Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)"
         REFERENCE_FILE: "(OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference."
         REFERENCE_INDEX_FILE: "(OPTIONAL) If specified, use this .fai index instead of indexing the reference file."
-        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if REFERENCE_INDEX_FILE is set"
+        REFERENCE_DICT_FILE: "(OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths."
+        HAPLOID_CONTIGS: "(OPTIONAL) Names of contigs in the reference (without REFERENCE_PREFIX) that are haploid in this sample (often chrX and chrY). Not compatible with DeepVariant 1.5."
+        PAR_REGIONS_BED_FILE: "(OPTIONAL) BED file with pseudo-autosomal regions. Not compatible with DeepVariant 1.5."
+        PRUNE_LOW_COMPLEXITY: "Whether or not to remove low-complexity or short in-tail anchors when surjecting and force tail realingment. Default is 'true'."
         LEFTALIGN_BAM: "Whether or not to left-align reads in the BAM. Default is 'true'."
         REALIGN_INDELS: "Whether or not to realign reads near indels. Default is 'true'."
         REALIGNMENT_EXPANSION_BASES: "Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160."
-        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is 1"
+        MIN_MAPQ: "Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is the DeepVariant default for the model type."
         MAX_FRAGMENT_LENGTH: "Maximum distance at which to mark paired reads properly paired. Default is 3000."
-        GIRAFFE_OPTIONS: "(OPTIONAL) extra command line options for Giraffe mapper"
+        GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10)"
+        GIRAFFE_OPTIONS: "(OPTIONAL) Extra command line options for Giraffe mapper"
         TRUTH_VCF: "Path to .vcf.gz to compare against"
         TRUTH_VCF_INDEX: "Path to Tabix index for TRUTH_VCF"
-        EVALUATION_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        EVALUATION_REGIONS_BED: "BED to evaluate against TRUTH_VCF on, where false positives will be counted"
+        RESTRICT_REGIONS_BED: "BED to restrict comparison against TRUTH_VCF to"
+        TARGET_REGION: "contig or region to restrict evaluation to"
+        RUN_STANDALONE_VCFEVAL: "whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)"
+        DV_MODEL_TYPE: "Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA."
         DV_MODEL_META: ".meta file for a custom DeepVariant calling model"
         DV_MODEL_INDEX: ".index file for a custom DeepVariant calling model"
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
-        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? Default is 'true'."
-        DV_NORM_READS: "Should DV normalize reads itself? Default is 'fasle'."
+        DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
+        DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
+        DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads."
+        DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
+        DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
+        DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
+        MAKE_EXAMPLES_CORES: "Number of cores to use when making DeepVariant examples. Default is CALL_CORES."
+        MAKE_EXAMPLES_MEM: "Memory, in GB, to use when making DeepVariant examples. Default is CALL_MEM."
+        EVAL_MEM: "Memory, in GB, to use when evaluating variant calls. Default is 60."
+        VG_DOCKER: "Container image to use when running vg"
+        VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
+        VG_SURJECT_DOCKER: "Alternate container image to use when running vg surject"
     }
 
     input {
@@ -63,61 +84,60 @@ workflow GiraffeDeepVariant {
         File GBZ_FILE
         File DIST_FILE
         File MIN_FILE
+        File? ZIPCODES_FILE
         String SAMPLE_NAME
         Boolean OUTPUT_GAF = true
         Boolean OUTPUT_SINGLE_BAM = false
+        Boolean OUTPUT_CALLING_BAMS = !OUTPUT_SINGLE_BAM
+        Boolean OUTPUT_UNMAPPED_BAM = false
         Boolean PAIRED_READS = true
         Int READS_PER_CHUNK = 20000000
-        File? PATH_LIST_FILE
         Array[String]+? CONTIGS
+        File? PATH_LIST_FILE
         String REFERENCE_PREFIX = ""
         File? REFERENCE_FILE
         File? REFERENCE_INDEX_FILE
         File? REFERENCE_DICT_FILE
+        Array[String]? HAPLOID_CONTIGS
+        File? PAR_REGIONS_BED_FILE
+        Boolean PRUNE_LOW_COMPLEXITY = true
         Boolean LEFTALIGN_BAM = true
         Boolean REALIGN_INDELS = true
         Int REALIGNMENT_EXPANSION_BASES = 160
-        Int MIN_MAPQ = 1
+        Int? MIN_MAPQ
         Int MAX_FRAGMENT_LENGTH = 3000
+        String GIRAFFE_PRESET = "default"
         String GIRAFFE_OPTIONS = ""
         File? TRUTH_VCF
         File? TRUTH_VCF_INDEX
         File? EVALUATION_REGIONS_BED
+        File? RESTRICT_REGIONS_BED
+        String? TARGET_REGION
+        Boolean RUN_STANDALONE_VCFEVAL = true
+        String DV_MODEL_TYPE = "WGS"
         File? DV_MODEL_META
         File? DV_MODEL_INDEX
         File? DV_MODEL_DATA
-        Boolean DV_KEEP_LEGACY_AC = true
-        Boolean DV_NORM_READS = false
+        Array[File]? DV_MODEL_FILES
+        Array[File]? DV_MODEL_VARIABLES_FILES
+        Boolean? DV_KEEP_LEGACY_AC
+        Boolean? DV_NORM_READS
         String OTHER_MAKEEXAMPLES_ARG = ""
+        String? DV_NO_GPU_DOCKER
+        String? DV_GPU_DOCKER
         Int SPLIT_READ_CORES = 8
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Int CALL_CORES = 8
         Int CALL_MEM = 50
+        Int MAKE_EXAMPLES_CORES = CALL_CORES
+        Int MAKE_EXAMPLES_MEM = CALL_MEM
+        Int EVAL_MEM = 60
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
+        String? VG_GIRAFFE_DOCKER
+        String? VG_SURJECT_DOCKER
     }
 
-    if(defined(INPUT_CRAM_FILE) && defined(CRAM_REF) && defined(CRAM_REF_INDEX)) {
-	    call utils.convertCRAMtoFASTQ {
-            input:
-            in_cram_file=INPUT_CRAM_FILE,
-            in_ref_file=CRAM_REF,
-            in_ref_index_file=CRAM_REF_INDEX,
-            in_paired_reads=PAIRED_READS,
-            in_cores=SPLIT_READ_CORES
-	    }
-    }
-
-    File read_1_file = select_first([INPUT_READ_FILE_1, convertCRAMtoFASTQ.output_fastq_1_file])
-    
-    # Split input reads into chunks for parallelized mapping
-    call utils.splitReads as firstReadPair {
-        input:
-            in_read_file=read_1_file,
-            in_pair_id="1",
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES
-    }
-    
     # Which path names to work on?
     if (!defined(CONTIGS)) {
         if (!defined(PATH_LIST_FILE)) {
@@ -129,7 +149,9 @@ workflow GiraffeDeepVariant {
             call map.extractSubsetPathNames {
                 input:
                     in_gbz_file=GBZ_FILE,
-                    in_extract_mem=MAP_MEM
+                    in_reference_prefix=REFERENCE_PREFIX,
+                    in_extract_mem=MAP_MEM,
+                    vg_docker=VG_DOCKER
             }
         }
     } 
@@ -149,12 +171,20 @@ workflow GiraffeDeepVariant {
             in_gbz_file=GBZ_FILE,
             in_path_list_file=pipeline_path_list_file,
             in_prefix_to_strip=REFERENCE_PREFIX,
-            in_extract_mem=MAP_MEM
+            in_extract_mem=MAP_MEM,
+            vg_docker=VG_DOCKER
         }
     }
-    File reference_file = select_first([REFERENCE_FILE, extractReference.reference_file])
+    if (defined(REFERENCE_FILE)) {
+        call utils.uncompressReferenceIfNeeded {
+            input:
+            # We know REFERENCE_FILE is defined but the WDL type system doesn't.
+            in_reference_file=select_first([REFERENCE_FILE]),
+        }
+    }
+    File reference_file = select_first([uncompressReferenceIfNeeded.reference_file, extractReference.reference_file])
     
-    if (!defined(REFERENCE_INDEX_FILE)) {
+    if (!defined(REFERENCE_INDEX_FILE) || !defined(REFERENCE_DICT_FILE)) {
         call utils.indexReference {
             input:
                 in_reference_file=reference_file
@@ -162,256 +192,105 @@ workflow GiraffeDeepVariant {
     }
     File reference_index_file = select_first([REFERENCE_INDEX_FILE, indexReference.reference_index_file])
     File reference_dict_file = select_first([REFERENCE_DICT_FILE, indexReference.reference_dict_file])
-    
-    ################################################################
-    # Distribute vg mapping operation over each chunked read pair #
-    ################################################################
-    if(PAIRED_READS){
-        File read_2_file = select_first([INPUT_READ_FILE_2, convertCRAMtoFASTQ.output_fastq_2_file])
-        call utils.splitReads as secondReadPair {
-            input:
-            in_read_file=read_2_file,
-            in_pair_id="2",
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES
-        }
-        Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
-        scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-            call map.runVGGIRAFFE as runVGGIRAFFEpe {
-                input:
-                fastq_file_1=read_pair_chunk_files.left,
-                fastq_file_2=read_pair_chunk_files.right,
-                in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
-                # We always need to pass a full dict file here, with lengths,
-                # because if we pass just path lists and the paths are not
-                # completely contained in the graph (like if we're working on
-                # GRCh38 paths in a CHM13-based graph), giraffe won't be able
-                # to get the path lengths and will crash.
-                # TODO: Somehow this problem is supposed to go away if we pull
-                # any GRCh38. prefix off the path names by setting
-                # REFERENCE_PREFIX and making sure the prefix isn't in the
-                # truth set.
-                # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                in_sample_name=SAMPLE_NAME,
-                nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM
-            }
-        }
-    }
-    if (!PAIRED_READS) {
-        scatter (read_pair_chunk_file in firstReadPair.output_read_chunks) {
-            call map.runVGGIRAFFE as runVGGIRAFFEse {
-                input:
-                fastq_file_1=read_pair_chunk_file,
-                in_giraffe_options=GIRAFFE_OPTIONS,
-                in_gbz_file=GBZ_FILE,
-                in_dist_file=DIST_FILE,
-                in_min_file=MIN_FILE,
-                # We always need to pass a full dict file here, with lengths,
-                # because if we pass just path lists and the paths are not
-                # completely contained in the graph (like if we're working on
-                # GRCh38 paths in a CHM13-based graph), giraffe won't be able
-                # to get the path lengths and will crash.
-                # TODO: Somehow this problem is supposed to go away if we pull
-                # any GRCh38. prefix off the path names by setting
-                # REFERENCE_PREFIX and making sure the prefix isn't in the
-                # truth set.
-                # See <https://github.com/adamnovak/giraffe-dv-wdl/pull/2#issuecomment-955096920>
-                in_sample_name=SAMPLE_NAME,
-                nb_cores=MAP_CORES,
-                mem_gb=MAP_MEM
-            }
-        }
-    }
 
-    Array[File] gaf_chunks = select_first([runVGGIRAFFEpe.chunk_gaf_file, runVGGIRAFFEse.chunk_gaf_file])
-    scatter (gaf_file in gaf_chunks) {
-        call gautils.surjectGAFtoBAM {
-            input:
-            in_gaf_file=gaf_file,
-            in_gbz_file=GBZ_FILE,
-            in_path_list_file=pipeline_path_list_file,
-            in_sample_name=SAMPLE_NAME,
-            in_max_fragment_length=MAX_FRAGMENT_LENGTH,
-            in_paired_reads=PAIRED_READS,
-            mem_gb=MAP_MEM
-        }
-
-        call utils.sortBAM {
-            input:
-            in_bam_file=surjectGAFtoBAM.output_bam_file,
-            in_ref_dict=reference_dict_file,
-            in_prefix_to_strip=REFERENCE_PREFIX
-        }
-    }
-
-    call utils.mergeAlignmentBAMChunks {
+    # Run the giraffe mapping workflow.
+    # We don't do postprocessing in the Giraffe workflow, just the DV workflow.
+    # Otherwise we'd split to contig BAMs, process, re-merge, and re-split.
+    call giraffe_wf.Giraffe {
         input:
-        in_sample_name=SAMPLE_NAME,
-        in_alignment_bam_chunk_files=sortBAM.sorted_bam
+        INPUT_READ_FILE_1=INPUT_READ_FILE_1,
+        INPUT_READ_FILE_2=INPUT_READ_FILE_2,
+        INPUT_CRAM_FILE=INPUT_CRAM_FILE,
+        CRAM_REF=CRAM_REF,
+        CRAM_REF_INDEX=CRAM_REF_INDEX,
+        GBZ_FILE=GBZ_FILE,
+        DIST_FILE=DIST_FILE,
+        MIN_FILE=MIN_FILE,
+        ZIPCODES_FILE=ZIPCODES_FILE,
+        SAMPLE_NAME=SAMPLE_NAME,
+        OUTPUT_SINGLE_BAM=true,
+        OUTPUT_CALLING_BAMS=false,
+        OUTPUT_GAF=OUTPUT_GAF,
+        PAIRED_READS=PAIRED_READS,
+        READS_PER_CHUNK=READS_PER_CHUNK,
+        PATH_LIST_FILE=pipeline_path_list_file,
+        CONTIGS=CONTIGS,
+        REFERENCE_PREFIX=REFERENCE_PREFIX,
+        REFERENCE_FILE=reference_file,
+        REFERENCE_INDEX_FILE=reference_index_file,
+        REFERENCE_DICT_FILE=reference_dict_file,
+        PRUNE_LOW_COMPLEXITY=PRUNE_LOW_COMPLEXITY,
+        LEFTALIGN_BAM=false,
+        REALIGN_INDELS=false,
+        MAX_FRAGMENT_LENGTH=MAX_FRAGMENT_LENGTH,
+        GIRAFFE_PRESET=GIRAFFE_PRESET,
+        GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
+        SPLIT_READ_CORES=SPLIT_READ_CORES,
+        MAP_CORES=MAP_CORES,
+        MAP_MEM=MAP_MEM,
+        HAPLOTYPE_SAMPLING=false,
+        VG_DOCKER=VG_DOCKER,
+        VG_GIRAFFE_DOCKER=VG_GIRAFFE_DOCKER,
+        VG_SURJECT_DOCKER=VG_SURJECT_DOCKER
     }
 
-    # Split merged alignment by contigs list
-    call utils.splitBAMbyPath {
+    # Run the DeepVariant calling workflow
+    call dv_wf.DeepVariant {
         input:
-        in_sample_name=SAMPLE_NAME,
-        in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
-        in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
-        in_path_list_file=pipeline_path_list_file,
-        in_prefix_to_strip=REFERENCE_PREFIX
-    }
-
-    ##
-    ## Call variants with DeepVariant in each contig
-    ##
-    scatter (bam_and_index_for_path in zip(splitBAMbyPath.bam_contig_files, splitBAMbyPath.bam_contig_files_index)) {
-        ## Evantually shift and realign reads
-        if (LEFTALIGN_BAM){
-            # Just left-shift each read individually
-            call utils.leftShiftBAMFile {
-                input:
-                in_bam_file=bam_and_index_for_path.left,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file
-            }
-        }
-        if (REALIGN_INDELS) {
-            File forrealign_bam = select_first([leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
-            File forrealign_index = select_first([leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-            # Do indel realignment
-            call utils.prepareRealignTargets {
-                input:
-                in_bam_file=forrealign_bam,
-                in_bam_index_file=forrealign_index,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_reference_dict_file=reference_dict_file,
-                in_expansion_bases=REALIGNMENT_EXPANSION_BASES
-            }
-            call utils.runAbraRealigner {
-                input:
-                    in_bam_file=forrealign_bam,
-                    in_bam_index_file=forrealign_index,
-                    in_target_bed_file=prepareRealignTargets.output_target_bed_file,
-                    in_reference_file=reference_file,
-                    in_reference_index_file=reference_index_file,
-                    # If the user has set a very low memory for mapping, don't use more for realignment
-                    memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
-            }
-        }
-        File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
-        File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
-        ## DeepVariant calling
-        call dv.runDeepVariantMakeExamples {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_bam_file=calling_bam,
-                in_bam_file_index=calling_bam_index,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_min_mapq=MIN_MAPQ,
-                in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
-                in_norm_reads=DV_NORM_READS,
-                in_other_makeexamples_arg=OTHER_MAKEEXAMPLES_ARG,
-                in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
-        }
-        call dv.runDeepVariantCallVariants {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_examples_file=runDeepVariantMakeExamples.examples_file,
-                in_nonvariant_site_tf_file=runDeepVariantMakeExamples.nonvariant_site_tf_file,
-                in_model_meta_file=DV_MODEL_META,
-                in_model_index_file=DV_MODEL_INDEX,
-                in_model_data_file=DV_MODEL_DATA,
-                in_call_cores=CALL_CORES,
-                in_call_mem=CALL_MEM
-        }
-    }
-
-    # Merge distributed variant called VCFs
-    call utils.concatClippedVCFChunks {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_vcf_file
-    }
-    call utils.concatClippedVCFChunks as concatClippedGVCFChunks {
-        input:
-            in_sample_name=SAMPLE_NAME,
-            in_clipped_vcf_chunk_files=runDeepVariantCallVariants.output_gvcf_file
+        MERGED_BAM_FILE=select_first([Giraffe.output_bam]),
+        MERGED_BAM_FILE_INDEX=select_first([Giraffe.output_bam_index]),
+        SAMPLE_NAME=SAMPLE_NAME,
+        OUTPUT_SINGLE_BAM=OUTPUT_SINGLE_BAM,
+        OUTPUT_CALLING_BAMS=OUTPUT_CALLING_BAMS,
+        OUTPUT_UNMAPPED_BAM=OUTPUT_UNMAPPED_BAM,
+        PATH_LIST_FILE=pipeline_path_list_file,
+        REFERENCE_PREFIX=REFERENCE_PREFIX,
+        REFERENCE_FILE=reference_file,
+        REFERENCE_INDEX_FILE=reference_index_file,
+        REFERENCE_DICT_FILE=reference_dict_file,
+        HAPLOID_CONTIGS=HAPLOID_CONTIGS,
+        PAR_REGIONS_BED_FILE=PAR_REGIONS_BED_FILE,
+        LEFTALIGN_BAM=LEFTALIGN_BAM,
+        REALIGN_INDELS=REALIGN_INDELS,
+        REALIGNMENT_EXPANSION_BASES=REALIGNMENT_EXPANSION_BASES,
+        MIN_MAPQ=MIN_MAPQ,
+        TRUTH_VCF=TRUTH_VCF,
+        TRUTH_VCF_INDEX=TRUTH_VCF_INDEX,
+        EVALUATION_REGIONS_BED=EVALUATION_REGIONS_BED,
+        RESTRICT_REGIONS_BED=RESTRICT_REGIONS_BED,
+        TARGET_REGION=TARGET_REGION,
+        RUN_STANDALONE_VCFEVAL=RUN_STANDALONE_VCFEVAL,
+        DV_MODEL_TYPE=DV_MODEL_TYPE,
+        DV_MODEL_META=DV_MODEL_META,
+        DV_MODEL_INDEX=DV_MODEL_INDEX,
+        DV_MODEL_DATA=DV_MODEL_DATA,
+        DV_MODEL_FILES=DV_MODEL_FILES,
+        DV_MODEL_VARIABLES_FILES=DV_MODEL_VARIABLES_FILES,
+        DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
+        DV_NORM_READS=DV_NORM_READS,
+        OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
+        DV_NO_GPU_DOCKER=DV_NO_GPU_DOCKER,
+        DV_GPU_DOCKER=DV_GPU_DOCKER,
+        REALIGN_MEM=if MAP_MEM < 40 then MAP_MEM else 40,
+        CALL_CORES=CALL_CORES,
+        CALL_MEM=CALL_MEM,
+        MAKE_EXAMPLES_CORES=MAKE_EXAMPLES_CORES,
+        MAKE_EXAMPLES_MEM=MAKE_EXAMPLES_MEM,
+        EVAL_MEM=EVAL_MEM
     }
     
-    if (defined(TRUTH_VCF) && defined(TRUTH_VCF_INDEX)) {
-    
-        # To evaluate the VCF we need a template of the reference
-        call eval.buildReferenceTemplate {
-            input:
-                in_reference_file=reference_file
-        }
-        
-        # Direct vcfeval comparison makes an archive with FP and FN VCFs
-        call eval.compareCalls {
-            input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_template_archive=buildReferenceTemplate.output_template_archive,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_mem=CALL_MEM
-        }
-        
-        # Hap.py comparison makes accuracy results stratified by SNPs and indels
-        call eval.compareCallsHappy {
-            input:
-                in_sample_vcf_file=concatClippedVCFChunks.output_merged_vcf,
-                in_sample_vcf_index_file=concatClippedVCFChunks.output_merged_vcf_index,
-                in_truth_vcf_file=select_first([TRUTH_VCF]),
-                in_truth_vcf_index_file=select_first([TRUTH_VCF_INDEX]),
-                in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file,
-                in_evaluation_regions_file=EVALUATION_REGIONS_BED,
-                in_mem=CALL_MEM
-        }
-    }
-
-    if (OUTPUT_GAF){
-        call gautils.mergeGAF {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_gaf_chunk_files=gaf_chunks
-        }
-    }
-
-    if (OUTPUT_SINGLE_BAM){
-        call utils.mergeAlignmentBAMChunks as mergeBAM {
-            input:
-            in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=select_all(flatten([calling_bam, [splitBAMbyPath.bam_unmapped_file]]))
-        }
-    }
-
-    if (!OUTPUT_SINGLE_BAM){
-        Array[File] output_calling_bam_files = calling_bam
-        Array[File] output_calling_bam_index_files = calling_bam_index
-    }
-
     output {
-        File? output_vcfeval_evaluation_archive = compareCalls.output_evaluation_archive
-        File? output_happy_evaluation_archive = compareCallsHappy.output_evaluation_archive
-        File output_vcf = concatClippedVCFChunks.output_merged_vcf
-        File output_vcf_index = concatClippedVCFChunks.output_merged_vcf_index
-        File output_gvcf = concatClippedGVCFChunks.output_merged_vcf
-        File output_gvcf_index = concatClippedGVCFChunks.output_merged_vcf_index
-        File? output_gaf = mergeGAF.output_merged_gaf
-        File? output_bam = mergeBAM.merged_bam_file
-        File? output_bam_index = mergeBAM.merged_bam_file_index
-        Array[File]? output_calling_bams = output_calling_bam_files
-        Array[File]? output_calling_bam_indexes = output_calling_bam_index_files
+        File? output_vcfeval_evaluation_archive = DeepVariant.output_vcfeval_evaluation_archive
+        File? output_happy_evaluation_archive = DeepVariant.output_happy_evaluation_archive
+        File output_vcf = DeepVariant.output_vcf
+        File output_vcf_index = DeepVariant.output_vcf_index
+        File output_gvcf = DeepVariant.output_gvcf
+        File output_gvcf_index = DeepVariant.output_gvcf_index
+        File? output_gaf = Giraffe.output_gaf
+        File? output_bam = DeepVariant.output_bam
+        File? output_bam_index = DeepVariant.output_bam_index
+        Array[File]? output_calling_bams = DeepVariant.output_calling_bams
+        Array[File]? output_calling_bam_indexes = DeepVariant.output_calling_bam_indexes
+        File? output_unmapped_bam = DeepVariant.output_unmapped_bam
     }   
 }

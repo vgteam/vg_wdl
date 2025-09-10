@@ -1,0 +1,3 @@
+@HD	VN:1.6
+@SQ	SN:chr1	LN:10000	M5:a52b0c9f3d24ad04532b2956e7087469	UR:file:/private/groups/cgl/seeskand/vg_wdl/vg_wdl/tests/small_sim_graph/ref.fa
+@SQ	SN:chr2	LN:10000	M5:363d9b34443f6a3fc37f55344f375b2b	UR:file:/private/groups/cgl/seeskand/vg_wdl/vg_wdl/tests/small_sim_graph/ref.fa

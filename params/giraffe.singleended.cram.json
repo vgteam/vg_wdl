@@ -8,6 +8,9 @@
   "Giraffe.MIN_FILE": "tests/small_sim_graph/graph.min",
   "Giraffe.DIST_FILE": "tests/small_sim_graph/graph.dist",
   "Giraffe.OUTPUT_GAF": true,
-  "Giraffe.OUTPUT_SINGLE_BAM": true
+  "Giraffe.OUTPUT_SINGLE_BAM": true,
+  "Giraffe.MAP_MEM": 8,
+  "Giraffe.MAP_CORES": 8,
+  "Giraffe.VG_DOCKER": "quay.io/vgteam/vg:v1.64.0"
 }
 

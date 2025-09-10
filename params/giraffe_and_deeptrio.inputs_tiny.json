@@ -1,0 +1,30 @@
+{
+  "vgGiraffeDeeptrio.CHILD_INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
+  "vgGiraffeDeeptrio.CHILD_INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz",
+  "vgGiraffeDeeptrio.MATERNAL_INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
+  "vgGiraffeDeeptrio.MATERNAL_INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz",
+  "vgGiraffeDeeptrio.PATERNAL_INPUT_READ_FILE_1": "tests/small_sim_graph/reads_1.fastq.gz",
+  "vgGiraffeDeeptrio.PATERNAL_INPUT_READ_FILE_2": "tests/small_sim_graph/reads_2.fastq.gz",
+
+  "vgGiraffeDeeptrio.SAMPLE_NAME": "child",
+  "vgGiraffeDeeptrio.MATERNAL_NAME": "mom",
+  "vgGiraffeDeeptrio.PATERNAL_NAME": "dad",
+
+  "vgGiraffeDeeptrio.READS_PER_CHUNK": 500,
+
+  "vgGiraffeDeeptrio.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
+  "vgGiraffeDeeptrio.DIST_FILE": "tests/small_sim_graph/graph.dist",
+  "vgGiraffeDeeptrio.MIN_FILE": "tests/small_sim_graph/graph.min",
+  "vgGiraffeDeeptrio.VG_DOCKER": "quay.io/vgteam/vg:v1.64.0",
+
+  "vgGiraffeDeeptrio.SPLIT_READ_CORES": 2,
+  "vgGiraffeDeeptrio.SPLIT_READ_DISK": 1,
+  "vgGiraffeDeeptrio.MAP_CORES": 2,
+  "vgGiraffeDeeptrio.MAP_DISK": 1,
+  "vgGiraffeDeeptrio.MAP_MEM": 4,
+  "vgGiraffeDeeptrio.CALL_CORES": 2,
+  "vgGiraffeDeeptrio.CALL_DISK": 1,
+  "vgGiraffeDeeptrio.CALL_MEM": 4
+}
+
+

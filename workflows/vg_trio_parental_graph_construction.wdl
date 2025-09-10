@@ -24,7 +24,7 @@ workflow vgTrioPipeline {
         String SAMPLE_NAME_MATERNAL                         # Sample name for the mother
         String SAMPLE_NAME_PATERNAL                         # Sample name for the father
         String SAMPLE_NAME_PROBAND                          # Sample name for the proband
-        String VG_CONTAINER = "quay.io/vgteam/vg:v1.19.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.16.0)
+        String VG_CONTAINER = "quay.io/vgteam/vg:v1.64.0"   # VG Container used in the pipeline (e.g. quay.io/vgteam/vg:v1.64.0)
         File REF_FILE                                       # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                                 # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                                  # Path to .dict file of the REF_FILE fasta reference

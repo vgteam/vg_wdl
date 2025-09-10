@@ -1,5 +1,6 @@
 version 1.0
 
+# Run DeepVariant example generation on a single-contig BAM named <sample>.<contig>(.indel_realigned)?(.left_shifted)?.bam
 task runDeepVariantMakeExamples {
     input {
         String in_sample_name
@@ -7,13 +8,18 @@ task runDeepVariantMakeExamples {
         File in_bam_file_index
         File in_reference_file
         File in_reference_index_file
-        Int in_min_mapq
-        Boolean in_keep_legacy_ac
-        Boolean in_norm_reads
+        String in_model_type = "WGS"
+        Array[File] in_model_files = []
+        Array[File] in_model_variables_files = []
+        Int? in_min_mapq
+        # If undefined, uses the model's or DV's default.
+        Boolean? in_keep_legacy_ac
+        # If undefined, uses the model's or DV's default.
+        Boolean? in_norm_reads
         String in_other_makeexamples_arg = ""
         Int in_call_cores
         Int in_call_mem
-        String in_dv_container = "google/deepvariant:1.5.0"
+        String in_dv_container = "google/deepvariant:1.8.0"
     }
     Int disk_size = round(2 * size(in_bam_file, 'G')) + 20
     command <<<
@@ -39,27 +45,155 @@ task runDeepVariantMakeExamples {
         ln -f -s ~{in_reference_file} reference.fa
         ln -f -s ~{in_reference_index_file} reference.fa.fai
                 
+        MODEL_TYPE=~{in_model_type}
+
+        # Set up the model so DV can read the channels out of it
+        if [[ ~{length(in_model_files)} -gt 0 ]] ; then
+            # Need to use a custom model
+            mkdir model_dir
+            ln -s ~{sep=" " in_model_files} model_dir/
+            if [[ ~{length(in_model_variables_files)} -gt 0 ]] ; then
+                # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
+                # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
+                mkdir model_dir/variables
+                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
+            fi
+        else
+            # Use default models for type
+            ln -s /opt/models/${MODEL_TYPE,,} model_dir
+        fi
+        ls -lah model_dir >&2
+        if [[ -e model_dir/saved_model.pb ]] ; then
+            # "If checkpoint is a directory containing saved_model.pb then it is a saved model."
+            # This is a savedmodel-format model and is named just by the directory
+            CHECKPOINT_NAME="model_dir"
+        else
+            # Try and guess which file in the list is the actual checkpoint file.
+            # Usually it is named with .ckpt, but it *can* be named anything.
+            # TODO: Can we actually find it by index name like this?
+            INDEX_FILES=(model_dir/*.index)
+            if [[ -e "${INDEX_FILES[0]}" ]] ; then
+                # This is a checkpoint-format model and we need to name it by passing this path without the .index
+                CHECKPOINT_NAME="${INDEX_FILES[0]%.index}"
+            else
+                echo >&2 "Could not determine model name. Make sure you have a saved_model.pb or a .index file."
+                exit 1
+            fi
+        fi
+        CHECKPOINT_ARGS=(--checkpoint "${CHECKPOINT_NAME}")
+
+        MODEL_TYPE_ARGS=()
+        if [[ ! -e model_dir/model.example_info.json ]] ; then
+            # Determine extra make_example arguments for the given model type just like in DeepVariant's main wrapper script.
+            # See <https://github.com/google/deepvariant/blob/ab068c4588a02e2167051bd9e74c0c9579462b51/scripts/run_deepvariant.py#L243-L276>
+            # Except instead of building a channel list we load it from the model.
+            case ${MODEL_TYPE} in
+                WGS)
+                    if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
+                        # Add our min MAPQ override
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    ;;
+
+                WES)
+                    if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
+                        # Add our min MAPQ override
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    ;;
+
+                PACBIO)
+                    MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                    MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
+                    MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                    MODEL_TYPE_ARGS+=(--partition_size 25000)
+                    MODEL_TYPE_ARGS+=(--phase_reads)
+                    MODEL_TYPE_ARGS+=(--pileup_image_width 147)
+                    MODEL_TYPE_ARGS+=(--norealign_reads)
+                    MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                    MODEL_TYPE_ARGS+=(--track_ref_reads)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    ;;
+
+                ONT_R104)
+                    MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                    MODEL_TYPE_ARGS+=(--max_reads_per_partition 600)
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 5])})
+                    MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                    MODEL_TYPE_ARGS+=(--partition_size 25000)
+                    MODEL_TYPE_ARGS+=(--phase_reads)
+                    MODEL_TYPE_ARGS+=(--pileup_image_width 99)
+                    MODEL_TYPE_ARGS+=(--norealign_reads)
+                    MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                    MODEL_TYPE_ARGS+=(--track_ref_reads)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_snps 0.08)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    ;;
+                
+                HYBRID_PACBIO_ILLUMINA)
+                    if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
+                        # Add our min MAPQ override
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    ;;
+
+                MASSEQ)
+                    MODEL_TYPE_ARGS+=(--alt_aligned_pileup 'diff_channels')
+                    MODEL_TYPE_ARGS+=(--max_reads_per_partition 0)
+                    MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 1])})
+                    MODEL_TYPE_ARGS+=(--parse_sam_aux_fields)
+                    MODEL_TYPE_ARGS+=(--partition_size 25000)
+                    MODEL_TYPE_ARGS+=(--phase_reads)
+                    MODEL_TYPE_ARGS+=(--pileup_image_width 199)
+                    MODEL_TYPE_ARGS+=(--norealign_reads)
+                    MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                    MODEL_TYPE_ARGS+=(--track_ref_reads)
+                    MODEL_TYPE_ARGS+=(--vsc_min_fraction_indels 0.12)
+                    MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                    MODEL_TYPE_ARGS+=(--max_reads_for_dynamic_bases_per_region 1500)
+                    ;;
+            esac
+        else
+            if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
+                # Add our min MAPQ override
+                MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+            fi
+        fi
+
         NORM_READS_ARG=""
-        if [ ~{in_norm_reads} == true ]; then
-          NORM_READS_ARG="--normalize_reads"
+        if [[ "~{defined(in_norm_reads)}" == "true" ]] ; then
+            if [[ "~{in_norm_reads}" == "true" ]] ; then
+                NORM_READS_ARG="--normalize_reads"
+            else
+                # If not true, and defined, it's false.
+                NORM_READS_ARG="--nonormalize_reads"
+            fi
         fi
 
         KEEP_LEGACY_AC_ARG=""
-        if [ ~{in_keep_legacy_ac} == true ]; then
-          KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
+        if [[ "~{defined(in_keep_legacy_ac)}" == "true" ]] ; then
+            if [[ "~{in_keep_legacy_ac}" == "true" ]]; then
+                KEEP_LEGACY_AC_ARG="--keep_legacy_allele_counter_behavior"
+            else
+                # If not true, and defined, it's false
+                KEEP_LEGACY_AC_ARG="--nokeep_legacy_allele_counter_behavior"
+            fi
         fi
 
         seq 0 $((~{in_call_cores}-1)) | \
         parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
         --mode calling \
+        "${CHECKPOINT_ARGS[@]}" \
         --ref reference.fa \
         --reads input_bam_file.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
         --sample_name ~{in_sample_name} \
         --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
-        --channels insert_size \
-        --min_mapping_quality ~{in_min_mapq} \
-        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} ~{in_other_makeexamples_arg} \
+        ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} "${MODEL_TYPE_ARGS[@]}" ~{in_other_makeexamples_arg} \
         --regions ${CONTIG_ID} \
         --task {}
         ls | grep 'make_examples.tfrecord-' | tar -czf 'make_examples.tfrecord.tar.gz' -T -
@@ -79,6 +213,7 @@ task runDeepVariantMakeExamples {
     }
 }
 
+# Run DeepVariant calling AND postprocessing on a file of examples, on GPUs.
 task runDeepVariantCallVariants {
     input {
         String in_sample_name
@@ -86,12 +221,17 @@ task runDeepVariantCallVariants {
         File in_reference_index_file
         File in_examples_file
         File in_nonvariant_site_tf_file
-        File? in_model_meta_file
-        File? in_model_index_file
-        File? in_model_data_file
+        String in_model_type = "WGS"
+        Array[File] in_model_files = []
+        Array[File] in_model_variables_files = []
+        # Not available on DV1.5
+        Array[String] in_haploid_contigs = []
+        # Not available on DV1.5
+        File? in_par_regions_bed_file
         Int in_call_cores
         Int in_call_mem
-        String in_dv_gpu_container = "google/deepvariant:1.5.0-gpu"
+        Boolean in_use_gpus = true
+        String in_dv_gpu_container = "google/deepvariant:1.8.0-gpu"
     }
     Int disk_size = 5 * round(size(in_examples_file, 'G') + size(in_nonvariant_site_tf_file, 'G') + size(in_reference_file, 'G')) + 50
     command <<<
@@ -114,29 +254,54 @@ task runDeepVariantCallVariants {
         ln -f -s ~{in_reference_file} reference.fa
         ln -f -s ~{in_reference_index_file} reference.fa.fai
 
-        # We should use an array here, but that doesn't seem to work the way I
-        # usually do them (because of a set -u maybe?)
-        if [[ ! -z "~{in_model_meta_file}" ]] ; then
-            # Model files must be adjacent and not at arbitrary paths
-            ln -f -s "~{in_model_meta_file}" model.meta
-            ln -f -s "~{in_model_index_file}" model.index
-            ln -f -s "~{in_model_data_file}" model.data-00000-of-00001
+        MODEL_TYPE=~{in_model_type}
+
+        # Set up the model
+        if [[ "~{length(in_model_files)}" -gt "0" ]] ; then
+            # Need to use a custom model
+            mkdir model_dir
+            ln -s ~{sep=" " in_model_files} model_dir/
+            if [[ "~{length(in_model_variables_files)}" -gt "0" ]] ; then
+                # Some models (like the DV release default models) also have a "variables" subdirectory. Handle it specially.
+                # TODO: Is it possible to iterate over a WDL Map in Bash so we can just send the whole structure?
+                mkdir model_dir/variables
+                ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
+            fi
         else
-            # use default WGS models
-            ln -f -s "/opt/models/wgs/model.ckpt.meta" model.meta
-            ln -f -s "/opt/models/wgs/model.ckpt.index" model.index
-            ln -f -s "/opt/models/wgs/model.ckpt.data-00000-of-00001" model.data-00000-of-00001
+            # Use default models for type
+            ln -s /opt/models/${MODEL_TYPE,,} model_dir
+        fi
+        ls -lah model_dir >&2
+        if [[ -e model_dir/saved_model.pb ]] ; then
+            # "If checkpoint is a directory containing saved_model.pb then it is a saved model."
+            # This is a savedmodel-format model and is named just by the directory
+            CHECKPOINT_NAME="model_dir"
+        else
+            # Try and guess which file in the list is the actual checkpoint file.
+            # Usually it is named with .ckpt, but it *can* be named anything.
+            # TODO: Can we actually find it by index name like this?
+            INDEX_FILES=(model_dir/*.index)
+            if [[ -e "${INDEX_FILES[0]}" ]] ; then
+                # This is a checkpoint-format model and we need to name it by passing this path without the .index
+                CHECKPOINT_NAME="${INDEX_FILES[0]%.index}"
+            else
+                echo >&2 "Could not determine model name. Make sure you have a saved_model.pb or a .index file."
+                exit 1
+            fi
         fi
         
         /opt/deepvariant/bin/call_variants \
         --outfile call_variants_output.tfrecord.gz \
         --examples "make_examples.tfrecord@~{in_call_cores}.gz" \
-        --checkpoint model && \
+        --checkpoint "${CHECKPOINT_NAME}" && \
         /opt/deepvariant/bin/postprocess_variants \
         --ref reference.fa \
         --infile call_variants_output.tfrecord.gz \
         --nonvariant_site_tfrecord_path "gvcf.tfrecord@~{in_call_cores}.gz" \
         --outfile "~{in_sample_name}_deepvariant.vcf.gz" \
+        --cpus ~{in_call_cores} \
+        ~{if length(in_haploid_contigs) > 0 then "--haploid_contigs" else ""} ~{sep=',' in_haploid_contigs} \
+        ~{"--par_regions_bed " + in_par_regions_bed_file} \
         --gvcf_outfile "~{in_sample_name}_deepvariant.g.vcf.gz"
     >>>
     output {
@@ -148,6 +313,7 @@ task runDeepVariantCallVariants {
         maxRetries: 5
         memory: in_call_mem + " GB"
         cpu: in_call_cores
+        gpu: in_use_gpus
         gpuType: "nvidia-tesla-t4"
         gpuCount: 1
         nvidiaDriverVersion: "418.87.00"
@@ -155,4 +321,5 @@ task runDeepVariantCallVariants {
         docker: in_dv_gpu_container
     }
 }
+
 

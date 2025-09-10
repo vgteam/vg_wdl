@@ -6,6 +6,7 @@ task mergeGAMandSort {
         String in_sample_name = "sample"
         Int in_cores = 16
         Int in_mem = 120
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     Int disk_size = round(4 * size(in_gam_files, 'G')) + 20
     command <<<
@@ -24,7 +25,7 @@ task mergeGAMandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
     }
 }
 
@@ -36,6 +37,7 @@ task mergeGAFandSort {
         Int in_cores = 16
         Int in_mem = 120
         Int disk_size = 4 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     Int half_cores = if in_cores > 1 then floor(in_cores/2) else 1
@@ -56,7 +58,7 @@ task mergeGAFandSort {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
     }
 }
 
@@ -66,6 +68,7 @@ task splitGAM {
 	    Int in_read_per_chunk
         Int in_mem = 30
         Int in_cores = 6
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     Int disk_size = 3 * round(size(in_gam_file, 'G')) + 20
 
@@ -92,7 +95,7 @@ task splitGAM {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
     }
 }
 
@@ -128,7 +131,7 @@ task splitGAF {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: "quay.io/vgteam/vg:v1.64.0"
     }
 }
 
@@ -137,6 +140,7 @@ task mergeGAF {
         String in_sample_name
         Array[File] in_gaf_chunk_files
         Int in_disk = round(3*size(in_gaf_chunk_files, 'G')) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -161,7 +165,7 @@ task mergeGAF {
         memory: "6GB"
         cpu: 1
         disks: "local-disk " + in_disk + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
     }
 }
 
@@ -173,12 +177,14 @@ task surjectGAFtoSortedBAM {
         File in_path_list_file
         String in_sample_name
         Boolean in_paired_reads = true
+        Boolean in_prune_low_complexity = true
         Int in_max_fragment_length = 3000
         Boolean make_bam_index = false
         Boolean input_is_gam = false
         Int nb_cores = 16
         String mem_gb = 120
         Int disk_size = 5 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 50
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     String out_prefix = sub(sub(sub(basename(in_gaf_file), "\\.gz$", ""), "\\.gaf$", ""), "\\.gam$", "")
     Int half_cores = nb_cores / 2
@@ -194,10 +200,14 @@ task surjectGAFtoSortedBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PAIR_ARGS=""
+        EXTRA_ARGS=()
         if [ ~{in_paired_reads} == true ]
         then
-            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+            EXTRA_ARGS+=(--interleaved --max-frag-len "~{in_max_fragment_length}")
+        fi
+
+        if [[ "~{in_prune_low_complexity}" == "true" ]] ; then
+            EXTRA_ARGS+=(--prune-low-cplx)
         fi
         
         vg surject \
@@ -207,7 +217,7 @@ task surjectGAFtoSortedBAM {
           --bam-output ~{true="" false="--gaf-input" input_is_gam} \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx $PAIR_ARGS \
+          "${EXTRA_ARGS[@]}" \
           ~{in_gaf_file} | samtools sort --threads ~{half_cores} \
                                        -O BAM > ~{out_prefix}.bam
 
@@ -225,7 +235,7 @@ task surjectGAFtoSortedBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
     }
 }
 
@@ -236,11 +246,13 @@ task surjectGAFtoBAM {
         File in_path_list_file
         String in_sample_name
         Boolean in_paired_reads = true
+        Boolean in_prune_low_complexity = true
         Int in_max_fragment_length = 3000
         Boolean input_is_gam = false
         Int nb_cores = 16
         String mem_gb = 120
         Int disk_size = 5 * round(size(in_gbz_file, 'G') + size(in_gaf_file, 'G')) + 50
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     String out_prefix = sub(sub(sub(basename(in_gaf_file), "\\.gz$", ""), "\\.gaf$", ""), "\\.gam$", "")
     command <<<
@@ -255,10 +267,14 @@ task surjectGAFtoBAM {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        PAIR_ARGS=""
+        EXTRA_ARGS=()
         if [ ~{in_paired_reads} == true ]
         then
-            PAIR_ARGS="--interleaved --max-frag-len ~{in_max_fragment_length}"
+            EXTRA_ARGS+=(--interleaved --max-frag-len "~{in_max_fragment_length}")
+        fi
+
+        if [[ "~{in_prune_low_complexity}" == "true" ]] ; then
+            EXTRA_ARGS+=(--prune-low-cplx)
         fi
         
         vg surject \
@@ -268,7 +284,7 @@ task surjectGAFtoBAM {
           --bam-output ~{true="" false="--gaf-input" input_is_gam} \
           --sample ~{in_sample_name} \
           --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-          --prune-low-cplx $PAIR_ARGS \
+          "${EXTRA_ARGS[@]}" \
           ~{in_gaf_file} > ~{out_prefix}.bam
     >>>
     output {
@@ -280,7 +296,7 @@ task surjectGAFtoBAM {
         memory: mem_gb + " GB"
         cpu: nb_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.50.1"
+        docker: vg_docker
     }
 }
 

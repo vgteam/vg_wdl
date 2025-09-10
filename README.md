@@ -1,6 +1,6 @@
 vg\_wdl
 ---------------
-Eric T Dawson, Mike Lin and Charles Markello, Jean Monlong, Adam Novak
+Eric T Dawson, Mike Lin and Charles Markello, Jean Monlong, Adam Novak, Parsa Eskandar
 MIT License, 2023
 
 [Workflow Description Language (WDL)](https://software.broadinstitute.org/wdl/documentation/quickstart) scripts
@@ -53,54 +53,68 @@ The full workflow to go from sequencing reads (FASTQs, CRAM) to small variant ca
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariant:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
-- *INPUT_READ_FILE_1*: Input sample 1st read pair fastq.gz
-- *INPUT_READ_FILE_2*: Input sample 2nd read pair fastq.gz
-- *INPUT_CRAM_FILE*: Input CRAM file
-- *CRAM_REF*: Genome fasta file associated with the CRAM file
-- *CRAM_REF_INDEX*: Index of the fasta file associated with the CRAM file
-- *GBZ_FILE*: Path to .gbz index file
-- *DIST_FILE*: Path to .dist index file
-- *MIN_FILE*: Path to .min index file
-- *SAMPLE_NAME*: The sample name
-- *OUTPUT_GAF*: Should a GAF file with the aligned reads be saved? Default is 'true'.
-- *OUTPUT_SINGLE_BAM*: Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling
-  bams' (one per contig) won't be outputed. Default is 'true'.
-- *PAIRED_READS*: Are the reads paired? Default is 'true'.
-- *READS_PER_CHUNK*: Number of reads contained in each mapping chunk. Default 20 000 000.
-- *PATH_LIST_FILE*: (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If
-  neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths.
-- *CONTIGS*: (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.
-- *REFERENCE_PREFIX*: Remove this off the beginning of path names in surjected BAM (set to match prefix in
-  PATH_LIST_FILE)
-- *REFERENCE_FILE*: (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required
-  if the graph does not contain all bases of the reference.
-- *REFERENCE_INDEX_FILE*: (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.
-- *REFERENCE_DICT_FILE*: (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths. Required if
-  REFERENCE_INDEX_FILE is set
-- *LEFTALIGN_BAM*: Whether or not to left-align reads in the BAM. Default is 'true'.
-- *REALIGN_INDELS*: Whether or not to realign reads near indels. Default is 'true'.
-- *REALIGNMENT_EXPANSION_BASES*: Number of bases to expand indel realignment targets by on either side, to free up read
-  tails in slippery regions. Default is 160.
-- *MIN_MAPQ*: Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right
-  than wrong. Default is 1
-- *MAX_FRAGMENT_LENGTH*: Maximum distance at which to mark paired reads properly paired. Default is 3000.
-- *GIRAFFE_OPTIONS*: (OPTIONAL) extra command line options for Giraffe mapper
-- *TRUTH_VCF*: (OPTIONAL) Path to .vcf.gz to compare against
-- *TRUTH_VCF_INDEX*: (OPTIONAL) Path to Tabix index for TRUTH_VCF
-- *EVALUATION_REGIONS_BED*: (OPTIONAL) BED to restrict comparison against TRUTH_VCF to
-- *DV_MODEL_META*: (OPTIONAL) .meta file for a custom DeepVariant calling model
-- *DV_MODEL_INDEX*: (OPTIONAL) .index file for a custom DeepVariant calling model
-- *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
-- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'.
-- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'false'.
-- *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
-- *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
-- *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
-- *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
-- *CALL_CORES*: Number of cores to use when calling variants. Default is 8.
-- *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.
+- *INPUT_READ_FILE_1*: Input sample 1st read pair fastq.gz  
+- *INPUT_READ_FILE_2*: Input sample 2nd read pair fastq.gz  
+- *INPUT_CRAM_FILE*: Input CRAM file  
+- *CRAM_REF*: Genome fasta file associated with the CRAM file  
+- *CRAM_REF_INDEX*: Index of the fasta file associated with the CRAM file  
+- *GBZ_FILE*: Path to .gbz index file  
+- *DIST_FILE*: Path to .dist index file  
+- *MIN_FILE*: Path to .min index file  
+- *ZIPCODES_FILE*: (OPTIONAL) For chaining-based alignment, path to .zipcodes index file  
+- *SAMPLE_NAME*: The sample name  
+- *OUTPUT_GAF*: Should a GAF file with the aligned reads be saved? Default is 'true'.  
+- *OUTPUT_SINGLE_BAM*: Should a single merged BAM file be saved? If yes, unmapped reads will be included and 'calling bams' (one per contig) won't be outputted by default. Default is 'false'.  
+- *OUTPUT_CALLING_BAMS*: Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM.  
+- *OUTPUT_UNMAPPED_BAM*: Should an unmapped reads BAM be saved? Default is false.  
+- *PAIRED_READS*: Are the reads paired? Default is 'true'.  
+- *READS_PER_CHUNK*: Number of reads contained in each mapping chunk. Default 20,000,000.  
+- *CONTIGS*: (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.  
+- *PATH_LIST_FILE*: (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths.  
+- *REFERENCE_PREFIX*: Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)  
+- *REFERENCE_FILE*: (OPTIONAL) If specified, use this FASTA reference instead of extracting it from the graph. Required if the graph does not contain all bases of the reference.  
+- *REFERENCE_INDEX_FILE*: (OPTIONAL) If specified, use this .fai index instead of indexing the reference file.  
+- *REFERENCE_DICT_FILE*: (OPTIONAL) If specified, use this pre-computed .dict file of sequence lengths.  
+- *HAPLOID_CONTIGS*: (OPTIONAL) Names of contigs in the reference (without REFERENCE_PREFIX) that are haploid in this sample (often chrX and chrY). Not compatible with DeepVariant 1.5.  
+- *PAR_REGIONS_BED_FILE*: (OPTIONAL) BED file with pseudo-autosomal regions. Not compatible with DeepVariant 1.5.  
+- *PRUNE_LOW_COMPLEXITY*: Whether or not to remove low-complexity or short in-tail anchors when surjecting and force tail realignment. Default is 'true'.  
+- *LEFTALIGN_BAM*: Whether or not to left-align reads in the BAM. Default is 'true'.  
+- *REALIGN_INDELS*: Whether or not to realign reads near indels. Default is 'true'.  
+- *REALIGNMENT_EXPANSION_BASES*: Number of bases to expand indel realignment targets by on either side, to free up read tails in slippery regions. Default is 160.  
+- *MIN_MAPQ*: Minimum MAPQ of reads to use for calling. 4 is the lowest at which a mapping is more likely to be right than wrong. Default is the DeepVariant default for the model type.  
+- *MAX_FRAGMENT_LENGTH*: Maximum distance at which to mark paired reads properly paired. Default is 3000.  
+- *GIRAFFE_PRESET*: (OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10)  
+- *GIRAFFE_OPTIONS*: (OPTIONAL) Extra command line options for Giraffe mapper  
+- *TRUTH_VCF*: Path to .vcf.gz to compare against  
+- *TRUTH_VCF_INDEX*: Path to Tabix index for TRUTH_VCF  
+- *EVALUATION_REGIONS_BED*: BED to evaluate against TRUTH_VCF on, where false positives will be counted  
+- *RESTRICT_REGIONS_BED*: BED to restrict comparison against TRUTH_VCF to  
+- *TARGET_REGION*: Contig or region to restrict evaluation to  
+- *RUN_STANDALONE_VCFEVAL*: Whether to run vcfeval on its own in addition to hap.py (can crash on some DeepVariant VCFs)  
+- *DV_MODEL_TYPE*: Type of DeepVariant model to use. Can be WGS (default), WES, PACBIO, ONT_R104, or HYBRID_PACBIO_ILLUMINA.  
+- *DV_MODEL_META*: .meta file for a custom DeepVariant calling model  
+- *DV_MODEL_INDEX*: .index file for a custom DeepVariant calling model  
+- *DV_MODEL_DATA*: .data-00000-of-00001 file for a custom DeepVariant calling model  
+- *DV_MODEL_FILES*: Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format  
+- *DV_MODEL_VARIABLES_FILES*: Array of files that need to go in a 'variables' subdirectory for a DV model  
+- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi.  
+- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi.  
+- *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant  
+- *DV_IS_1_7_OR_NEWER*: Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one.  
+- *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs  
+- *DV_GPU_DOCKER*: Container image to use when running DeepVariant for steps that benefit from GPUs  
+- *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.  
+- *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.  
+- *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.  
+- *CALL_CORES*: Number of cores to use when calling variants. Default is 8.  
+- *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.  
+- *EVAL_MEM*: Memory, in GB, to use when evaluating variant calls. Default is 60.  
+- *VG_DOCKER*: Container image to use when running vg  
+- *VG_GIRAFFE_DOCKER*: Alternate container image to use when running vg giraffe mapping  
+- *VG_SURJECT_DOCKER*: Alternate container image to use when running vg surject  
+
 
 Related
 topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
@@ -123,7 +137,7 @@ realignment).
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/Giraffe:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *INPUT_READ_FILE_1*: Input sample 1st read pair fastq.gz
 - *INPUT_READ_FILE_2*: Input sample 2nd read pair fastq.gz
@@ -175,7 +189,7 @@ topics: [read realignment](#Read-realignment), [reference prefix removal](#Refer
 miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe.json
 miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe.singleended.json
 miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe.singleended.cram.json
-miniwdl run --as-me workflows/giraffe.wdl -i params/haplotype_sampling_and_giraffe.json
+miniwdl run --as-me workflows/giraffe.wdl -i params/giraffe_and_haplotype_sampling.json
 ```
 
 ### Giraffe-DeepVariant from GAF workflow
@@ -187,7 +201,7 @@ with [DeepVariant](https://github.com/google/deepvariant).
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/GiraffeDeepVariantFromGAF:gbz?tab=info)
 - If you use this workflow, please cite [the HPRC preprint](#cite-HPRC).
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *INPUT_GAF*: Input gzipped GAF file
 - *GBZ_FILE*: Path to .gbz index file
@@ -215,8 +229,8 @@ Parameters (semi-auto-generated from the *parameter_meta* section):
 - *DV_MODEL_META*: (OPTIONAL) .meta file for a custom DeepVariant calling model
 - *DV_MODEL_INDEX*: (OPTIONAL) .index file for a custom DeepVariant calling model
 - *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
-- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'.
-- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'fasle'.
+- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is done, unless the model is responsible for the setting.
+- *DV_NORM_READS*: Should DV normalize reads itself? If unspecified this is not done, unless the model is responsible for the setting.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
 - *VG_CORES*: Number of cores to use when projecting the reads. Default is 16.
 - *VG_MEM*: Memory, in GB, to use when projecting the reads. Default is 120.
@@ -240,7 +254,7 @@ Evaluation of the small variant calls using [hap.py](https://github.com/Illumina
 - workflow file: [workflows/happy_evaluation.wdl](workflows/happy_evaluation.wdl)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/HappyEvaluation:gbz?tab=info)
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *VCF*: bgzipped VCF with variant calls
 - *VCF_INDEX*: (Optional) If specified, use this tabix index for the VCF instead of indexing it
@@ -266,7 +280,7 @@ This workflow converts reads aligned to a pangenome in a GAF file to a sorted an
 - workflow file: [workflows/sort_graph_aligned_reads.wdl](workflows/sort_graph_aligned_reads.wdl)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/sortGraphAlignedReads:gbz?tab=info)
 
-Parameters (semi-auto-generated from the *parameter_meta* section):
+Parameters (semi-auto-generated from the parameter_meta section):
 
 - *GAF_FILE*: GAF file to convert and sort.
 - *GBZ_FILE*: the GBZ index of the graph
@@ -284,8 +298,8 @@ miniwdl run --as-me workflows/sort_graph_aligned_reads.wdl -i params/sort_graph_
 
 Workflow for mapping short reads and genotyping the structural variants in a pangenome.
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/svpack/workflows/vg_map_call_sv.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/svpack/params/vg_map_call_sv_test.inputs.json)
+- workflow file: [workflows/vg_map_call_sv.wdl](workflows/vg_map_call_sv.wdl)
+- parameter file: [params/vg_map_call_sv_test.json](params/vg_map_call_sv_test.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/vg_map_call_sv:svpack?tab=info)
 - If you use this workflow, please cite [the Giraffe-SV article](#cite-giraffe-sv).
 
@@ -296,16 +310,16 @@ Workflow for creating a personalized pangenome with [haplotype sampling](https:/
 - [workflow file](https://github.com/vgteam/vg_wdl/blob/master/workflows/haplotype_sampling.wdl)
 - [parameter file](https://github.com/vgteam/vg_wdl/blob/master/params/haplotype_sampling.json)
 
-Parameters  (semi-auto-generated from the *parameter_meta* section):
-- *IN_GBZ_FILE*: Path to .gbz index file
+Parameters  (semi-auto-generated from the parameter_meta section):
+- *GBZ_FILE*: Path to .gbz index file
 - *INPUT_READ_FILE_FIRST*: Input sample 1st read pair fastq.gz
 - *INPUT_READ_FILE_SECOND*: Input sample 2st read pair fastq.gz
 - *HAPL_FILE*: Path to .hapl file
-- *IN_DIST_FILE*: Path to .dist file
+- *DIST_FILE*: Path to .dist file
 - *R_INDEX_FILE*: Path to .ri file
 - *KFF_FILE*: Path to .kff file
-- *IN_OUTPUT_NAME_PREFIX*: Name of the output file (Default: haplotype_sampled_graph)
-- *IN_KMER_LENGTH*: Size of kmer using for sampling (Up to 31) (Default: 29)
+- *OUTPUT_NAME_PREFIX*: Name of the output file (Default: haplotype_sampled_graph)
+- *KMER_LENGTH*: Size of kmer using for sampling (Up to 31) (Default: 29)
 - *CORES*: Number of cores to use with commands. (Default: 16)
 - *WINDOW_LENGTH*: Window length used for building the minimizer index. (Default: 11)
 - *SUBCHAIN_LENGTH*: Target length (in bp) for subchains. (Default: 10000)
@@ -315,7 +329,12 @@ Parameters  (semi-auto-generated from the *parameter_meta* section):
 - *ABSENT_SCORE*: Score for absent kmers. (Default: 0.8)
 - *INCLUDE_REFERENCE*: Include reference paths and generic paths from the full graph in the sampled graph. (Default:
 true)
+- *SET_REFERENCE*: Name of single reference to include in sampled graph. (Default: all references)
 - *DIPLOID*: Activate diploid sampling. (Default: true)
+- *INDEX_MINIMIZER_K*: K-mer size of minimizer index to produce for sampled graph. Should be 29 for short read mapping and 31 for long read mapping. (Default: 29)
+- *INDEX_MINIMIZER_W*: Window size of minimizer index to produce for sampled graph. Should be 11 for short read mapping and 50 for long read mapping. (Default: 11)
+- *INDEX_MINIMIZER_WEIGHTED*: Whether to produce a weighted minimizer index for the sampled graph. (Default: true)
+- *VG_DOCKER*: Container image to use when running vg.
 
 [Test locally](#testing-locally) with:
 
@@ -325,14 +344,14 @@ miniwdl run --as-me workflows/haplotype_sampling.wdl -i params/haplotype_samplin
 
 ### Map-call workflow
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_multi_map_call.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/master/params/vg_multi_map_call.inputs_tiny.http_url.json)
+- workflow file: [workflows/vg_multi_map_call.wdl](workflows/vg_multi_map_call.wdl)
+- parameter file: [params/vg_multi_map_call.inputs_tiny.json](params/vg_multi_map_call.inputs_tiny.json)
 - [Dockstore page](https://dockstore.org/workflows/github.com/vgteam/vg_wdl/vg-pipeline-workingexample:master?tab=info)
 
 ### Map-call Pedigree workflow
 
-- [workflow file](https://github.com/vgteam/vg_wdl/raw/master/workflows/vg_trio_multi_map_call.wdl)
-- [parameter file](https://github.com/vgteam/vg_wdl/raw/master/params/vg_trio_multi_map_call.inputs_tiny.http_url.json)
+- workflow file: [workflows/vg_trio_multi_map_call.wdl](workflows/vg_trio_multi_map_call.wdl)
+- parameter file: [params/vg_trio_multi_map_call.inputs_tiny.json](params/vg_trio_multi_map_call.inputs_tiny.json)
 - If you use this workflow, please cite the [Pedigree-VG article](#Cite-Pedigree-VG).
 
 ### Going further

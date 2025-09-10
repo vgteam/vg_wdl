@@ -41,7 +41,7 @@ workflow vg_construct_and_index {
         String decoy_regex = ">GL\|>NC_007605\|>hs37d5\|>hs38d1_decoys\|>chrEBV\|>chrUn\|>chr\([1-2][1-9]\|[1-9]\|Y\)_"
         
         # vg docker image tag
-        String vg_docker = "quay.io/vgteam/vg:v1.31.0"
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
 
     # construct graph for each reference contig
@@ -334,7 +334,7 @@ task combine_graphs {
     String in_mem = if in_small_resources then "20" else "40"
     
     Boolean decoy_contigs_exist = defined(decoy_contigs_vg)
-    Array[File] decoy_contigs_vg_resolved = if decoy_contigs_exist then decoy_contigs_vg else []
+    Array[File] decoy_contigs_vg_resolved = select_first([decoy_contigs_vg, []])
     
     command {
         set -exu -o pipefail
