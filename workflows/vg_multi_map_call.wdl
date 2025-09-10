@@ -11,14 +11,14 @@ workflow vgMultiMapCall {
     }
 
     input {
-        String MAPPER = "MAP"                   # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
+        String MAPPER = "GIRAFFE"                   # Set to 'MAP' to use the "VG MAP" algorithm, set to 'MPMAP' to use "VG MPMAP" algorithm, set to 'GIRAFFE' to use "VG GIRAFFE".
         Boolean SURJECT_MODE = true             # Set to 'true' to run pipeline using alignmed BAM files surjected from GAM. Set to 'false' to output graph aligned GAM files.
         Boolean DEEPVARIANT_MODE = false        # Set to 'true' to use the DeepVariant variant caller. Set to 'false' to use GATK HaplotypeCallers genotyper.
         Boolean GVCF_MODE = false               # Set to 'true' to process and output gVCFs instead of VCFs.
         Boolean SNPEFF_ANNOTATION = true        # Set to 'true' to run snpEff annotation on the joint genotyped VCF.
         Boolean SV_CALLER_MODE = false          # Set to 'true' to run structural variant calling from graph aligned GAMs (SURJECT_MODE must be 'false' for this feature to be used)
-        Boolean CLEANUP_FILES = false            # Set to 'false' to turn off intermediate file cleanup.
-        Boolean GOOGLE_CLEANUP_MODE = false     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
+        Boolean CLEANUP_FILES = true            # Set to 'false' to turn off intermediate file cleanup.
+        Boolean GOOGLE_CLEANUP_MODE = true     # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File INPUT_READ_FILE_1                  # Input sample 1st read pair fastq.gz
         File INPUT_READ_FILE_2                  # Input sample 2nd read pair fastq.gz
         String SAMPLE_NAME                      # The sample name
@@ -563,12 +563,20 @@ workflow vgMultiMapCall {
 # Tasks for intermediate file cleanup
 task cleanUpUnixFilesystem {
     input {
-        Array[String] previous_task_outputs
-        String current_task_output
+        Array[File] previous_task_outputs
+        File current_task_output
     }
     command <<<
-        set -eux -o pipefail
-        cat ~{write_lines(previous_task_outputs)} | sed 's/.*\(\/cromwell-executions\)/\1/g' | xargs -I {} ls -li {} | cut -f 1 -d ' ' | xargs -I {} find ../../../ -xdev -inum {} | xargs -I {} rm -v {}
+        set -euo pipefail
+
+        while IFS= read -r path; do
+            if [ -e "$path" ]; then
+                inode="$(stat -c %i "$path" 2>/dev/null || true)"
+                if [ -n "$inode" ]; then
+                    find ../../../ -xdev -inum "$inode" -exec rm -v {} + 2>/dev/null || true
+                fi
+            fi
+        done < ~{write_lines(previous_task_outputs)}
     >>>
     runtime {
         docker: "ubuntu@sha256:2695d3e10e69cc500a16eae6d6629c803c43ab075fa5ce60813a0fc49c47e859"
@@ -1318,19 +1326,8 @@ task runVGCaller {
     String chunk_tag = basename(in_vg_file, ".vg")
     command <<<
         set -eux -o pipefail
-
-        VG_INDEX_XG_COMMAND=""
-        VG_FILTER_COMMAND=""
-        VG_AUGMENT_SV_OPTIONS=""
         VG_CALL_SV_OPTIONS=""
-        if [ ~{in_sv_mode} == false ]; then
-            VG_INDEX_XG_COMMAND="vg index -x ~{chunk_tag}.xg -t ~{in_vgcall_cores} ~{in_vg_file}"
-            VG_FILTER_COMMAND="vg filter ~{in_gam_file} -t 1 -r 0.9 -fu -s 1000 -m 1 -q 15 -D 999 -x ~{chunk_tag}.xg > ~{chunk_tag}.filtered.gam"
-            VG_AUGMENT_SV_OPTIONS="~{chunk_tag}.filtered.gam"
-        else
-            VG_AUGMENT_SV_OPTIONS="~{in_gam_file} --recall"
-            VG_CALL_SV_OPTIONS=""
-        fi
+        
 
         PATH_NAME="$(echo ~{chunk_tag} | cut -f 4 -d '_')"
         OFFSET=""
