@@ -38,7 +38,6 @@ Save the following as `my_inputs.json`, then edit only the FASTQ/CRAM inputs and
   "GiraffeDeepVariant.MIN_FILE": "graphs/hprc-v1.1-mc-grch38.min",
   "GiraffeDeepVariant.DIST_FILE": "graphs/hprc-v1.1-mc-grch38.dist",
 
-  "GiraffeDeepVariant.PATH_LIST_FILE": "/path/to/GRCh38.path_list.txt",
   "GiraffeDeepVariant.REFERENCE_PREFIX": "GRCh38#0#",
 
   "GiraffeDeepVariant.SAMPLE_NAME": "sample_name",
@@ -48,7 +47,7 @@ Save the following as `my_inputs.json`, then edit only the FASTQ/CRAM inputs and
 
   "GiraffeDeepVariant.DV_MODEL_TYPE": "WGS",
   "GiraffeDeepVariant.DV_GPU_DOCKER": "google/deepvariant:1.8.0-gpu",
-  "GiraffeDeepVariant.VG_DOCKER": "quay.io/vgteam/vg:v1.64.0",
+  "GiraffeDeepVariant.VG_DOCKER": "quay.io/vgteam/vg:v1.68.0",
 
   "GiraffeDeepVariant.MAP_CORES": 16,
   "GiraffeDeepVariant.MAP_MEM": 120,
