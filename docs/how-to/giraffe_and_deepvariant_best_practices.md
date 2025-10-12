@@ -42,7 +42,7 @@ Save the following as `my_inputs.json`, then edit only the FASTQ/CRAM inputs and
 
   "GiraffeDeepVariant.DV_MODEL_TYPE": "WGS",
   "GiraffeDeepVariant.DV_GPU_DOCKER": "google/deepvariant:1.8.0-gpu",
-  "GiraffeDeepVariant.VG_DOCKER": "quay.io/vgteam/vg:v1.64.0",
+  "GiraffeDeepVariant.VG_DOCKER": "quay.io/vgteam/vg:v1.68.0",
 
   "GiraffeDeepVariant.MAP_CORES": 16,
   "GiraffeDeepVariant.MAP_MEM": 120,
