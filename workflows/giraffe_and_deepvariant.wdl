@@ -22,6 +22,7 @@ workflow GiraffeDeepVariant {
         DIST_FILE: "Path to .dist index file"
         MIN_FILE: "Path to .min index file"
         ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignment, path to .zipcodes index file"
+        HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         SAMPLE_NAME: "The sample name"
         OUTPUT_GAF: "Should a GAF file with the aligned reads be saved? Default is 'true'."
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? If yes, unmapped reads will be inluded and 'calling bams' (one per contig) won't be outputed by default. Default is 'false'."
@@ -82,9 +83,10 @@ workflow GiraffeDeepVariant {
         File? CRAM_REF
         File? CRAM_REF_INDEX
         File GBZ_FILE
-        File DIST_FILE
-        File MIN_FILE
+        File? DIST_FILE
+        File? MIN_FILE
         File? ZIPCODES_FILE
+        File? HAPL_FILE
         String SAMPLE_NAME
         Boolean OUTPUT_GAF = true
         Boolean OUTPUT_SINGLE_BAM = false
@@ -136,6 +138,7 @@ workflow GiraffeDeepVariant {
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
+
     }
 
     # Which path names to work on?
@@ -207,6 +210,7 @@ workflow GiraffeDeepVariant {
         DIST_FILE=DIST_FILE,
         MIN_FILE=MIN_FILE,
         ZIPCODES_FILE=ZIPCODES_FILE,
+        HAPL_FILE=HAPL_FILE,
         SAMPLE_NAME=SAMPLE_NAME,
         OUTPUT_SINGLE_BAM=true,
         OUTPUT_CALLING_BAMS=false,
@@ -228,7 +232,7 @@ workflow GiraffeDeepVariant {
         SPLIT_READ_CORES=SPLIT_READ_CORES,
         MAP_CORES=MAP_CORES,
         MAP_MEM=MAP_MEM,
-        HAPLOTYPE_SAMPLING=false,
+        HAPLOTYPE_SAMPLING=true,
         VG_DOCKER=VG_DOCKER,
         VG_GIRAFFE_DOCKER=VG_GIRAFFE_DOCKER,
         VG_SURJECT_DOCKER=VG_SURJECT_DOCKER

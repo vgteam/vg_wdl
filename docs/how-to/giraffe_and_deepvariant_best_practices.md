@@ -10,20 +10,16 @@ These files are large; use a server or a reliable network. Download into `graphs
 mkdir -p graphs && cd graphs
 
 # GBZ (graph)
-curl -O https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.gbz
+curl -O https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/release2/minigraph-cactus/hprc-v2.0-mc-grch38.gbz
 
-# Minimizer index
-curl -O https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.min
-
-# Distance index
-curl -O https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.dist
+# .hapl index
+curl -O  https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/release2/minigraph-cactus/hprc-v2.0-mc-grch38.hapl
 
 ```
 
 Files used above:
-- [HPRC v1.1 GBZ](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.gbz)
-- [HPRC v1.1 MIN](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.min)
-- [HPRC v1.1 DIST](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.dist)
+- [HPRC v2.0 GBZ](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/release2/minigraph-cactus/hprc-v2.0-mc-grch38.gbz)
+- [HPRC v2.0 HAPL](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/release2/minigraph-cactus/hprc-v2.0-mc-grch38.hapl)
 
 ### 2) Prepare inputs JSON (template)
 
@@ -34,11 +30,9 @@ Save the following as `my_inputs.json`, then edit only the FASTQ/CRAM inputs and
   "GiraffeDeepVariant.INPUT_READ_FILE_1": "/path/to/reads_R1.fastq.gz",
   "GiraffeDeepVariant.INPUT_READ_FILE_2": "/path/to/reads_R2.fastq.gz",
 
-  "GiraffeDeepVariant.GBZ_FILE": "graphs/hprc-v1.1-mc-grch38.gbz",
-  "GiraffeDeepVariant.MIN_FILE": "graphs/hprc-v1.1-mc-grch38.min",
-  "GiraffeDeepVariant.DIST_FILE": "graphs/hprc-v1.1-mc-grch38.dist",
+  "GiraffeDeepVariant.GBZ_FILE": "graphs/hprc-v2.0-mc-grch38.gbz",
+  "GiraffeDeepVariant.HAPL_FILE": "graphs/hprc-v2.0-mc-grch38.hapl",
 
-  "GiraffeDeepVariant.PATH_LIST_FILE": "/path/to/GRCh38.path_list.txt",
   "GiraffeDeepVariant.REFERENCE_PREFIX": "GRCh38#0#",
 
   "GiraffeDeepVariant.SAMPLE_NAME": "sample_name",
@@ -82,9 +76,8 @@ Create `hg002_inputs.json`:
   "GiraffeDeepVariant.INPUT_READ_FILE_1": "reads/HG002.novaseq.pcr-free.40x.R1.fastq.gz",
   "GiraffeDeepVariant.INPUT_READ_FILE_2": "reads/HG002.novaseq.pcr-free.40x.R2.fastq.gz",
 
-  "GiraffeDeepVariant.GBZ_FILE": "graphs/hprc-v1.1-mc-grch38.gbz",
-  "GiraffeDeepVariant.MIN_FILE": "graphs/hprc-v1.1-mc-grch38.min",
-  "GiraffeDeepVariant.DIST_FILE": "graphs/hprc-v1.1-mc-grch38.dist",
+  "GiraffeDeepVariant.GBZ_FILE": "graphs/hprc-v2.0-mc-grch38.gbz",
+  "GiraffeDeepVariant.HAPL_FILE": "graphs/hprc-v2.0-mc-grch38.hapl",
 
   "GiraffeDeepVariant.REFERENCE_PREFIX": "GRCh38#0#",
 
