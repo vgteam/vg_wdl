@@ -1,0 +1,35 @@
+name: miniwdl check
+
+on:
+  push:
+    paths:
+      - '**.wdl'
+      - '.github/workflows/miniwdl-check.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - '**.wdl'
+      - '.github/workflows/miniwdl-check.yml'
+
+jobs:
+  miniwdl-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install miniwdl
+        run: pip install miniwdl==1.11.0
+
+      - name: Run miniwdl check on all workflows
+        run: |
+          set -e
+          for wdl_file in workflows/*.wdl; do
+            echo "Checking $wdl_file..."
+            miniwdl check "$wdl_file"
+          done
+          echo "All workflows passed miniwdl check!"
