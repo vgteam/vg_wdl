@@ -1,7 +1,7 @@
 version 1.0
 
 import "../tasks/bioinfo_utils.wdl" as utils
-import "./vg_multi_map.wdl" as mappingTasks
+import "./vg_multi_map.wdl" as vgMultiMapWorkflow
 
 ### vg_multi_map_call.wdl ###
 workflow vgMultiMapCall {
@@ -59,199 +59,54 @@ workflow vgMultiMapCall {
         Int VGCALL_MEM = 80
     }
 
-    # Split input reads into chunks for parallelized mapping
-    call mappingTasks.splitReads as firstReadPair {
+    # Call vgMultiMap workflow for read mapping and alignment
+    call vgMultiMapWorkflow.vgMultiMap {
         input:
-            in_read_file=INPUT_READ_FILE_1,
-            in_pair_id="1",
-            in_vg_container=VG_CONTAINER,
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES,
-            in_split_read_disk=SPLIT_READ_DISK
-    }
-    call mappingTasks.splitReads as secondReadPair {
-        input:
-            in_read_file=INPUT_READ_FILE_2,
-            in_pair_id="2",
-            in_vg_container=VG_CONTAINER,
-            in_reads_per_chunk=READS_PER_CHUNK,
-            in_split_read_cores=SPLIT_READ_CORES,
-            in_split_read_disk=SPLIT_READ_DISK
-    }
-
-    # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
-    if (!defined(PATH_LIST_FILE)) {
-        call mappingTasks.extractPathNames {
-            input:
-                in_xg_file=XG_FILE,
-                in_vg_container=VG_CONTAINER
-        }
-    }
-    File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
-
-    ################################################################
-    # Distribute vg mapping opperation over each chunked read pair #
-    ################################################################
-    Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
-    scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
-        if (MAPPER == "MPMAP") {
-            call mappingTasks.runVGMPMAP {
-                input:
-                    in_left_read_pair_chunk_file=read_pair_chunk_files.left,
-                    in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-                    in_vg_container=VG_CONTAINER,
-                    in_xg_file=XG_FILE,
-                    in_gcsa_file=GCSA_FILE,
-                    in_gcsa_lcp_file=GCSA_LCP_FILE,
-                    in_gbwt_file=GBWT_FILE,
-                    in_snarls_file=SNARLS_FILE,
-                    in_ref_dict=REF_DICT_FILE,
-                    in_sample_name=SAMPLE_NAME,
-                    surject_output=SURJECT_MODE,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
-            }
-        }
-        if (MAPPER == "MAP") {
-            call mappingTasks.runVGMAP {
-                input:
-                    in_left_read_pair_chunk_file=read_pair_chunk_files.left,
-                    in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-                    in_vg_container=VG_CONTAINER,
-                    in_xg_file=XG_FILE,
-                    in_gcsa_file=GCSA_FILE,
-                    in_gcsa_lcp_file=GCSA_LCP_FILE,
-                    in_gbwt_file=GBWT_FILE,
-                    in_ref_dict=REF_DICT_FILE,
-                    in_sample_name=SAMPLE_NAME,
-                    surject_output=SURJECT_MODE,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
-            }
-        }
-        if (MAPPER == "GIRAFFE") {
-            call mappingTasks.runVGGIRAFFE {
-                input:
-                    in_left_read_pair_chunk_file=read_pair_chunk_files.left,
-                    in_right_read_pair_chunk_file=read_pair_chunk_files.right,
-                    in_vg_container=VG_CONTAINER,
-                    in_xg_file=XG_FILE,
-                    in_gbwt_file=GBWT_FILE,
-                    in_ggbwt_file=GGBWT_FILE,
-                    in_dist_file=DIST_FILE,
-                    in_min_file=MIN_FILE,
-                    in_ref_dict=REF_DICT_FILE,
-                    in_sample_name=SAMPLE_NAME,
-                    surject_output=SURJECT_MODE,
-                    in_map_cores=MAP_CORES,
-                    in_map_disk=MAP_DISK,
-                    in_map_mem=MAP_MEM
-            }
-        }
-
-        # Surject GAM alignment files to BAM if SURJECT_MODE set to true
-        File vg_map_algorithm_chunk_gam_output = select_first([runVGMAP.chunk_gam_file, runVGMPMAP.chunk_gam_file, runVGGIRAFFE.chunk_gam_file])
-        # Cleanup input reads after use
-        if (CLEANUP_FILES) {
-            if (GOOGLE_CLEANUP_MODE) {
-                call mappingTasks.cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
-                    input:
-                        previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
-                        current_task_output = vg_map_algorithm_chunk_gam_output
-                }
-            }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call mappingTasks.cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
-                    input:
-                        previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
-                        current_task_output = vg_map_algorithm_chunk_gam_output
-                }
-            }
-        }
-        if (SURJECT_MODE) {
-            call utils.sortBAM {
-                input:
-                in_bam_file=vg_map_algorithm_chunk_gam_output,
-                in_ref_dict=REF_DICT_FILE,
-                in_prefix_to_strip=REFERENCE_PREFIX
-            }
-
-#            call sortMDTagBAMFile {
-#                input:
-#                    in_sample_name=SAMPLE_NAME,
-#                    in_bam_chunk_file=vg_map_algorithm_chunk_gam_output,
-#                    in_reference_file=REF_FILE,
-#                    in_reference_index_file=REF_INDEX_FILE,
-#                    in_reference_dict_file=REF_DICT_FILE,
-#                    in_map_cores=MAP_CORES,
-#                    in_map_disk=MAP_DISK,
-#                    in_map_mem=MAP_MEM,
-#            }
-            # Cleanup intermediate surject files after use
-            if (CLEANUP_FILES) {
-                if (GOOGLE_CLEANUP_MODE) {
-                    call mappingTasks.cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
-                        input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
-                            current_task_output = sortBAM.sorted_bam
-                    }
-                }
-                if (!GOOGLE_CLEANUP_MODE) {
-                    call mappingTasks.cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
-                        input:
-                            previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
-                            current_task_output = sortBAM.sorted_bam
-                    }
-                }
-            }
-        }
+            MAPPER=MAPPER,
+            SURJECT_MODE=SURJECT_MODE,
+            INPUT_READ_FILE_1=INPUT_READ_FILE_1,
+            INPUT_READ_FILE_2=INPUT_READ_FILE_2,
+            SAMPLE_NAME=SAMPLE_NAME,
+            VG_CONTAINER=VG_CONTAINER,
+            READS_PER_CHUNK=READS_PER_CHUNK,
+            PATH_LIST_FILE=PATH_LIST_FILE,
+            XG_FILE=XG_FILE,
+            GCSA_FILE=GCSA_FILE,
+            GCSA_LCP_FILE=GCSA_LCP_FILE,
+            GBWT_FILE=GBWT_FILE,
+            GGBWT_FILE=GGBWT_FILE,
+            DIST_FILE=DIST_FILE,
+            MIN_FILE=MIN_FILE,
+            SNARLS_FILE=SNARLS_FILE,
+            REF_FILE=REF_FILE,
+            REF_INDEX_FILE=REF_INDEX_FILE,
+            REF_DICT_FILE=REF_DICT_FILE,
+            REFERENCE_PREFIX=REFERENCE_PREFIX,
+            SPLIT_READ_CORES=SPLIT_READ_CORES,
+            SPLIT_READ_DISK=SPLIT_READ_DISK,
+            MAP_CORES=MAP_CORES,
+            MAP_DISK=MAP_DISK,
+            MAP_MEM=MAP_MEM,
+            MERGE_GAM_CORES=MERGE_GAM_CORES,
+            MERGE_GAM_DISK=MERGE_GAM_DISK,
+            MERGE_GAM_MEM=MERGE_GAM_MEM,
+            MERGE_GAM_TIME=MERGE_GAM_TIME,
+            CLEANUP_FILES=CLEANUP_FILES,
+            GOOGLE_CLEANUP_MODE=GOOGLE_CLEANUP_MODE
     }
 
     ##############################################
     # Run the linear alignment calling procedure #
     ##############################################
     if (SURJECT_MODE) {
-        # Merge chunked alignments from surjected GAM files
-        Array[File?] alignment_chunk_bam_files_maybes = sortBAM.sorted_bam
-        Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
-        call mappingTasks.mergeAlignmentBAMChunks {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
-                in_merge_bam_cores=MERGE_GAM_CORES,
-                in_merge_bam_disk=MERGE_GAM_DISK,
-                in_merge_bam_mem=MERGE_GAM_MEM,
-                in_merge_bam_time=MERGE_GAM_TIME
-        }
-        File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
-        File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
-        if (CLEANUP_FILES) {
-            if (GOOGLE_CLEANUP_MODE) {
-                call mappingTasks.cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
-                    input:
-                        previous_task_outputs = alignment_chunk_bam_files_valid,
-                        current_task_output = merged_bam_file_output
-                }
-            }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call mappingTasks.cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
-                    input:
-                        previous_task_outputs = alignment_chunk_bam_files_valid,
-                        current_task_output = merged_bam_file_output
-                }
-            }
-        }
-
         # Run VCF variant calling procedure
         # Split merged alignment by contigs list
         call splitBAMbyPath {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_merged_bam_file=merged_bam_file_output,
-                in_merged_bam_file_index=merged_bam_file_index_output,
-                in_path_list_file=pipeline_path_list_file,
+                in_merged_bam_file=select_first([vgMultiMap.output_merged_bam]),
+                in_merged_bam_file_index=select_first([vgMultiMap.output_merged_bam_index]),
+                in_path_list_file=select_first([PATH_LIST_FILE, vgMultiMap.output_path_list]),
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
@@ -277,14 +132,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpGoogleFilestore as cleanUpGATKCallerInputsGoogle {
+                            call vgMultiMapWorkflow.cleanUpGoogleFilestore as cleanUpGATKCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCaller.genotyped_vcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpUnixFilesystem as cleanUpGATKCallerInputsUnix {
+                            call vgMultiMapWorkflow.cleanUpUnixFilesystem as cleanUpGATKCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCaller.genotyped_vcf
@@ -308,14 +163,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpGoogleFilestore as cleanUpDeepVariantCallerInputsGoogle {
+                            call vgMultiMapWorkflow.cleanUpGoogleFilestore as cleanUpDeepVariantCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCaller.genotyped_vcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpUnixFilesystem as cleanUpDeepVariantCallerInputsUnix {
+                            call vgMultiMapWorkflow.cleanUpUnixFilesystem as cleanUpDeepVariantCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCaller.genotyped_vcf
@@ -344,14 +199,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpGoogleFilestore as cleanUpGATKGVCFCallerInputsGoogle {
+                            call vgMultiMapWorkflow.cleanUpGoogleFilestore as cleanUpGATKGVCFCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCallerGVCF.genotyped_gvcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpUnixFilesystem as cleanUpGATKGVCFCallerInputsUnix {
+                            call vgMultiMapWorkflow.cleanUpUnixFilesystem as cleanUpGATKGVCFCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCallerGVCF.genotyped_gvcf
@@ -375,14 +230,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpGoogleFilestore as cleanUpDeepVariantGVCFCallerInputsGoogle {
+                            call vgMultiMapWorkflow.cleanUpGoogleFilestore as cleanUpDeepVariantGVCFCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCallerGVCF.genotyped_gvcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call mappingTasks.cleanUpUnixFilesystem as cleanUpDeepVariantGVCFCallerInputsUnix {
+                            call vgMultiMapWorkflow.cleanUpUnixFilesystem as cleanUpDeepVariantGVCFCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCallerGVCF.genotyped_gvcf
@@ -419,44 +274,16 @@ workflow vgMultiMapCall {
     # Run the VG calling procedure #
     ################################
     if (!SURJECT_MODE) {
-        # Merge chunked graph alignments
-        call mappingTasks.mergeAlignmentGAMChunks {
-            input:
-                in_sample_name=SAMPLE_NAME,
-                in_vg_container=VG_CONTAINER,
-                in_alignment_gam_chunk_files=vg_map_algorithm_chunk_gam_output,
-                in_merge_gam_cores=MERGE_GAM_CORES,
-                in_merge_gam_disk=MERGE_GAM_DISK,
-                in_merge_gam_mem=MERGE_GAM_MEM,
-                in_merge_gam_time=MERGE_GAM_TIME
-        }
-        # Cleanup gam chunk files after use
-        if (CLEANUP_FILES) {
-            if (GOOGLE_CLEANUP_MODE) {
-                call mappingTasks.cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
-                    input:
-                        previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-                        current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
-                }
-            }
-            if (!GOOGLE_CLEANUP_MODE) {
-                call mappingTasks.cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
-                    input:
-                        previous_task_outputs = vg_map_algorithm_chunk_gam_output,
-                        current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
-                }
-            }
-        }
         # Set chunk context amount depending on structural variant or default variant calling mode
         Int default_or_sv_chunk_context = if SV_CALLER_MODE then 2500 else 50
         # Chunk GAM alignments by contigs list
         call chunkAlignmentsByPathNames {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_merged_sorted_gam=mergeAlignmentGAMChunks.merged_sorted_gam_file,
-            in_merged_sorted_gam_gai=mergeAlignmentGAMChunks.merged_sorted_gam_gai_file,
+            in_merged_sorted_gam=select_first([vgMultiMap.output_merged_gam]),
+            in_merged_sorted_gam_gai=select_first([vgMultiMap.output_merged_gam_index]),
             in_xg_file=XG_FILE,
-            in_path_list_file=pipeline_path_list_file,
+            in_path_list_file=select_first([PATH_LIST_FILE, vgMultiMap.output_path_list]),
             in_chunk_context=default_or_sv_chunk_context,
             in_chunk_bases=CHUNK_BASES,
             in_overlap=OVERLAP,
@@ -493,14 +320,14 @@ workflow vgMultiMapCall {
             # Cleanup vg call input files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
-                    call mappingTasks.cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
+                    call vgMultiMapWorkflow.cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
                         input:
                             previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
                             current_task_output = runVCFClipper.output_clipped_vcf
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
-                    call mappingTasks.cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
+                    call vgMultiMapWorkflow.cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
                         input:
                             previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
                             current_task_output = runVCFClipper.output_clipped_vcf
@@ -551,10 +378,10 @@ workflow vgMultiMapCall {
     }
     output {
         File output_vcf = select_first([snpEffAnnotateVCF.output_snpeff_annotated_vcf, variantcaller_vcf_output])
-        File? output_bam = merged_bam_file_output
-        File? output_bam_index = merged_bam_file_index_output
-        File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
-        File? output_gam_index = mergeAlignmentGAMChunks.merged_sorted_gam_gai_file
+        File? output_bam = vgMultiMap.output_merged_bam
+        File? output_bam_index = vgMultiMap.output_merged_bam_index
+        File? output_gam = vgMultiMap.output_merged_gam
+        File? output_gam_index = vgMultiMap.output_merged_gam_index
     }
 }
 

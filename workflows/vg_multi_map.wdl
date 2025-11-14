@@ -250,6 +250,7 @@ workflow vgMultiMap {
         File? output_bam_index = merged_bam_file_index_output
         File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
         File? output_gam_index = mergeAlignmentGAMChunks.merged_sorted_gam_gai_file
+        File output_path_list = pipeline_path_list_file
     }
 }
 
