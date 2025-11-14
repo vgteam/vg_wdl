@@ -1,6 +1,7 @@
 version 1.0
 
 import "../tasks/bioinfo_utils.wdl" as utils
+import "./vg_multi_map.wdl" as mappingTasks
 
 ### vg_multi_map_call.wdl ###
 workflow vgMultiMapCall {
@@ -59,7 +60,7 @@ workflow vgMultiMapCall {
     }
 
     # Split input reads into chunks for parallelized mapping
-    call splitReads as firstReadPair {
+    call mappingTasks.splitReads as firstReadPair {
         input:
             in_read_file=INPUT_READ_FILE_1,
             in_pair_id="1",
@@ -68,7 +69,7 @@ workflow vgMultiMapCall {
             in_split_read_cores=SPLIT_READ_CORES,
             in_split_read_disk=SPLIT_READ_DISK
     }
-    call splitReads as secondReadPair {
+    call mappingTasks.splitReads as secondReadPair {
         input:
             in_read_file=INPUT_READ_FILE_2,
             in_pair_id="2",
@@ -80,7 +81,7 @@ workflow vgMultiMapCall {
 
     # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
     if (!defined(PATH_LIST_FILE)) {
-        call extractPathNames {
+        call mappingTasks.extractPathNames {
             input:
                 in_xg_file=XG_FILE,
                 in_vg_container=VG_CONTAINER
@@ -94,7 +95,7 @@ workflow vgMultiMapCall {
     Array[Pair[File,File]] read_pair_chunk_files_list = zip(firstReadPair.output_read_chunks, secondReadPair.output_read_chunks)
     scatter (read_pair_chunk_files in read_pair_chunk_files_list) {
         if (MAPPER == "MPMAP") {
-            call runVGMPMAP {
+            call mappingTasks.runVGMPMAP {
                 input:
                     in_left_read_pair_chunk_file=read_pair_chunk_files.left,
                     in_right_read_pair_chunk_file=read_pair_chunk_files.right,
@@ -113,7 +114,7 @@ workflow vgMultiMapCall {
             }
         }
         if (MAPPER == "MAP") {
-            call runVGMAP {
+            call mappingTasks.runVGMAP {
                 input:
                     in_left_read_pair_chunk_file=read_pair_chunk_files.left,
                     in_right_read_pair_chunk_file=read_pair_chunk_files.right,
@@ -131,7 +132,7 @@ workflow vgMultiMapCall {
             }
         }
         if (MAPPER == "GIRAFFE") {
-            call runVGGIRAFFE {
+            call mappingTasks.runVGGIRAFFE {
                 input:
                     in_left_read_pair_chunk_file=read_pair_chunk_files.left,
                     in_right_read_pair_chunk_file=read_pair_chunk_files.right,
@@ -155,14 +156,14 @@ workflow vgMultiMapCall {
         # Cleanup input reads after use
         if (CLEANUP_FILES) {
             if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
+                call mappingTasks.cleanUpGoogleFilestore as cleanUpVGMapperInputsGoogle {
                     input:
                         previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
                         current_task_output = vg_map_algorithm_chunk_gam_output
                 }
             }
             if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
+                call mappingTasks.cleanUpUnixFilesystem as cleanUpVGMapperInputsUnix {
                     input:
                         previous_task_outputs = [read_pair_chunk_files.left, read_pair_chunk_files.right],
                         current_task_output = vg_map_algorithm_chunk_gam_output
@@ -191,14 +192,14 @@ workflow vgMultiMapCall {
             # Cleanup intermediate surject files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
-                    call cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
+                    call mappingTasks.cleanUpGoogleFilestore as cleanUpVGSurjectInputsGoogle {
                         input:
                             previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
                             current_task_output = sortBAM.sorted_bam
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
-                    call cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
+                    call mappingTasks.cleanUpUnixFilesystem as cleanUpVGSurjectInputsUnix {
                         input:
                             previous_task_outputs = [vg_map_algorithm_chunk_gam_output],
                             current_task_output = sortBAM.sorted_bam
@@ -215,26 +216,27 @@ workflow vgMultiMapCall {
         # Merge chunked alignments from surjected GAM files
         Array[File?] alignment_chunk_bam_files_maybes = sortBAM.sorted_bam
         Array[File] alignment_chunk_bam_files_valid = select_all(alignment_chunk_bam_files_maybes)
-        call mergeAlignmentBAMChunks {
+        call mappingTasks.mergeAlignmentBAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
-                in_map_cores=MAP_CORES,
-                in_map_disk=MAP_DISK,
-                in_map_mem=MAP_MEM
+                in_merge_bam_cores=MERGE_GAM_CORES,
+                in_merge_bam_disk=MERGE_GAM_DISK,
+                in_merge_bam_mem=MERGE_GAM_MEM,
+                in_merge_bam_time=MERGE_GAM_TIME
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
         File merged_bam_file_index_output = mergeAlignmentBAMChunks.merged_bam_file_index
         if (CLEANUP_FILES) {
             if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
+                call mappingTasks.cleanUpGoogleFilestore as cleanUpAlignmentBAMChunksGoogle {
                     input:
                         previous_task_outputs = alignment_chunk_bam_files_valid,
                         current_task_output = merged_bam_file_output
                 }
             }
             if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
+                call mappingTasks.cleanUpUnixFilesystem as cleanUpAlignmentBAMChunksUnix {
                     input:
                         previous_task_outputs = alignment_chunk_bam_files_valid,
                         current_task_output = merged_bam_file_output
@@ -275,14 +277,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call cleanUpGoogleFilestore as cleanUpGATKCallerInputsGoogle {
+                            call mappingTasks.cleanUpGoogleFilestore as cleanUpGATKCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCaller.genotyped_vcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call cleanUpUnixFilesystem as cleanUpGATKCallerInputsUnix {
+                            call mappingTasks.cleanUpUnixFilesystem as cleanUpGATKCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCaller.genotyped_vcf
@@ -306,14 +308,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call cleanUpGoogleFilestore as cleanUpDeepVariantCallerInputsGoogle {
+                            call mappingTasks.cleanUpGoogleFilestore as cleanUpDeepVariantCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCaller.genotyped_vcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call cleanUpUnixFilesystem as cleanUpDeepVariantCallerInputsUnix {
+                            call mappingTasks.cleanUpUnixFilesystem as cleanUpDeepVariantCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCaller.genotyped_vcf
@@ -342,14 +344,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call cleanUpGoogleFilestore as cleanUpGATKGVCFCallerInputsGoogle {
+                            call mappingTasks.cleanUpGoogleFilestore as cleanUpGATKGVCFCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCallerGVCF.genotyped_gvcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call cleanUpUnixFilesystem as cleanUpGATKGVCFCallerInputsUnix {
+                            call mappingTasks.cleanUpUnixFilesystem as cleanUpGATKGVCFCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runGATKHaplotypeCallerGVCF.genotyped_gvcf
@@ -373,14 +375,14 @@ workflow vgMultiMapCall {
                     # Cleanup intermediate variant calling files after use
                     if (CLEANUP_FILES) {
                         if (GOOGLE_CLEANUP_MODE) {
-                            call cleanUpGoogleFilestore as cleanUpDeepVariantGVCFCallerInputsGoogle {
+                            call mappingTasks.cleanUpGoogleFilestore as cleanUpDeepVariantGVCFCallerInputsGoogle {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCallerGVCF.genotyped_gvcf
                             }
                         }
                         if (!GOOGLE_CLEANUP_MODE) {
-                            call cleanUpUnixFilesystem as cleanUpDeepVariantGVCFCallerInputsUnix {
+                            call mappingTasks.cleanUpUnixFilesystem as cleanUpDeepVariantGVCFCallerInputsUnix {
                                 input:
                                     previous_task_outputs = [gatk_caller_input_files.left, gatk_caller_input_files.right],
                                     current_task_output = runDeepVariantCallerGVCF.genotyped_gvcf
@@ -418,7 +420,7 @@ workflow vgMultiMapCall {
     ################################
     if (!SURJECT_MODE) {
         # Merge chunked graph alignments
-        call mergeAlignmentGAMChunks {
+        call mappingTasks.mergeAlignmentGAMChunks {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_vg_container=VG_CONTAINER,
@@ -431,14 +433,14 @@ workflow vgMultiMapCall {
         # Cleanup gam chunk files after use
         if (CLEANUP_FILES) {
             if (GOOGLE_CLEANUP_MODE) {
-                call cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
+                call mappingTasks.cleanUpGoogleFilestore as cleanUpGAMChunksGoogle {
                     input:
                         previous_task_outputs = vg_map_algorithm_chunk_gam_output,
                         current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
                 }
             }
             if (!GOOGLE_CLEANUP_MODE) {
-                call cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
+                call mappingTasks.cleanUpUnixFilesystem as cleanUpGAMChunksUnix {
                     input:
                         previous_task_outputs = vg_map_algorithm_chunk_gam_output,
                         current_task_output = mergeAlignmentGAMChunks.merged_sorted_gam_file
@@ -491,14 +493,14 @@ workflow vgMultiMapCall {
             # Cleanup vg call input files after use
             if (CLEANUP_FILES) {
                 if (GOOGLE_CLEANUP_MODE) {
-                    call cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
+                    call mappingTasks.cleanUpGoogleFilestore as cleanUpVGCallInputsGoogle {
                         input:
                             previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
                             current_task_output = runVCFClipper.output_clipped_vcf
                     }
                 }
                 if (!GOOGLE_CLEANUP_MODE) {
-                    call cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
+                    call mappingTasks.cleanUpUnixFilesystem as cleanUpVGCallInputsUnix {
                         input:
                             previous_task_outputs = [vg_caller_input_files.left, vg_caller_input_files.right, runVGCaller.output_vcf],
                             current_task_output = runVCFClipper.output_clipped_vcf
@@ -559,417 +561,6 @@ workflow vgMultiMapCall {
 ########################
 ### TASK DEFINITIONS ###
 ########################
-
-# Tasks for intermediate file cleanup
-task cleanUpUnixFilesystem {
-    input {
-        Array[File] previous_task_outputs
-        File current_task_output
-    }
-    command <<<
-        set -euo pipefail
-
-        while IFS= read -r path; do
-            if [ -e "$path" ]; then
-                inode="$(stat -c %i "$path" 2>/dev/null || true)"
-                if [ -n "$inode" ]; then
-                    find ../../../ -xdev -inum "$inode" -exec rm -v {} + 2>/dev/null || true
-                fi
-            fi
-        done < ~{write_lines(previous_task_outputs)}
-    >>>
-    runtime {
-        docker: "ubuntu@sha256:2695d3e10e69cc500a16eae6d6629c803c43ab075fa5ce60813a0fc49c47e859"
-        continueOnReturnCode: true
-    }
-}
-
-task cleanUpGoogleFilestore {
-    input {
-        Array[String] previous_task_outputs
-        String current_task_output
-    }
-    command {
-        set -eux -o pipefail
-        gsutil rm -I < ${write_lines(previous_task_outputs)}
-    }
-    runtime {
-        docker: "google/cloud-sdk@sha256:4ef6b0e969fa96f10acfd893644d100469e979f4384e5e70f58be5cb80593a8a"
-        continueOnReturnCode: true
-    }
-}
-
-task splitReads {
-    input {
-        File in_read_file
-        String in_pair_id
-        String in_vg_container
-        Int in_reads_per_chunk
-        Int in_split_read_cores
-        Int in_split_read_disk
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        gzip -cd ~{in_read_file} | split -l $CHUNK_LINES --filter='pigz -p ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
-    >>>
-    output {
-        Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
-    }
-    runtime {
-        time: 120
-        cpu: in_split_read_cores
-        memory: "2 GB"
-        disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task extractPathNames {
-    input {
-        File in_xg_file
-        String in_vg_container
-    }
-
-    command {
-        set -eux -o pipefail
-
-        vg paths \
-            --list \
-            --xg ${in_xg_file} > path_list.txt
-    }
-    output {
-        File output_path_list = "path_list.txt"
-    }
-    runtime {
-        memory: "20 GB"
-        disks: "local-disk 50 SSD"
-        docker: in_vg_container
-    }
-}
-
-task runVGMAP {
-    input {
-        File in_left_read_pair_chunk_file
-        File in_right_read_pair_chunk_file
-        File in_xg_file
-        File? in_gcsa_file
-        File? in_gcsa_lcp_file
-        File? in_gbwt_file
-        File? in_ref_dict
-        String in_vg_container
-        String in_sample_name
-        Boolean surject_output
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    Boolean gbwt_options = defined(in_gbwt_file)
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
-        GBWT_OPTION_STRING=""
-        if [ ~{gbwt_options} == true ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file}"
-        fi
-        ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
-        ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
-        if [ ~{surject_output} == false ]; then
-            vg map \
-              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-              --sample "~{in_sample_name}" \
-              -x ~{in_xg_file} \
-              -g input_gcsa_file.gcsa \
-              ${GBWT_OPTION_STRING} \
-              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
-        else
-           vg map \
-              --ref-paths ~{in_ref_dict} \
-              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-              --sample "~{in_sample_name}" \
-              --surject-to bam \
-              -x ~{in_xg_file} \
-              -g input_gcsa_file.gcsa \
-              ${GBWT_OPTION_STRING} \
-              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
-        fi
-    >>>
-    output {
-        File chunk_gam_file = glob("*am")[0]
-    }
-    runtime {
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task runVGMPMAP {
-    input {
-        File in_left_read_pair_chunk_file
-        File in_right_read_pair_chunk_file
-        File in_xg_file
-        File? in_gcsa_file
-        File? in_gcsa_lcp_file
-        File? in_gbwt_file
-        File? in_snarls_file
-        File? in_ref_dict
-        String in_vg_container
-        String in_sample_name
-        Boolean surject_output
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    Boolean gbwt_options = defined(in_gbwt_file)
-    Boolean snarl_options = defined(in_snarls_file)
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
-        GBWT_OPTION_STRING=""
-        if [ ~{gbwt_options} == true ] && [ ~{snarl_options} == false ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} --recombination-penalty 5.0"
-        elif [ ~{gbwt_options} == true ] && [ ~{snarl_options} == true ]; then
-          GBWT_OPTION_STRING="--gbwt-name ~{in_gbwt_file} -s ~{in_snarls_file} --recombination-penalty 5.0"
-        fi
-        ln -s ~{in_gcsa_file} input_gcsa_file.gcsa
-        ln -s ~{in_gcsa_lcp_file} input_gcsa_file.gcsa.lcp
-        if [ ~{surject_output} == false ]; then
-            vg mpmap \
-              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-              --sample "~{in_sample_name}" \
-              -S \
-              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-              -x ~{in_xg_file} \
-              -g input_gcsa_file.gcsa \
-              ${GBWT_OPTION_STRING} \
-              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
-        else
-            vg mpmap \
-              --ref-paths ~{in_ref_dict} \
-              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-              --sample "~{in_sample_name}" \
-              --output-fmt BAM \
-              -S \
-              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-              -x ~{in_xg_file} \
-              -g input_gcsa_file.gcsa \
-              ${GBWT_OPTION_STRING} \
-              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
-        fi
-    >>>
-    output {
-        File chunk_gam_file = glob("*am")[0]
-    }
-    runtime {
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-task runVGGIRAFFE {
-    input {
-        File in_left_read_pair_chunk_file
-        File in_right_read_pair_chunk_file
-        File in_xg_file
-        File? in_gbwt_file
-        File? in_ggbwt_file
-        File? in_dist_file
-        File? in_min_file
-        File? in_ref_dict
-        String in_vg_container
-        String in_sample_name
-        Boolean surject_output
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        READ_CHUNK_ID=($(ls ~{in_left_read_pair_chunk_file} | awk -F'.' '{print $(NF-2)}'))
-        if [ ~{surject_output} == false ]; then
-            vg giraffe \
-              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-              -x ~{in_xg_file} \
-              -H ~{in_gbwt_file} \
-              -g ~{in_ggbwt_file} \
-              -d ~{in_dist_file} \
-              -m ~{in_min_file} \
-              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-              --sample "~{in_sample_name}" \
-              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.gam
-        else
-            vg giraffe \
-              --read-group "ID:1 LB:lib1 SM:~{in_sample_name} PL:illumina PU:unit1" \
-              --sample "~{in_sample_name}" \
-              --output-format BAM \
-              --ref-paths ~{in_ref_dict} \
-              -f ~{in_left_read_pair_chunk_file} -f ~{in_right_read_pair_chunk_file} \
-              -x ~{in_xg_file} \
-              -H ~{in_gbwt_file} \
-              -g ~{in_ggbwt_file} \
-              -d ~{in_dist_file} \
-              -m ~{in_min_file} \
-              -t ~{in_map_cores} > ~{in_sample_name}.${READ_CHUNK_ID}.bam
-        fi
-    >>>
-    output {
-        File chunk_gam_file = glob("*am")[0]
-    }
-    runtime {
-        time: 300
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task sortMDTagBAMFile {
-    input {
-        String in_sample_name
-        File in_bam_chunk_file
-        File in_reference_file
-        File in_reference_index_file
-        File in_reference_dict_file
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools sort \
-          --threads ~{in_map_cores} \
-          ~{in_bam_chunk_file} \
-          -O BAM \
-        | samtools calmd \
-          -b \
-          - \
-          ~{in_reference_file} \
-          > ~{in_sample_name}_positionsorted.mdtag.bam \
-        && samtools index \
-          ~{in_sample_name}_positionsorted.mdtag.bam
-        java -Xmx~{in_map_mem}g -XX:ParallelGCThreads=~{in_map_cores} -jar /usr/picard/picard.jar MarkDuplicates \
-          PROGRAM_RECORD_ID=null \
-          VALIDATION_STRINGENCY=LENIENT \
-          I=~{in_sample_name}_positionsorted.mdtag.bam \
-          O=~{in_sample_name}.mdtag.dupmarked.bam \
-          M=marked_dup_metrics.txt 2> mark_dup_stderr.txt \
-        && rm -f ~{in_sample_name}_positionsorted.mdtag.bam ~{in_sample_name}_positionsorted.mdtag.bam.bai \
-    >>>
-    output {
-        File mark_dupped_reordered_bam = "~{in_sample_name}.mdtag.dupmarked.bam"
-    }
-    runtime {
-        time: 90
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "quay.io/cmarkello/samtools_picard@sha256:e484603c61e1753c349410f0901a7ba43a2e5eb1c6ce9a240b7f737bba661eb4"
-    }
-}
-
-task mergeAlignmentBAMChunks {
-    input {
-        String in_sample_name
-        Array[File] in_alignment_bam_chunk_files
-        Int in_map_cores
-        Int in_map_disk
-        String in_map_mem
-    }
-
-    command <<<
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-        samtools merge \
-          -f -p -c --threads ~{in_map_cores} \
-          ~{in_sample_name}_merged.positionsorted.bam \
-          ~{sep=" " in_alignment_bam_chunk_files} \
-        && samtools index \
-          ~{in_sample_name}_merged.positionsorted.bam
-    >>>
-    output {
-        File merged_bam_file = "~{in_sample_name}_merged.positionsorted.bam"
-        File merged_bam_file_index = "~{in_sample_name}_merged.positionsorted.bam.bai"
-    }
-    runtime {
-        time: 240
-        memory: in_map_mem + " GB"
-        cpu: in_map_cores
-        disks: "local-disk " + in_map_disk + " SSD"
-        docker: "biocontainers/samtools@sha256:3ff48932a8c38322b0a33635957bc6372727014357b4224d420726da100f5470"
-    }
-}
 
 task splitBAMbyPath {
     input {
@@ -1210,48 +801,6 @@ task runDeepVariantCallerGVCF {
         cpu: in_vgcall_cores
         disks: "local-disk " + in_vgcall_disk + " SSD"
         docker: "google/deepvariant:1.0.0"
-    }
-}
-
-task mergeAlignmentGAMChunks {
-    input {
-        String in_sample_name
-        String in_vg_container
-        Array[File] in_alignment_gam_chunk_files
-        Int in_merge_gam_cores
-        Int in_merge_gam_disk
-        Int in_merge_gam_mem
-        Int in_merge_gam_time
-    }
-
-    command {
-        # Set the exit code of a pipeline to that of the rightmost command
-        # to exit with a non-zero status, or zero if all commands of the pipeline exit
-        set -o pipefail
-        # cause a bash script to exit immediately when a command fails
-        set -e
-        # cause the bash shell to treat unset variables as an error and exit immediately
-        set -u
-        # echo each line of the script to stdout so we can see what is happening
-        set -o xtrace
-        #to turn off echo do 'set +o xtrace'
-
-        cat ${sep=" " in_alignment_gam_chunk_files} > ${in_sample_name}_merged.gam \
-        && vg gamsort \
-            ${in_sample_name}_merged.gam \
-            -i ${in_sample_name}_merged.sorted.gam.gai \
-            -t ${in_merge_gam_cores} > ${in_sample_name}_merged.sorted.gam
-    }
-    output {
-        File merged_sorted_gam_file = "${in_sample_name}_merged.sorted.gam"
-        File merged_sorted_gam_gai_file = "${in_sample_name}_merged.sorted.gam.gai"
-    }
-    runtime {
-        memory: in_merge_gam_mem + " GB"
-        cpu: in_merge_gam_cores
-        disks: "local-disk " + in_merge_gam_disk  + " SSD"
-        time: in_merge_gam_time
-        docker: in_vg_container
     }
 }
 

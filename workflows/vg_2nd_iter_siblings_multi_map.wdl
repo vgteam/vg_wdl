@@ -5,7 +5,7 @@ version 1.0
 # Description: Mapping workflow for proband-siblings against the parental graph reference.
 #              Designed as the 4th step in a pedigree-backed graph alignment pipeline.
 
-import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+import "./vg_multi_map_call.wdl" as vgMultiMapWorkflow
 
 workflow vgTrioPipeline {
     input {
@@ -66,7 +66,7 @@ workflow vgTrioPipeline {
                 MERGE_GAM_DISK=MERGE_GAM_DISK,
                 MERGE_GAM_MEM=MERGE_GAM_MEM,
                 MERGE_GAM_TIME=MERGE_GAM_TIME,
-                VGMPMAP_MODE=VGMPMAP_MODE,
+                MAPPER=if VGMPMAP_MODE then "MPMAP" else "MAP",
                 SURJECT_MODE=true
         }
     }

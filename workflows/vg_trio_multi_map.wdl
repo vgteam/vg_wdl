@@ -5,7 +5,7 @@ version 1.0
 # Description: Mapping workflow for mother-father-proband trios.
 #              Designed as the 1st step in a pedigree-backed graph alignment pipeline.
 
-import "./vg_multi_map.wdl" as vgMultiMapWorkflow
+import "./vg_multi_map_call.wdl" as vgMultiMapWorkflow
 
 ###########################
 ### WORKFLOW DEFINITION ###
@@ -72,7 +72,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_DISK=MERGE_GAM_DISK,
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            MAPPER=if VGMPMAP_MODE then "MPMAP" else "MAP",
             SURJECT_MODE=true
     }
     call vgMultiMapWorkflow.vgMultiMapCall as paternalMapWorkflow {
@@ -100,7 +100,7 @@ workflow vgTrioPipeline {
             MERGE_GAM_DISK=MERGE_GAM_DISK,
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            MAPPER=if VGMPMAP_MODE then "MPMAP" else "MAP",
             SURJECT_MODE=true
     }
     call vgMultiMapWorkflow.vgMultiMapCall as probandMapWorkflow {
@@ -128,10 +128,10 @@ workflow vgTrioPipeline {
             MERGE_GAM_DISK=MERGE_GAM_DISK,
             MERGE_GAM_MEM=MERGE_GAM_MEM,
             MERGE_GAM_TIME=MERGE_GAM_TIME,
-            VGMPMAP_MODE=VGMPMAP_MODE,
+            MAPPER=if VGMPMAP_MODE then "MPMAP" else "MAP",
             SURJECT_MODE=true
     }
-    
+
     output {
         File? output_maternal_bam = maternalMapWorkflow.output_bam
         File? output_maternal_bam_index = maternalMapWorkflow.output_bam_index
