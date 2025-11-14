@@ -61,7 +61,7 @@ workflow HaplotypeSampling {
         Int INDEX_MINIMIZER_K = 29
         Int INDEX_MINIMIZER_W = 11
         Boolean INDEX_MINIMIZER_WEIGHTED = true
-        String? VG_DOCKER
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
 
 
     }
@@ -73,7 +73,8 @@ workflow HaplotypeSampling {
         if (!defined(DIST_FILE)) {
             call index.createDistanceIndex {
                 input:
-                    in_gbz_file=GBZ_FILE
+                    in_gbz_file=GBZ_FILE,
+                    vg_docker=VG_DOCKER
             }
         }
 
@@ -83,7 +84,8 @@ workflow HaplotypeSampling {
             call index.createRIndex {
                 input:
                     in_gbz_file=GBZ_FILE,
-                    nb_cores=CORES
+                    nb_cores=CORES,
+                    vg_docker=VG_DOCKER
             }
         }
 
@@ -98,7 +100,8 @@ workflow HaplotypeSampling {
                 nb_cores=CORES,
                 kmer_length=KMER_LENGTH,
                 window_length=WINDOW_LENGTH,
-                subchain_length=SUBCHAIN_LENGTH
+                subchain_length=SUBCHAIN_LENGTH,
+                vg_docker=VG_DOCKER
         }
     }
 
@@ -132,14 +135,16 @@ workflow HaplotypeSampling {
             include_reference = INCLUDE_REFERENCE,
             set_reference = SET_REFERENCE,
             nb_cores=CORES,
-            use_diploid_sampling=DIPLOID
+            use_diploid_sampling=DIPLOID,
+            vg_docker=VG_DOCKER
 
 
     }
 
     call index.createDistanceIndex as giraffeDist {
                 input:
-                    in_gbz_file=samplingHaplotypes.output_graph
+                    in_gbz_file=samplingHaplotypes.output_graph,
+                    vg_docker=VG_DOCKER
     }
 
     call index.createMinimizerIndex {
@@ -151,7 +156,8 @@ workflow HaplotypeSampling {
             in_minimizer_weighted = INDEX_MINIMIZER_WEIGHTED,
             out_name=OUTPUT_NAME_PREFIX,
             nb_cores=CORES,
-            in_extract_mem=INDEX_MINIMIZER_MEM
+            in_extract_mem=INDEX_MINIMIZER_MEM,
+            vg_docker=VG_DOCKER
     }
 
     output {
