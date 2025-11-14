@@ -106,7 +106,7 @@ workflow vgMultiMapCall {
                 in_sample_name=SAMPLE_NAME,
                 in_merged_bam_file=select_first([vgMultiMap.output_bam]),
                 in_merged_bam_file_index=select_first([vgMultiMap.output_bam_index]),
-                in_path_list_file=select_first([PATH_LIST_FILE, vgMultiMap.output_path_list]),
+                in_path_list_file=vgMultiMap.output_path_list,
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
                 in_map_mem=MAP_MEM
@@ -283,7 +283,7 @@ workflow vgMultiMapCall {
             in_merged_sorted_gam=select_first([vgMultiMap.output_gam]),
             in_merged_sorted_gam_gai=select_first([vgMultiMap.output_gam_index]),
             in_xg_file=XG_FILE,
-            in_path_list_file=select_first([PATH_LIST_FILE, vgMultiMap.output_path_list]),
+            in_path_list_file=vgMultiMap.output_path_list,
             in_chunk_context=default_or_sv_chunk_context,
             in_chunk_bases=CHUNK_BASES,
             in_overlap=OVERLAP,
