@@ -104,8 +104,8 @@ workflow vgMultiMapCall {
         call splitBAMbyPath {
             input:
                 in_sample_name=SAMPLE_NAME,
-                in_merged_bam_file=select_first([vgMultiMap.output_merged_bam]),
-                in_merged_bam_file_index=select_first([vgMultiMap.output_merged_bam_index]),
+                in_merged_bam_file=select_first([vgMultiMap.output_bam]),
+                in_merged_bam_file_index=select_first([vgMultiMap.output_bam_index]),
                 in_path_list_file=select_first([PATH_LIST_FILE, vgMultiMap.output_path_list]),
                 in_map_cores=MAP_CORES,
                 in_map_disk=MAP_DISK,
@@ -280,8 +280,8 @@ workflow vgMultiMapCall {
         call chunkAlignmentsByPathNames {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_merged_sorted_gam=select_first([vgMultiMap.output_merged_gam]),
-            in_merged_sorted_gam_gai=select_first([vgMultiMap.output_merged_gam_index]),
+            in_merged_sorted_gam=select_first([vgMultiMap.output_gam]),
+            in_merged_sorted_gam_gai=select_first([vgMultiMap.output_gam_index]),
             in_xg_file=XG_FILE,
             in_path_list_file=select_first([PATH_LIST_FILE, vgMultiMap.output_path_list]),
             in_chunk_context=default_or_sv_chunk_context,
@@ -378,10 +378,10 @@ workflow vgMultiMapCall {
     }
     output {
         File output_vcf = select_first([snpEffAnnotateVCF.output_snpeff_annotated_vcf, variantcaller_vcf_output])
-        File? output_bam = vgMultiMap.output_merged_bam
-        File? output_bam_index = vgMultiMap.output_merged_bam_index
-        File? output_gam = vgMultiMap.output_merged_gam
-        File? output_gam_index = vgMultiMap.output_merged_gam_index
+        File? output_bam = vgMultiMap.output_bam
+        File? output_bam_index = vgMultiMap.output_bam_index
+        File? output_gam = vgMultiMap.output_gam
+        File? output_gam_index = vgMultiMap.output_gam_index
     }
 }
 
