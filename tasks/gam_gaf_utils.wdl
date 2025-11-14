@@ -131,7 +131,7 @@ task splitGAF {
         memory: in_mem + " GB"
         cpu: in_cores
         disks: "local-disk " + disk_size + " SSD"
-        docker: "quay.io/vgteam/vg:v1.64.0"
+        docker: "ubuntu:24.04"
     }
 }
 
@@ -140,7 +140,6 @@ task mergeGAF {
         String in_sample_name
         Array[File] in_gaf_chunk_files
         Int in_disk = round(3*size(in_gaf_chunk_files, 'G')) + 20
-        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -165,7 +164,7 @@ task mergeGAF {
         memory: "6GB"
         cpu: 1
         disks: "local-disk " + in_disk + " SSD"
-        docker: vg_docker
+        docker: "ubuntu:24.04"
     }
 }
 

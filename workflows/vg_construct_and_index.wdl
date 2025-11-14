@@ -62,7 +62,6 @@ workflow vg_construct_and_index {
         call extract_decoys { input:
             ref_fasta_gz = ref_fasta_gz,
             decoy_regex = decoy_regex,
-            vg_docker = vg_docker,
             in_small_resources = in_small_resources
         }
         scatter (contig in extract_decoys.decoy_contig_ids) {
@@ -223,12 +222,11 @@ task extract_decoys {
     input {
         File ref_fasta_gz
         String decoy_regex
-        String vg_docker
         Boolean in_small_resources
     }
 
     String in_mem = if in_small_resources then "1" else "5"
-    
+
     command <<<
         set -exu -o pipefail
         GREP_REGEX="~{decoy_regex}"
@@ -241,7 +239,7 @@ task extract_decoys {
         preemptible: 2
         time: 10
         memory: in_mem + " GB"
-        docker: vg_docker
+        docker: "ubuntu:24.04"
     }
 }
 
