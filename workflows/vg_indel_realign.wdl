@@ -5,7 +5,7 @@ version 1.0
 ## Description: Core VG indel realignment workflow for single sample datasets.
 ## Reference: https://github.com/vgteam/vg/wiki
 
-workflow vgMultiMapCall {
+workflow vgIndelRealign {
     input {
         Boolean GOOGLE_CLEANUP_MODE = false         # Set to 'true' to use google cloud compatible script for intermediate file cleanup. Set to 'false' to use local unix filesystem compatible script for intermediate file cleanup.
         File? INPUT_BAM_FILE                         # Input sample surjected .bam file

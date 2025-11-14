@@ -29,6 +29,16 @@ workflow vgMultiMap {
         File REF_FILE                                   # Path to .fa cannonical reference fasta (only grch37/hg19 currently supported)
         File REF_INDEX_FILE                             # Path to .fai index of the REF_FILE fasta reference
         File REF_DICT_FILE                              # Path to .dict file of the REF_FILE fasta reference
+        String REFERENCE_PREFIX = ""                    # Remove this off the beginning of path names in surjected BAM (set to match prefix in PATH_LIST_FILE)
+        Int SPLIT_READ_CORES = 32
+        Int SPLIT_READ_DISK = 10
+        Int MAP_CORES = 32
+        Int MAP_DISK = 10
+        Int MAP_MEM = 60
+        Int MERGE_GAM_CORES = 56
+        Int MERGE_GAM_DISK = 100
+        Int MERGE_GAM_MEM = 40
+        Int MERGE_GAM_TIME = 2400
     }
 
     # Split input reads into chunks for parallelized mapping
@@ -38,6 +48,8 @@ workflow vgMultiMap {
             in_pair_id="1",
             in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK,
             in_small_resources=SMALL_RESOURCES
     }
     call splitReads as secondReadPair {
@@ -46,6 +58,8 @@ workflow vgMultiMap {
             in_pair_id="2",
             in_vg_container=VG_CONTAINER,
             in_reads_per_chunk=READS_PER_CHUNK,
+            in_split_read_cores=SPLIT_READ_CORES,
+            in_split_read_disk=SPLIT_READ_DISK,
             in_small_resources=SMALL_RESOURCES
     }
 
@@ -142,6 +156,10 @@ workflow vgMultiMap {
                     in_reference_file=REF_FILE,
                     in_reference_index_file=REF_INDEX_FILE,
                     in_mapper_used=MAPPER,
+                    in_map_cores=MAP_CORES,
+                    in_map_disk=MAP_DISK,
+                    in_map_mem=MAP_MEM,
+                    in_reference_prefix=REFERENCE_PREFIX,
                     in_small_resources=SMALL_RESOURCES
             }
             # Cleanup intermediate surject files after use
@@ -172,6 +190,10 @@ workflow vgMultiMap {
             input:
                 in_sample_name=SAMPLE_NAME,
                 in_alignment_bam_chunk_files=alignment_chunk_bam_files_valid,
+                in_merge_bam_cores=MERGE_GAM_CORES,
+                in_merge_bam_disk=MERGE_GAM_DISK,
+                in_merge_bam_mem=MERGE_GAM_MEM,
+                in_merge_bam_time=MERGE_GAM_TIME,
                 in_small_resources=SMALL_RESOURCES
         }
         File merged_bam_file_output = mergeAlignmentBAMChunks.merged_bam_file
@@ -199,6 +221,10 @@ workflow vgMultiMap {
                 in_sample_name=SAMPLE_NAME,
                 in_vg_container=VG_CONTAINER,
                 in_alignment_gam_chunk_files=vg_map_algorithm_chunk_gam_output,
+                in_merge_gam_cores=MERGE_GAM_CORES,
+                in_merge_gam_disk=MERGE_GAM_DISK,
+                in_merge_gam_mem=MERGE_GAM_MEM,
+                in_merge_gam_time=MERGE_GAM_TIME,
                 in_small_resources=SMALL_RESOURCES
         }
         # Cleanup gam chunk files after use
@@ -224,6 +250,7 @@ workflow vgMultiMap {
         File? output_bam_index = merged_bam_file_index_output
         File? output_gam = mergeAlignmentGAMChunks.merged_sorted_gam_file
         File? output_gam_index = mergeAlignmentGAMChunks.merged_sorted_gam_gai_file
+        File output_path_list = pipeline_path_list_file
     }
 }
 
@@ -269,11 +296,10 @@ task splitReads {
         String in_pair_id
         String in_vg_container
         Int in_reads_per_chunk
-        Boolean in_small_resources
+        Boolean in_small_resources = false
+        Int in_split_read_cores = if in_small_resources then 2 else 32
+        Int in_split_read_disk = if in_small_resources then 1 else 200
     }
-    
-    Int in_split_read_cores = if in_small_resources then 2 else 32
-    Int in_split_read_disk = if in_small_resources then 1 else 200
     
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -339,14 +365,13 @@ task runVGMAP {
         String in_vg_container
         String in_sample_name
         Boolean surject_output
-        Boolean in_small_resources
+        Boolean in_small_resources = false
+        Int in_map_cores = if in_small_resources then 8 else 32
+        Int in_map_disk = if in_small_resources then 80 else 100
+        String in_map_mem = if in_small_resources then "80" else "100"
     }
 
     Boolean gbwt_options = defined(in_gbwt_file)
-    
-    Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 80 else 100
-    String in_map_mem = if in_small_resources then "80" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -415,14 +440,14 @@ task runVGMPMAP {
         String in_vg_container
         String in_sample_name
         Boolean surject_output
-        Boolean in_small_resources
+        Boolean in_small_resources = false
+        Int in_map_cores = if in_small_resources then 8 else 32
+        Int in_map_disk = if in_small_resources then 80 else 100
+        String in_map_mem = if in_small_resources then "80" else "100"
     }
 
     Boolean gbwt_options = defined(in_gbwt_file)
     Boolean snarl_options = defined(in_snarls_file)
-    Int in_map_cores = if in_small_resources then 8 else 32
-    Int in_map_disk = if in_small_resources then 80 else 100
-    String in_map_mem = if in_small_resources then "80" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -495,12 +520,11 @@ task runVGGIRAFFE {
         String in_vg_container
         String in_sample_name
         Boolean surject_output
-        Boolean in_small_resources
+        Boolean in_small_resources = false
+        Int in_map_cores = if in_small_resources then 4 else 16
+        Int in_map_disk = if in_small_resources then 80 else 100
+        String in_map_mem = if in_small_resources then "80" else "100"
     }
-    
-    Int in_map_cores = if in_small_resources then 4 else 16
-    Int in_map_disk = if in_small_resources then 80 else 100
-    String in_map_mem = if in_small_resources then "80" else "100"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -561,12 +585,12 @@ task sortMDTagBAMFile {
         File in_reference_file
         File in_reference_index_file
         String in_mapper_used
-        Boolean in_small_resources
+        String in_reference_prefix = ""
+        Boolean in_small_resources = false
+        Int in_map_cores = if in_small_resources then 8 else 32
+        Int in_map_disk = if in_small_resources then 10 else 10
+        String in_map_mem = if in_small_resources then "10" else "60"
     }
-    
-    Int in_map_cores = if in_small_resources then 8 else 8
-    Int in_map_disk = if in_small_resources then 10 else 50
-    String in_map_mem = if in_small_resources then "10" else "32"
 
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
@@ -637,14 +661,13 @@ task mergeAlignmentBAMChunks {
     input {
         String in_sample_name
         Array[File] in_alignment_bam_chunk_files
-        Boolean in_small_resources
+        Boolean in_small_resources = false
+        Int in_merge_bam_cores = if in_small_resources then 4 else 12
+        Int in_merge_bam_disk = if in_small_resources then 10 else 100
+        String in_merge_bam_mem = if in_small_resources then "10" else "20"
+        Int in_merge_bam_time = if in_small_resources then 30 else 240
     }
-    
-    Int in_merge_bam_cores = if in_small_resources then 4 else 12
-    Int in_merge_bam_disk = if in_small_resources then 10 else 100
-    String in_merge_bam_mem = if in_small_resources then "10" else "20"
-    Int in_merge_bam_time = if in_small_resources then 30 else 240
-    
+
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -682,13 +705,12 @@ task mergeAlignmentGAMChunks {
         String in_sample_name
         String in_vg_container
         Array[File] in_alignment_gam_chunk_files
-        Boolean in_small_resources
+        Boolean in_small_resources = false
+        Int in_merge_gam_cores = if in_small_resources then 1 else 56
+        Int in_merge_gam_disk = if in_small_resources then 20 else 400
+        String in_merge_gam_mem = if in_small_resources then "20" else "100"
+        Int in_merge_gam_time = if in_small_resources then 30 else 1200
     }
-    
-    Int in_merge_gam_cores = if in_small_resources then 1 else 56
-    Int in_merge_gam_disk = if in_small_resources then 20 else 400
-    String in_merge_gam_mem = if in_small_resources then "20" else "100"
-    Int in_merge_gam_time = if in_small_resources then 30 else 1200
 
     command {
         # Set the exit code of a pipeline to that of the rightmost command

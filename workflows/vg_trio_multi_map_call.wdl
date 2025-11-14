@@ -428,7 +428,7 @@ workflow vgTrioPipeline {
     ######################################################
     ## Run indel realignment workflows on pedigree bams ##
     ######################################################
-    call vgIndelRealignmentWorkflow.vgMultiMapCall as maternalIndelRealignmentWorkflow {
+    call vgIndelRealignmentWorkflow.vgIndelRealign as maternalIndelRealignmentWorkflow {
         input:
             INPUT_BAM_FILE=maternalMapCallWorkflow.output_bam,
             INPUT_BAM_FILE_INDEX=maternalMapCallWorkflow.output_bam_index,
@@ -443,7 +443,7 @@ workflow vgTrioPipeline {
             MAP_DISK=MAP_DISK,
             MAP_MEM=MAP_MEM
     }
-    call vgIndelRealignmentWorkflow.vgMultiMapCall as paternalIndelRealignmentWorkflow {
+    call vgIndelRealignmentWorkflow.vgIndelRealign as paternalIndelRealignmentWorkflow {
         input:
             INPUT_BAM_FILE=paternalMapCallWorkflow.output_bam,
             INPUT_BAM_FILE_INDEX=paternalMapCallWorkflow.output_bam_index,
@@ -462,7 +462,7 @@ workflow vgTrioPipeline {
     Array[Pair[File,File]] bam_pair_files_list = zip(output_sibling_bam_list, output_sibling_bam_index_list)
     scatter (bam_pair_set in zip(bam_pair_files_list, SAMPLE_NAME_SIBLING_LIST)) {
         Pair[File,File] bam_pair_files = bam_pair_set.left
-        call vgIndelRealignmentWorkflow.vgMultiMapCall as siblingIndelRealignmentWorkflow {
+        call vgIndelRealignmentWorkflow.vgIndelRealign as siblingIndelRealignmentWorkflow {
             input:
                 INPUT_BAM_FILE=bam_pair_files.left,
                 INPUT_BAM_FILE_INDEX=bam_pair_files.right,

@@ -110,8 +110,7 @@ workflow vgTrioPipeline {
             ref_fasta_gz=REF_FASTA_GZ,
             contigs=CONTIGS,
             contigs_vcf_gz=splitPhasedVCF.contig_vcfs,
-            use_haplotypes=USE_HAPLOTYPES,
-            make_snarls=MAKE_SNARLS,
+            giraffe_indexes=(USE_HAPLOTYPES || MAKE_SNARLS),
             use_decoys=USE_DECOYS,
             decoy_regex=DECOY_REGEX,
             vg_docker=VG_CONTAINER
@@ -119,8 +118,8 @@ workflow vgTrioPipeline {
     
     output {
         File parental_xg_index = constructGraphIndexWorkflow.xg
-        File parental_gcsa_index = constructGraphIndexWorkflow.gcsa
-        File parental_gcsa_lcp_index = constructGraphIndexWorkflow.gcsa_lcp
+        File? parental_gcsa_index = constructGraphIndexWorkflow.gcsa
+        File? parental_gcsa_lcp_index = constructGraphIndexWorkflow.gcsa_lcp
         File? parental_gbwt_index = constructGraphIndexWorkflow.gbwt
         File? parental_snarls_index = constructGraphIndexWorkflow.snarls
     }
