@@ -117,7 +117,7 @@ workflow HaplotypeSampling {
                 output_file_name=OUTPUT_NAME_PREFIX,
                 kmer_length=KMER_LENGTH,
                 nb_cores=CORES,
-                max_mem=KMER_COUNTING_MEM
+                max_ram=KMER_COUNTING_MEM
 
         }
 
