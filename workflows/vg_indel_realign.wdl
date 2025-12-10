@@ -145,7 +145,7 @@ task cleanUpGoogleFilestore {
         gsutil rm -I < ${write_lines(previous_task_outputs)}
     }
     runtime {
-        docker: "google/cloud-sdk&sha256:4ef6b0e969fa96f10acfd893644d100469e979f4384e5e70f58be5cb80593a8a"
+        docker: "google/cloud-sdk@sha256:4ef6b0e969fa96f10acfd893644d100469e979f4384e5e70f58be5cb80593a8a"
         continueOnReturnCode: true
     }
 }
