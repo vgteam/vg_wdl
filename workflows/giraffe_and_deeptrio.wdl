@@ -490,7 +490,7 @@ task splitReads {
         cpu: in_split_read_cores
         memory: "2 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: "quay.io/glennhickey/pigz:2.3.1"
+        docker: "quay.io/biocontainers/pigz:2.3.4"
     }
 }
 
