@@ -54,6 +54,7 @@ workflow Giraffe {
         INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
         KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
 
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
@@ -103,7 +104,8 @@ workflow Giraffe {
         Boolean INDEX_MINIMIZER_WEIGHTED = true
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
         Int KMER_COUNTING_MEM = 64
-        
+        Int HAPLOTYPE_INDEXING_MEM = 120
+
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
@@ -178,7 +180,7 @@ workflow Giraffe {
             GBZ_FILE=GBZ_FILE,
             INPUT_READ_FILE_FIRST=read_1_file,
             # If we're not doing paired reads the result here is probably null.
-            INPUT_READ_FILE_SECOND=if PAIRED_READS then read_2_file else INPUT_READ_FILE_2, 
+            INPUT_READ_FILE_SECOND=if PAIRED_READS then read_2_file else INPUT_READ_FILE_2,
             HAPL_FILE=HAPL_FILE,
             DIST_FILE=DIST_FILE,
             R_INDEX_FILE=R_INDEX_FILE,
@@ -191,6 +193,7 @@ workflow Giraffe {
             INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
             CORES=MAP_CORES,
             KMER_COUNTING_MEM=KMER_COUNTING_MEM,
+            HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
             INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
             VG_DOCKER=VG_DOCKER
         }

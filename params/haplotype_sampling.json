@@ -2,6 +2,7 @@
   "HaplotypeSampling.GBZ_FILE": "tests/small_sim_graph/graph.gbz",
   "HaplotypeSampling.INPUT_READ_FILE_FIRST": "tests/small_sim_graph/reads_1.fastq.gz",
   "HaplotypeSampling.INPUT_READ_FILE_SECOND": "tests/small_sim_graph/reads_2.fastq.gz",
+  "HaplotypeSampling.HAPLOTYPE_INDEXING_MEM": 8,
   "HaplotypeSampling.INDEX_MINIMIZER_MEM": 8,
   "HaplotypeSampling.KMER_COUNTING_MEM": 8
 }
