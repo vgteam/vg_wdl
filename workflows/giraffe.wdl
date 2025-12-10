@@ -97,7 +97,7 @@ workflow Giraffe {
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Int BAM_PREPROCESS_MEM = 20
-        Int REALIGN_MEM = min(MAP_MEM, 40)
+        Int REALIGN_MEM = if MAP_MEM < 40 then MAP_MEM else 40
         Boolean HAPLOTYPE_SAMPLING = true
         Boolean DIPLOID = true
         String? SET_REFERENCE
