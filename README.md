@@ -109,6 +109,8 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *SPLIT_READ_MEM*: Memory, in GB, to use when splitting the reads into chunks. Default is 50.
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
+- *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
+- *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.  
 - *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.  
 - *EVAL_MEM*: Memory, in GB, to use when evaluating variant calls. Default is 60.  
@@ -174,6 +176,8 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
+- *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
+- *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower.
 - *HAPLOTYPE_SAMPLING*: Whether or not to use haplotype sampling before running giraffe. Default is 'true'
 - *DIPLOID*:Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'
 - *HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling

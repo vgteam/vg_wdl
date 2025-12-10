@@ -44,6 +44,8 @@ workflow Giraffe {
         SPLIT_READ_MEM: "Memory, in GB, to use when splitting the reads into chunks. Default is 50."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+        BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
+        REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'"
         DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
         SET_REFERENCE:"(OPTIONAL) Name of the single reference to keep for haplotype sampling."
@@ -94,6 +96,8 @@ workflow Giraffe {
         Int SPLIT_READ_MEM = 50
         Int MAP_CORES = 16
         Int MAP_MEM = 120
+        Int BAM_PREPROCESS_MEM = 20
+        Int REALIGN_MEM = min(MAP_MEM, 40)
         Boolean HAPLOTYPE_SAMPLING = true
         Boolean DIPLOID = true
         String? SET_REFERENCE
@@ -403,7 +407,8 @@ workflow Giraffe {
                         input:
                         in_bam_file=bam_and_index_for_path.left,
                         in_reference_file=reference_file,
-                        in_reference_index_file=reference_index_file
+                        in_reference_index_file=reference_index_file,
+                        mem_gb=BAM_PREPROCESS_MEM
                     }
                 }
                 if (REALIGN_INDELS) {
@@ -417,7 +422,8 @@ workflow Giraffe {
                         in_reference_file=reference_file,
                         in_reference_index_file=reference_index_file,
                         in_reference_dict_file=reference_dict_file,
-                        in_expansion_bases=REALIGNMENT_EXPANSION_BASES
+                        in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
+                        mem_gb=BAM_PREPROCESS_MEM
                     }
                     call utils.runAbraRealigner {
                         input:
@@ -426,8 +432,7 @@ workflow Giraffe {
                             in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                             in_reference_file=reference_file,
                             in_reference_index_file=reference_index_file,
-                            # If the user has set a very low memory for mapping, don't use more for realignment
-                            memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
+                            memoryGb=REALIGN_MEM
                     }
                 }
                 File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])

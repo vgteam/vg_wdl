@@ -12,6 +12,8 @@
   "Giraffe.SPLIT_READ_MEM": 8,
   "Giraffe.MAP_MEM": 8,
   "Giraffe.MAP_CORES": 8,
+  "Giraffe.BAM_PREPROCESS_MEM": 8,
+  "Giraffe.REALIGN_MEM": 8,
   "Giraffe.HAPLOTYPE_SAMPLING": true,
   "Giraffe.HAPLOTYPE_INDEXING_MEM": 8,
   "Giraffe.INDEX_MINIMIZER_MEM": 8,
