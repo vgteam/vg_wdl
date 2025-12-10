@@ -174,11 +174,13 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
 - *HAPLOTYPE_SAMPLING*: Whether or not to use haplotype sampling before running giraffe. Default is 'true'
-- *IN_DIPLOID*:Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'
+- *DIPLOID*:Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'
 - *HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
 - *R_INDEX_FILE*: (OPTIONAL) Path to .ri file used in haplotype sampling
-- *IN_KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
-- *IN_HAPLOTYPE_NUMBER*: Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)
+- *KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
+- *HAPLOTYPE_NUMBER*: Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)
+- *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)
+- *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
 
 Related
 topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes), [Haplotype Sampling](#Haplotype-Sampling-workflow).

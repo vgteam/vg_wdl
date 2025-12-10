@@ -22,6 +22,7 @@ workflow HaplotypeSampling {
         OUTPUT_NAME_PREFIX: "Name of the output file (Default: haplotype_sampled_graph)"
         KMER_LENGTH: "Size of kmer using for sampling (Up to 31) (Default: 29)"
         CORES: "Number of cores to use with commands. (Default: 16)"
+        KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320)"
         WINDOW_LENGTH: "Window length used for building the minimizer index for sampling haplotypes. (Default: 11)"
         SUBCHAIN_LENGTH: "Target length (in bp) for subchains. (Default: 10000)"
@@ -48,6 +49,7 @@ workflow HaplotypeSampling {
         String OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
         Int KMER_LENGTH = 29
         Int CORES = 16
+        Int KMER_COUNTING_MEM = 64
         Int INDEX_MINIMIZER_MEM = 320
         Int WINDOW_LENGTH = 11
         Int SUBCHAIN_LENGTH = 10000
@@ -114,7 +116,8 @@ workflow HaplotypeSampling {
                 input_read_file_2=INPUT_READ_FILE_SECOND,
                 output_file_name=OUTPUT_NAME_PREFIX,
                 kmer_length=KMER_LENGTH,
-                nb_cores=CORES
+                nb_cores=CORES,
+                max_mem=KMER_COUNTING_MEM
 
         }
 

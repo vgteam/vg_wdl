@@ -12,5 +12,6 @@
   "Giraffe.MAP_MEM": 8,
   "Giraffe.MAP_CORES": 4,
   "Giraffe.HAPLOTYPE_SAMPLING": true,
-  "Giraffe.INDEX_MINIMIZER_MEM": 8
+  "Giraffe.INDEX_MINIMIZER_MEM": 8,
+  "Giraffe.KMER_COUNTING_MEM": 8
 }

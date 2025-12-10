@@ -52,7 +52,8 @@ workflow Giraffe {
         KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
         HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 32)"
         INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
-        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)" 
+        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
+        KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
 
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
@@ -101,6 +102,7 @@ workflow Giraffe {
         Int HAPLOTYPE_NUMBER = 32
         Boolean INDEX_MINIMIZER_WEIGHTED = true
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
+        Int KMER_COUNTING_MEM = 64
         
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
@@ -188,6 +190,7 @@ workflow Giraffe {
             INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50,
             INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
             CORES=MAP_CORES,
+            KMER_COUNTING_MEM=KMER_COUNTING_MEM,
             INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
             VG_DOCKER=VG_DOCKER
         }
