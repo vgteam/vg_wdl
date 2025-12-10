@@ -105,9 +105,12 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *DV_IS_1_7_OR_NEWER*: Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one.  
 - *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs  
 - *DV_GPU_DOCKER*: Container image to use when running DeepVariant for steps that benefit from GPUs  
-- *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.  
-- *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.  
-- *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.  
+- *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
+- *SPLIT_READ_MEM*: Memory, in GB, to use when splitting the reads into chunks. Default is 50.
+- *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
+- *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
+- *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
+- *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.  
 - *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.  
 - *EVAL_MEM*: Memory, in GB, to use when evaluating variant calls. Default is 60.  
@@ -173,12 +176,17 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
+- *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
+- *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower.
 - *HAPLOTYPE_SAMPLING*: Whether or not to use haplotype sampling before running giraffe. Default is 'true'
-- *IN_DIPLOID*:Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'
+- *DIPLOID*:Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'
 - *HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
 - *R_INDEX_FILE*: (OPTIONAL) Path to .ri file used in haplotype sampling
-- *IN_KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
-- *IN_HAPLOTYPE_NUMBER*: Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)
+- *KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
+- *HAPLOTYPE_NUMBER*: Number of generated synthetic haplotypes used in haplotype sampling. (Default: 4)
+- *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)
+- *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
+- *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)
 
 Related
 topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes), [Haplotype Sampling](#Haplotype-Sampling-workflow).
@@ -321,6 +329,9 @@ Parameters  (semi-auto-generated from the parameter_meta section):
 - *OUTPUT_NAME_PREFIX*: Name of the output file (Default: haplotype_sampled_graph)
 - *KMER_LENGTH*: Size of kmer using for sampling (Up to 31) (Default: 29)
 - *CORES*: Number of cores to use with commands. (Default: 16)
+- *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
+- *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)
+- *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320)
 - *WINDOW_LENGTH*: Window length used for building the minimizer index. (Default: 11)
 - *SUBCHAIN_LENGTH*: Target length (in bp) for subchains. (Default: 10000)
 - *HAPLOTYPE_NUMBER*: Number of generated synthetic haplotypes. (Default: 4)

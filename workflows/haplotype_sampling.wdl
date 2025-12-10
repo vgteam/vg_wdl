@@ -22,6 +22,8 @@ workflow HaplotypeSampling {
         OUTPUT_NAME_PREFIX: "Name of the output file (Default: haplotype_sampled_graph)"
         KMER_LENGTH: "Size of kmer using for sampling (Up to 31) (Default: 29)"
         CORES: "Number of cores to use with commands. (Default: 16)"
+        KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320)"
         WINDOW_LENGTH: "Window length used for building the minimizer index for sampling haplotypes. (Default: 11)"
         SUBCHAIN_LENGTH: "Target length (in bp) for subchains. (Default: 10000)"
@@ -48,6 +50,8 @@ workflow HaplotypeSampling {
         String OUTPUT_NAME_PREFIX = "haplotype_sampled_graph"
         Int KMER_LENGTH = 29
         Int CORES = 16
+        Int KMER_COUNTING_MEM = 64
+        Int HAPLOTYPE_INDEXING_MEM = 120
         Int INDEX_MINIMIZER_MEM = 320
         Int WINDOW_LENGTH = 11
         Int SUBCHAIN_LENGTH = 10000
@@ -74,6 +78,7 @@ workflow HaplotypeSampling {
             call index.createDistanceIndex {
                 input:
                     in_gbz_file=GBZ_FILE,
+                    in_extract_mem=HAPLOTYPE_INDEXING_MEM,
                     vg_docker=VG_DOCKER
             }
         }
@@ -85,6 +90,7 @@ workflow HaplotypeSampling {
                 input:
                     in_gbz_file=GBZ_FILE,
                     nb_cores=CORES,
+                    in_extract_mem=HAPLOTYPE_INDEXING_MEM,
                     vg_docker=VG_DOCKER
             }
         }
@@ -101,6 +107,7 @@ workflow HaplotypeSampling {
                 kmer_length=KMER_LENGTH,
                 window_length=WINDOW_LENGTH,
                 subchain_length=SUBCHAIN_LENGTH,
+                in_extract_mem=HAPLOTYPE_INDEXING_MEM,
                 vg_docker=VG_DOCKER
         }
     }
@@ -114,7 +121,8 @@ workflow HaplotypeSampling {
                 input_read_file_2=INPUT_READ_FILE_SECOND,
                 output_file_name=OUTPUT_NAME_PREFIX,
                 kmer_length=KMER_LENGTH,
-                nb_cores=CORES
+                nb_cores=CORES,
+                max_ram=KMER_COUNTING_MEM
 
         }
 
@@ -135,6 +143,7 @@ workflow HaplotypeSampling {
             include_reference = INCLUDE_REFERENCE,
             set_reference = SET_REFERENCE,
             nb_cores=CORES,
+            in_extract_mem=HAPLOTYPE_INDEXING_MEM,
             use_diploid_sampling=DIPLOID,
             vg_docker=VG_DOCKER
 
@@ -144,6 +153,7 @@ workflow HaplotypeSampling {
     call index.createDistanceIndex as giraffeDist {
                 input:
                     in_gbz_file=samplingHaplotypes.output_graph,
+                    in_extract_mem=HAPLOTYPE_INDEXING_MEM,
                     vg_docker=VG_DOCKER
     }
 

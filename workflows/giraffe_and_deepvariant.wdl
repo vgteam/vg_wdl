@@ -64,8 +64,11 @@ workflow GiraffeDeepVariant {
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
+        SPLIT_READ_MEM: "Memory, in GB, to use when splitting the reads into chunks. Default is 50."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+        BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
+        REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
         MAKE_EXAMPLES_CORES: "Number of cores to use when making DeepVariant examples. Default is CALL_CORES."
@@ -128,8 +131,11 @@ workflow GiraffeDeepVariant {
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
         Int SPLIT_READ_CORES = 8
+        Int SPLIT_READ_MEM = 50
         Int MAP_CORES = 16
         Int MAP_MEM = 120
+        Int BAM_PREPROCESS_MEM = 20
+        Int REALIGN_MEM = if MAP_MEM < 40 then MAP_MEM else 40
         Int CALL_CORES = 8
         Int CALL_MEM = 50
         Int MAKE_EXAMPLES_CORES = CALL_CORES
@@ -230,6 +236,7 @@ workflow GiraffeDeepVariant {
         GIRAFFE_PRESET=GIRAFFE_PRESET,
         GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
         SPLIT_READ_CORES=SPLIT_READ_CORES,
+        SPLIT_READ_MEM=SPLIT_READ_MEM,
         MAP_CORES=MAP_CORES,
         MAP_MEM=MAP_MEM,
         HAPLOTYPE_SAMPLING=true,
@@ -275,7 +282,8 @@ workflow GiraffeDeepVariant {
         OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
         DV_NO_GPU_DOCKER=DV_NO_GPU_DOCKER,
         DV_GPU_DOCKER=DV_GPU_DOCKER,
-        REALIGN_MEM=if MAP_MEM < 40 then MAP_MEM else 40,
+        BAM_PREPROCESS_MEM=BAM_PREPROCESS_MEM,
+        REALIGN_MEM=REALIGN_MEM,
         CALL_CORES=CALL_CORES,
         CALL_MEM=CALL_MEM,
         MAKE_EXAMPLES_CORES=MAKE_EXAMPLES_CORES,

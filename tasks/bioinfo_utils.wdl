@@ -288,6 +288,7 @@ task leftShiftBAMFile {
         File in_reference_file
         File in_reference_index_file
         Int disk_size = round(3 * size(in_bam_file, 'G')) + 50
+        Int mem_gb = 20
     }
     String out_prefix = basename(in_bam_file, ".bam")
     command <<<
@@ -321,7 +322,7 @@ task leftShiftBAMFile {
     runtime {
         preemptible: 2
         time: 180
-        memory: "20 GB"
+        memory: mem_gb + " GB"
         cpu: 1
         disks: "local-disk " + disk_size + " SSD"
         docker: "quay.io/parsaeskandar/freebayes-samtools:1.3.9_1.13"

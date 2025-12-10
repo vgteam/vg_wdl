@@ -44,6 +44,8 @@ workflow Giraffe {
         SPLIT_READ_MEM: "Memory, in GB, to use when splitting the reads into chunks. Default is 50."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+        BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
+        REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'"
         DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
         SET_REFERENCE:"(OPTIONAL) Name of the single reference to keep for haplotype sampling."
@@ -52,7 +54,9 @@ workflow Giraffe {
         KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
         HAPLOTYPE_NUMBER: "Number of generated synthetic haplotypes used in haplotype sampling. (Default: 32)"
         INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
-        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)" 
+        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
+        KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
 
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
@@ -92,6 +96,8 @@ workflow Giraffe {
         Int SPLIT_READ_MEM = 50
         Int MAP_CORES = 16
         Int MAP_MEM = 120
+        Int BAM_PREPROCESS_MEM = 20
+        Int REALIGN_MEM = if MAP_MEM < 40 then MAP_MEM else 40
         Boolean HAPLOTYPE_SAMPLING = true
         Boolean DIPLOID = true
         String? SET_REFERENCE
@@ -101,7 +107,9 @@ workflow Giraffe {
         Int HAPLOTYPE_NUMBER = 32
         Boolean INDEX_MINIMIZER_WEIGHTED = true
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
-        
+        Int KMER_COUNTING_MEM = 64
+        Int HAPLOTYPE_INDEXING_MEM = 120
+
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
@@ -176,7 +184,7 @@ workflow Giraffe {
             GBZ_FILE=GBZ_FILE,
             INPUT_READ_FILE_FIRST=read_1_file,
             # If we're not doing paired reads the result here is probably null.
-            INPUT_READ_FILE_SECOND=if PAIRED_READS then read_2_file else INPUT_READ_FILE_2, 
+            INPUT_READ_FILE_SECOND=if PAIRED_READS then read_2_file else INPUT_READ_FILE_2,
             HAPL_FILE=HAPL_FILE,
             DIST_FILE=DIST_FILE,
             R_INDEX_FILE=R_INDEX_FILE,
@@ -188,6 +196,8 @@ workflow Giraffe {
             INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50,
             INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
             CORES=MAP_CORES,
+            KMER_COUNTING_MEM=KMER_COUNTING_MEM,
+            HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
             INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
             VG_DOCKER=VG_DOCKER
         }
@@ -382,7 +392,8 @@ workflow Giraffe {
                 in_merged_bam_file=mergeAlignmentBAMChunks.merged_bam_file,
                 in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
                 in_path_list_file=pipeline_path_list_file,
-                in_prefix_to_strip=REFERENCE_PREFIX
+                in_prefix_to_strip=REFERENCE_PREFIX,
+                mem_gb=SPLIT_READ_MEM
             }
 
             ##
@@ -396,7 +407,8 @@ workflow Giraffe {
                         input:
                         in_bam_file=bam_and_index_for_path.left,
                         in_reference_file=reference_file,
-                        in_reference_index_file=reference_index_file
+                        in_reference_index_file=reference_index_file,
+                        mem_gb=BAM_PREPROCESS_MEM
                     }
                 }
                 if (REALIGN_INDELS) {
@@ -410,7 +422,8 @@ workflow Giraffe {
                         in_reference_file=reference_file,
                         in_reference_index_file=reference_index_file,
                         in_reference_dict_file=reference_dict_file,
-                        in_expansion_bases=REALIGNMENT_EXPANSION_BASES
+                        in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
+                        mem_gb=BAM_PREPROCESS_MEM
                     }
                     call utils.runAbraRealigner {
                         input:
@@ -419,8 +432,7 @@ workflow Giraffe {
                             in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                             in_reference_file=reference_file,
                             in_reference_index_file=reference_index_file,
-                            # If the user has set a very low memory for mapping, don't use more for realignment
-                            memoryGb=if MAP_MEM < 40 then MAP_MEM else 40
+                            memoryGb=REALIGN_MEM
                     }
                 }
                 File processed_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])

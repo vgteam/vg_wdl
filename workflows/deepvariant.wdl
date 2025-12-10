@@ -47,7 +47,8 @@ workflow DeepVariant {
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
-        REALIGN_MEM: "Memory, in GB, to use when realigning the reads. Default is 40."
+        BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
+        REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
         CALL_MEM: "Memory, in GB, to use when calling variants. Default is 50."
         MAKE_EXAMPLES_CORES: "Number of cores to use when making DeepVariant examples. Default is CALL_CORES."
@@ -92,6 +93,7 @@ workflow DeepVariant {
         String OTHER_MAKEEXAMPLES_ARG = ""
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
+        Int BAM_PREPROCESS_MEM = 20
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
         Int CALL_MEM = 50
@@ -138,7 +140,8 @@ workflow DeepVariant {
                 input:
                 in_bam_file=bam_and_index_for_path.left,
                 in_reference_file=reference_file,
-                in_reference_index_file=reference_index_file
+                in_reference_index_file=reference_index_file,
+                mem_gb=BAM_PREPROCESS_MEM
             }
         }
         if (REALIGN_INDELS) {
@@ -152,7 +155,8 @@ workflow DeepVariant {
                 in_reference_file=reference_file,
                 in_reference_index_file=reference_index_file,
                 in_reference_dict_file=reference_dict_file,
-                in_expansion_bases=REALIGNMENT_EXPANSION_BASES
+                in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
+                mem_gb=BAM_PREPROCESS_MEM
             }
             call utils.runAbraRealigner {
                 input:
