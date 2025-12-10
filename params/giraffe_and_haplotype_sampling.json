@@ -10,7 +10,7 @@
   "Giraffe.OUTPUT_CALLING_BAMS": true,
   "Giraffe.OUTPUT_SINGLE_BAM": true,
   "Giraffe.MAP_MEM": 8,
-  "Giraffe.MAP_CORES": 4,
+  "Giraffe.MAP_CORES": 8,
   "Giraffe.HAPLOTYPE_SAMPLING": true,
   "Giraffe.INDEX_MINIMIZER_MEM": 8,
   "Giraffe.KMER_COUNTING_MEM": 8
