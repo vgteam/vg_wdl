@@ -105,9 +105,10 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *DV_IS_1_7_OR_NEWER*: Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one.  
 - *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs  
 - *DV_GPU_DOCKER*: Container image to use when running DeepVariant for steps that benefit from GPUs  
-- *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.  
-- *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.  
-- *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.  
+- *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
+- *SPLIT_READ_MEM*: Memory, in GB, to use when splitting the reads into chunks. Default is 50.
+- *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
+- *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.  
 - *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.  
 - *EVAL_MEM*: Memory, in GB, to use when evaluating variant calls. Default is 60.  

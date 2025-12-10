@@ -64,6 +64,7 @@ workflow GiraffeDeepVariant {
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
         SPLIT_READ_CORES: "Number of cores to use when splitting the reads into chunks. Default is 8."
+        SPLIT_READ_MEM: "Memory, in GB, to use when splitting the reads into chunks. Default is 50."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
@@ -128,6 +129,7 @@ workflow GiraffeDeepVariant {
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
         Int SPLIT_READ_CORES = 8
+        Int SPLIT_READ_MEM = 50
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Int CALL_CORES = 8
@@ -230,6 +232,7 @@ workflow GiraffeDeepVariant {
         GIRAFFE_PRESET=GIRAFFE_PRESET,
         GIRAFFE_OPTIONS=GIRAFFE_OPTIONS,
         SPLIT_READ_CORES=SPLIT_READ_CORES,
+        SPLIT_READ_MEM=SPLIT_READ_MEM,
         MAP_CORES=MAP_CORES,
         MAP_MEM=MAP_MEM,
         HAPLOTYPE_SAMPLING=true,
