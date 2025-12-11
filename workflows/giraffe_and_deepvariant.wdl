@@ -69,6 +69,10 @@ workflow GiraffeDeepVariant {
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'."
+        INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
+        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
+        KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
         BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
         REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
@@ -138,6 +142,10 @@ workflow GiraffeDeepVariant {
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = true
+        Boolean INDEX_MINIMIZER_WEIGHTED = true
+        Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
+        Int KMER_COUNTING_MEM = 64
+        Int HAPLOTYPE_INDEXING_MEM = 120
         Int BAM_PREPROCESS_MEM = 20
         Int REALIGN_MEM = if MAP_MEM < 40 then MAP_MEM else 40
         Int CALL_CORES = 8
@@ -245,6 +253,10 @@ workflow GiraffeDeepVariant {
         MAP_CORES=MAP_CORES,
         MAP_MEM=MAP_MEM,
         HAPLOTYPE_SAMPLING=HAPLOTYPE_SAMPLING,
+        INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
+        INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
+        KMER_COUNTING_MEM=KMER_COUNTING_MEM,
+        HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
         VG_DOCKER=VG_DOCKER,
         VG_GIRAFFE_DOCKER=VG_GIRAFFE_DOCKER,
         VG_SURJECT_DOCKER=VG_SURJECT_DOCKER
