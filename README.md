@@ -42,6 +42,7 @@ See also the [Going further](#Going-further) section for more details on some as
 - [Reference prefix removal](#Reference-prefix-removal)
 - [CRAM input](#CRAM-input)
 - [Single-end reads](#Single-end-reads)
+- [Interleaved reads](#Interleaved-reads)
 - [Unmapped reads](#Unmapped-reads)
 - [Reads chunking](#Reads-chunking)
 
@@ -69,8 +70,9 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *OUTPUT_GAF*: Should a GAF file with the aligned reads be saved? Default is 'true'.  
 - *OUTPUT_SINGLE_BAM*: Should a single merged BAM file be saved? If yes, unmapped reads will be included and 'calling bams' (one per contig) won't be outputted by default. Default is 'false'.  
 - *OUTPUT_CALLING_BAMS*: Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM.  
-- *OUTPUT_UNMAPPED_BAM*: Should an unmapped reads BAM be saved? Default is false.  
-- *PAIRED_READS*: Are the reads paired? Default is 'true'.  
+- *OUTPUT_UNMAPPED_BAM*: Should an unmapped reads BAM be saved? Default is false.
+- *PAIRED_READS*: Are the reads paired? Default is 'true'.
+- *INTERLEAVED_READS*: Are paired reads interleaved in a single FASTQ? Only meaningful when PAIRED_READS is true and there is a single input FASTQ. Default is 'false'.
 - *READS_PER_CHUNK*: Number of reads contained in each mapping chunk. Default 20,000,000.  
 - *CONTIGS*: (OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index.  
 - *PATH_LIST_FILE*: (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths.  
@@ -122,7 +124,7 @@ Parameters (semi-auto-generated from the parameter_meta section):
 
 
 Related
-topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
+topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [interleaved reads](#Interleaved-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
 
 [Test locally](#testing-locally) with:
 
@@ -158,6 +160,7 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *OUTPUT_CALLING_BAMS*: Should individual contig BAMs be saved? Default is 'false'.
 - *OUTPUT_GAF*: Should a GAF file with the aligned reads be saved? Default is 'false'.
 - *PAIRED_READS*: Are the reads paired? Default is 'true'.
+- *INTERLEAVED_READS*: Are paired reads interleaved in a single FASTQ? Only meaningful when PAIRED_READS is true and there is a single input FASTQ. Default is 'false'.
 - *READS_PER_CHUNK*: Number of reads contained in each mapping chunk. Default 20 000 000.
 - *PATH_LIST_FILE*: (OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If
   neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths.
@@ -248,7 +251,7 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *CALL_MEM*: Memory, in GB, to use when calling variants. Default is 50.
 
 Related
-topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
+topics: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [path list](#Path-list), [single-end reads](#Single-end-reads), [interleaved reads](#Interleaved-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
 
 [Test locally](#testing-locally) with:
 
@@ -370,7 +373,7 @@ miniwdl run --as-me workflows/haplotype_sampling.wdl -i params/haplotype_samplin
 ### Going further
 
 See below more information
-about: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
+about: [read realignment](#Read-realignment), [reference prefix removal](#Reference-prefix-removal), [CRAM input](#CRAM-input), [reads chunking](#Reads-chunking), [path list](#Path-list), [single-end reads](#Single-end-reads), [interleaved reads](#Interleaved-reads), [unmapped reads](#Unmapped-reads), [HPRC pangenomes](#HPRC-pangenomes).
 
 #### Read realignment
 
@@ -461,6 +464,17 @@ To use single-end reads:
 
 - If providing FASTQs, only provide `INPUT_READ_FILE_1` (no `INPUT_READ_FILE_2`).
 - Use `PAIRED_READS=false`
+
+#### Interleaved reads
+
+Some paired-end reads are stored in a single FASTQ file with the two reads of each pair interleaved.
+
+To use interleaved paired-end reads:
+
+- Only provide `INPUT_READ_FILE_1` (no `INPUT_READ_FILE_2`).
+- Use `PAIRED_READS=true`
+- Use `INTERLEAVED_READS=true`
+- Ensure `READS_PER_CHUNK` is even
 
 #### Unmapped reads
 

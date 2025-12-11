@@ -29,6 +29,7 @@ workflow GiraffeDeepVariant {
         OUTPUT_CALLING_BAMS: "Should individual contig BAMs used for calling be saved? Default is the opposite of OUTPUT_SINGLE_BAM."
         OUTPUT_UNMAPPED_BAM: "Should an unmapped reads BAM be saved? Default is false."
         PAIRED_READS: "Are the reads paired? Default is 'true'."
+        INTERLEAVED_READS: "Are paired reads interleaved in a single FASTQ? Only meaningful when PAIRED_READS is true and there is a single input FASTQ. Default is 'false'."
         READS_PER_CHUNK: "Number of reads contained in each mapping chunk. Default 20 000 000."
         CONTIGS: "(OPTIONAL) Desired reference genome contigs, which are all paths in the GBZ index."
         PATH_LIST_FILE: "(OPTIONAL) Text file where each line is a path name in the GBZ index, to use instead of CONTIGS. If neither is given, paths are extracted from the GBZ and subset to chromosome-looking paths."
@@ -97,6 +98,7 @@ workflow GiraffeDeepVariant {
         Boolean OUTPUT_CALLING_BAMS = !OUTPUT_SINGLE_BAM
         Boolean OUTPUT_UNMAPPED_BAM = false
         Boolean PAIRED_READS = true
+        Boolean INTERLEAVED_READS = false
         Int READS_PER_CHUNK = 20000000
         Array[String]+? CONTIGS
         File? PATH_LIST_FILE
@@ -224,6 +226,7 @@ workflow GiraffeDeepVariant {
         OUTPUT_CALLING_BAMS=false,
         OUTPUT_GAF=OUTPUT_GAF,
         PAIRED_READS=PAIRED_READS,
+        INTERLEAVED_READS=INTERLEAVED_READS,
         READS_PER_CHUNK=READS_PER_CHUNK,
         PATH_LIST_FILE=pipeline_path_list_file,
         CONTIGS=CONTIGS,

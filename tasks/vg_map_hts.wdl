@@ -34,6 +34,7 @@ task runVGGIRAFFE {
     input {
         File fastq_file_1
         File? fastq_file_2
+        Boolean in_interleaved = false
         File in_gbz_file
         File in_dist_file
         File in_min_file
@@ -48,7 +49,7 @@ task runVGGIRAFFE {
     }
 
     String out_prefix = sub(sub(sub(basename(fastq_file_1), "\\.gz$", ""), "\\.fastq$", ""), "\\.fq$", "")
-    Boolean paired_reads = defined(fastq_file_2)
+    Boolean paired_fastq = defined(fastq_file_2)
     command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
@@ -62,7 +63,10 @@ task runVGGIRAFFE {
         #to turn off echo do 'set +o xtrace'
 
         PAIR_ARGS=""
-        if [ ~{paired_reads} == true ]
+        if [ ~{in_interleaved} == true ]
+        then
+            PAIR_ARGS="-i"
+        elif [ ~{paired_fastq} == true ]
         then
             PAIR_ARGS="-f ~{fastq_file_2}"
         fi
