@@ -63,7 +63,8 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *GBZ_FILE*: Path to .gbz index file  
 - *DIST_FILE*: Path to .dist index file  
 - *MIN_FILE*: Path to .min index file  
-- *ZIPCODES_FILE*: (OPTIONAL) For chaining-based alignment, path to .zipcodes index file  
+- *ZIPCODES_FILE*: (OPTIONAL) For chaining-based alignment, path to .zipcodes index file
+- *HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
 - *SAMPLE_NAME*: The sample name  
 - *OUTPUT_GAF*: Should a GAF file with the aligned reads be saved? Default is 'true'.  
 - *OUTPUT_SINGLE_BAM*: Should a single merged BAM file be saved? If yes, unmapped reads will be included and 'calling bams' (one per contig) won't be outputted by default. Default is 'false'.  
@@ -109,6 +110,7 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *SPLIT_READ_MEM*: Memory, in GB, to use when splitting the reads into chunks. Default is 50.
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
+- *HAPLOTYPE_SAMPLING*: Whether or not to use haplotype sampling before running giraffe. Default is 'true'.
 - *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
 - *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.  

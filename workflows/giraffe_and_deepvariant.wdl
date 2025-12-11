@@ -67,6 +67,7 @@ workflow GiraffeDeepVariant {
         SPLIT_READ_MEM: "Memory, in GB, to use when splitting the reads into chunks. Default is 50."
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
+        HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'."
         BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
         REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
@@ -134,6 +135,7 @@ workflow GiraffeDeepVariant {
         Int SPLIT_READ_MEM = 50
         Int MAP_CORES = 16
         Int MAP_MEM = 120
+        Boolean HAPLOTYPE_SAMPLING = true
         Int BAM_PREPROCESS_MEM = 20
         Int REALIGN_MEM = if MAP_MEM < 40 then MAP_MEM else 40
         Int CALL_CORES = 8
@@ -239,7 +241,7 @@ workflow GiraffeDeepVariant {
         SPLIT_READ_MEM=SPLIT_READ_MEM,
         MAP_CORES=MAP_CORES,
         MAP_MEM=MAP_MEM,
-        HAPLOTYPE_SAMPLING=true,
+        HAPLOTYPE_SAMPLING=HAPLOTYPE_SAMPLING,
         VG_DOCKER=VG_DOCKER,
         VG_GIRAFFE_DOCKER=VG_GIRAFFE_DOCKER,
         VG_SURJECT_DOCKER=VG_SURJECT_DOCKER
