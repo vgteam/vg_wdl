@@ -603,6 +603,12 @@ task convertCRAMtoFASTQ {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
+    # samtools uses the temp directory, but WDL specifies that our requested
+    # disk space is available in the current directory only (in versions where
+    # it specifies the semantics for runtime.disks at all)
+    mkdir -p ./tmp
+    export TMPDIR="$(pwd)/tmp"
+
     if [ ~{in_paired_reads} == true ]
     then
         samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
