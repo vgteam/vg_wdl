@@ -35,7 +35,7 @@ task checkPathList {
         time: 20
         cpu: 1
         memory: "2 GB"
-        disks: "local-disk " + (size(in_path_list_file, "GB") + 1) + " SSD"
+        disks: "local-disk " + round(size(in_path_list_file, "GB") + 1) + " SSD"
         docker: "ubuntu:24.04"
     }
 }
