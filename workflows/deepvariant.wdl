@@ -159,6 +159,7 @@ workflow DeepVariant {
                 in_reference_index_file=reference_index_file,
                 in_reference_dict_file=reference_dict_file,
                 in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
+                thread_count=CALL_CORES,
                 mem_gb=BAM_PREPROCESS_MEM
             }
             call utils.runAbraRealigner {
@@ -168,6 +169,7 @@ workflow DeepVariant {
                     in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                     in_reference_file=reference_file,
                     in_reference_index_file=reference_index_file,
+                    threadCount=CALL_CORES,
                     memoryGb=REALIGN_MEM
             }
         }
