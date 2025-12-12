@@ -105,7 +105,8 @@ workflow DeepVariant {
     call utils.uncompressReferenceIfNeeded {
         input:
         # We know REFERENCE_FILE is defined but the WDL type system doesn't.
-        in_reference_file=REFERENCE_FILE
+        in_reference_file=REFERENCE_FILE,
+        in_uncompress_cores=CALL_CORES
     }
     File reference_file = uncompressReferenceIfNeeded.reference_file
 
@@ -126,7 +127,9 @@ workflow DeepVariant {
         in_merged_bam_file_index=MERGED_BAM_FILE_INDEX,
         in_path_list_file=PATH_LIST_FILE,
         in_prefix_to_strip=REFERENCE_PREFIX,
-        strip_from_bam=REFERENCE_PREFIX_ON_BAM
+        strip_from_bam=REFERENCE_PREFIX_ON_BAM,
+        thread_count=CALL_CORES,
+        mem_gb=BAM_PREPROCESS_MEM
     }
 
     ##
@@ -242,7 +245,9 @@ workflow DeepVariant {
         call utils.mergeAlignmentBAMChunks as mergeBAM {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=flatten([calling_bam, [splitBAMbyPath.bam_unmapped_file]])
+            in_alignment_bam_chunk_files=flatten([calling_bam, [splitBAMbyPath.bam_unmapped_file]]),
+            in_cores=CALL_CORES,
+            mem_gb=BAM_PREPROCESS_MEM
         }
     }
 
