@@ -102,11 +102,12 @@ Parameters (semi-auto-generated from the parameter_meta section):
 - *DV_MODEL_DATA*: .data-00000-of-00001 file for a custom DeepVariant calling model  
 - *DV_MODEL_FILES*: Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format  
 - *DV_MODEL_VARIABLES_FILES*: Array of files that need to go in a 'variables' subdirectory for a DV model  
-- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi.  
-- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi.  
-- *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant  
-- *DV_IS_1_7_OR_NEWER*: Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one.  
-- *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs  
+- *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? Default is 'true'. Should be 'false' for HiFi.
+- *DV_NORM_READS*: Should DV normalize reads itself? Default is 'false'. Should be 'true' for HiFi.
+- *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
+- *DV_USE_GPUS*: Should DeepVariant use GPUs for calling variants? Default is 'true'.
+- *DV_IS_1_7_OR_NEWER*: Flag to use DeepVariant 1.7+ command line syntax and recommended flags. Must be true if providing a DV 1.7+ Docker image, and false if providing an older one.
+- *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs
 - *DV_GPU_DOCKER*: Container image to use when running DeepVariant for steps that benefit from GPUs  
 - *SPLIT_READ_CORES*: Number of cores to use when splitting the reads into chunks. Default is 8.
 - *SPLIT_READ_MEM*: Memory, in GB, to use when splitting the reads into chunks. Default is 50.

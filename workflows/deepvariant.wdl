@@ -45,6 +45,7 @@ workflow DeepVariant {
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads."
         DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
+        DV_USE_GPUS: "Should DeepVariant use GPUs for calling variants? Default is 'true'."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
         BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
@@ -91,6 +92,7 @@ workflow DeepVariant {
         Boolean? DV_KEEP_LEGACY_AC
         Boolean? DV_NORM_READS
         String OTHER_MAKEEXAMPLES_ARG = ""
+        Boolean DV_USE_GPUS = true
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
         Int BAM_PREPROCESS_MEM = 20
@@ -206,6 +208,7 @@ workflow DeepVariant {
                 in_model_variables_files=DV_MODEL_VARIABLES_FILES,
                 in_haploid_contigs=HAPLOID_CONTIGS,
                 in_par_regions_bed_file=PAR_REGIONS_BED_FILE,
+                in_use_gpus=DV_USE_GPUS,
                 in_dv_gpu_container=DV_GPU_DOCKER,
                 in_call_cores=CALL_CORES,
                 in_call_mem=CALL_MEM
