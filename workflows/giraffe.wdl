@@ -366,6 +366,7 @@ workflow Giraffe {
                 in_max_fragment_length=MAX_FRAGMENT_LENGTH,
                 in_paired_reads=PAIRED_READS,
                 in_prune_low_complexity=PRUNE_LOW_COMPLEXITY,
+                nb_cores=MAP_CORES,
                 mem_gb=MAP_MEM,
                 vg_docker=select_first([VG_SURJECT_DOCKER, VG_DOCKER])
             }
@@ -374,7 +375,9 @@ workflow Giraffe {
                 input:
                 in_bam_file=surjectGAFtoBAM.output_bam_file,
                 in_ref_dict=reference_dict_file,
-                in_prefix_to_strip=REFERENCE_PREFIX
+                in_prefix_to_strip=REFERENCE_PREFIX,
+                nb_cores=MAP_CORES,
+                mem_gb=BAM_PREPROCESS_MEM
             }
         }
         
@@ -382,7 +385,9 @@ workflow Giraffe {
         call utils.mergeAlignmentBAMChunks {
             input:
             in_sample_name=SAMPLE_NAME,
-            in_alignment_bam_chunk_files=sortBAM.sorted_bam
+            in_alignment_bam_chunk_files=sortBAM.sorted_bam,
+            in_cores=MAP_CORES,
+            mem_gb=BAM_PREPROCESS_MEM
         }
 
         if (OUTPUT_CALLING_BAMS || LEFTALIGN_BAM || REALIGN_INDELS) {
@@ -397,6 +402,7 @@ workflow Giraffe {
                 in_merged_bam_file_index=mergeAlignmentBAMChunks.merged_bam_file_index,
                 in_path_list_file=pipeline_path_list_file,
                 in_prefix_to_strip=REFERENCE_PREFIX,
+                thread_count=SPLIT_READ_CORES,
                 mem_gb=SPLIT_READ_MEM
             }
 
@@ -427,6 +433,7 @@ workflow Giraffe {
                         in_reference_index_file=reference_index_file,
                         in_reference_dict_file=reference_dict_file,
                         in_expansion_bases=REALIGNMENT_EXPANSION_BASES,
+                        thread_count=MAP_CORES,
                         mem_gb=BAM_PREPROCESS_MEM
                     }
                     call utils.runAbraRealigner {
@@ -436,6 +443,7 @@ workflow Giraffe {
                             in_target_bed_file=prepareRealignTargets.output_target_bed_file,
                             in_reference_file=reference_file,
                             in_reference_index_file=reference_index_file,
+                            threadCount=MAP_CORES,
                             memoryGb=REALIGN_MEM
                     }
                 }
@@ -448,7 +456,9 @@ workflow Giraffe {
                 call utils.mergeAlignmentBAMChunks as mergeBAM {
                     input:
                     in_sample_name=SAMPLE_NAME,
-                    in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]]))
+                    in_alignment_bam_chunk_files=select_all(flatten([processed_bam, [splitBAMbyPath.bam_unmapped_file]])),
+                    in_cores=SPLIT_READ_CORES,
+                    mem_gb=SPLIT_READ_MEM
                 }
             }
             
