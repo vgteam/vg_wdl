@@ -119,18 +119,24 @@ task extractSubsetPathNames {
             if [[ ! -z "~{in_reference_prefix}" ]] ; then
                 # Pull only the paths that actually have this prefix.
                 # Leave the prefix on.
-                grep "~{in_reference_prefix}" raw_path_list.txt | sort > path_list.txt
+                grep "~{in_reference_prefix}" raw_path_list.txt > path_list.txt
             else
                 # Keep all the paths.
-                sort raw_path_list.txt > path_list.txt
+                cat raw_path_list.txt > path_list.txt
             fi
         else
             # Couldn't get reference paths. This is probably an old GBZ that predates them.
             # Pull all contig names and assume they are paths also.
-            vg gbwt -CL -Z ~{in_gbz_file} | sort > path_list.txt
+            vg gbwt -CL -Z ~{in_gbz_file} > path_list.txt
         fi
 
-        grep -v _decoy path_list.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM | grep -v chain_ > path_list.sub.txt
+        # If paths with []-enclosed subranges at the end exist, remove the
+        # subranges, because base-path namers are what will come out of
+        # surjection.
+        # Also make sure to use a sensible order for digit runs (-V)
+        cat path_list.txt | sed 's/\[[0-9][0-9]*\(-[0-9][0-9]*\)\?\]$//g' | sort -V | uniq >path_list.base.txt
+
+        grep -v _decoy path_list.base.txt | grep -v _random |  grep -v chrUn_ | grep -v chrEBV | grep -v chrM | grep -v chain_ > path_list.sub.txt
 
         if [[ "$(wc -l path_list.sub.txt | cut -f1 -d" ")" == "0" ]] ; then
             echo >&2 "Error: could not find any paths!"
