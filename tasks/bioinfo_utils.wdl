@@ -19,9 +19,9 @@ task uncompressReferenceIfNeeded {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        if [[ ~{in_reference_file} == *.gz ]] ; then
+        if [[ '~{in_reference_file}' == *.gz ]] ; then
             # Decompress
-            bgzip -d -c -@ ~{in_uncompress_cores} ~{in_reference_file} >ref.fa
+            bgzip -d -c -@ ~{in_uncompress_cores} '~{in_reference_file}' >ref.fa
             echo "decompressed" > control.txt
         else 
             # It wasn't compressed. Link through.
@@ -52,7 +52,7 @@ task indexReference {
     command <<<
         set -eux -o pipefail
         
-        ln -s ~{in_reference_file} ref.fa
+        ln -s '~{in_reference_file}' ref.fa
                 
         # Index the subset reference
         samtools faidx ref.fa 
@@ -84,7 +84,7 @@ task indexVcf {
 
     command <<<
         set -eux -o pipefail
-        bcftools index -t -o variants.vcf.gz.tbi ~{in_vcf}
+        bcftools index -t -o variants.vcf.gz.tbi '~{in_vcf}'
     >>>
     output {
         File vcf_index_file = "variants.vcf.gz.tbi"
@@ -109,9 +109,9 @@ task fixVCFContigNaming {
     command <<<
     set -eux -o pipefail
 
-    bcftools view -h ~{in_vcf} | grep contig | awk -v PREF="~{in_prefix_to_strip}" '{split($0, a, ","); gsub("##contig=<ID=", "", a[1]); chr=a[1]; gsub(PREF, "", a[1]); print chr"\t"a[1]}' > chrsrename.txt
+    bcftools view -h '~{in_vcf}' | grep contig | awk -v PREF="~{in_prefix_to_strip}" '{split($0, a, ","); gsub("##contig=<ID=", "", a[1]); chr=a[1]; gsub(PREF, "", a[1]); print chr"\t"a[1]}' > chrsrename.txt
     
-    bcftools annotate --rename-chrs chrsrename.txt -o variants.vcf.gz -Oz ~{in_vcf}
+    bcftools annotate --rename-chrs chrsrename.txt -o variants.vcf.gz -Oz '~{in_vcf}'
     >>>
     output {
         File vcf = "variants.vcf.gz"
@@ -134,7 +134,7 @@ task removeHomRefs {
     command <<<
     set -eux -o pipefail
 
-    bcftools view -c 1 -o variants.vcf.gz -O z ~{in_vcf}
+    bcftools view -c 1 -o variants.vcf.gz -O z '~{in_vcf}'
     >>>
     output {
         File vcf = "variants.vcf.gz"
@@ -169,14 +169,14 @@ task splitReads {
         #to turn off echo do 'set +o xtrace'
 
         CHUNK_LINES=$(( ~{in_reads_per_chunk} * 4 ))
-        if [[ ~{in_read_file} == *.gz ]] ; then
+        if [[ '~{in_read_file}' == *.gz ]] ; then
             DECOMPRESS_COMMAND=(gzip -cd)
         else
             # Support inputs that aren't actually compressed.
             # TODO: Sniff for actual compressed data instead of by extension.
             DECOMPRESS_COMMAND=(cat)
         fi
-        "${DECOMPRESS_COMMAND[@]}" ~{in_read_file} | split -l $CHUNK_LINES --filter='bgzip --threads ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
+        "${DECOMPRESS_COMMAND[@]}" '~{in_read_file}' | split -l $CHUNK_LINES --filter='bgzip --threads ~{in_split_read_cores} > ${FILE}.fq.gz' - "fq_chunk_~{in_pair_id}.part."
     >>>
     output {
         Array[File] output_read_chunks = glob("fq_chunk_~{in_pair_id}.part.*")
@@ -199,7 +199,7 @@ task concatClippedVCFChunks {
         Int disk_size = 30 * round(size(in_clipped_vcf_chunk_files, "G")) + 50
     }
 
-    command {
+    command <<<
         # Set the exit code of a pipeline to that of the rightmost command
         # to exit with a non-zero status, or zero if all commands of the pipeline exit
         set -o pipefail
@@ -212,8 +212,17 @@ task concatClippedVCFChunks {
         #to turn off echo do 'set +o xtrace'
 
         mkdir bcftools.tmp
-        bcftools concat -n ${sep=" " in_clipped_vcf_chunk_files} | bcftools sort -T bcftools.tmp -O z -o ${in_sample_name}.vcf.gz - && bcftools index -t -o ${in_sample_name}.vcf.gz.tbi ${in_sample_name}.vcf.gz
-    }
+
+        # We need to support filenames with [] in them, but WDL 1.0 doesn't
+        # let us quote or escape an array of them at all. See
+        # <https://github.com/openwdl/wdl/pull/362>.
+        cat >file_list.txt <<'EOF'
+        ~{sep="\n" in_clipped_vcf_chunk_files}
+        EOF
+        readarray -t FILE_LIST < file_list.txt
+
+        bcftools concat -n "${FILE_LIST[@]}" | bcftools sort -T bcftools.tmp -O z -o '~{in_sample_name}'.vcf.gz - && bcftools index -t -o '~{in_sample_name}'.vcf.gz.tbi '~{in_sample_name}'.vcf.gz
+    >>>
     output {
         File output_merged_vcf = "${in_sample_name}.vcf.gz"
         File output_merged_vcf_index = "${in_sample_name}.vcf.gz.tbi"
@@ -253,20 +262,20 @@ task sortBAM {
 
         if [ ! -z "~{in_prefix_to_strip}" ] ; then
             # patch the SQ fields from the dict into a new header
-            samtools view -H ~{in_bam_file} | grep ^@HD > new_header.sam
-            grep ^@SQ ~{in_ref_dict} | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
-            samtools view -H ~{in_bam_file}  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
+            samtools view -H '~{in_bam_file}' | grep ^@HD > new_header.sam
+            grep ^@SQ '~{in_ref_dict}' | awk '{print $1 "\t" $2 "\t" $3}' >> new_header.sam
+            samtools view -H '~{in_bam_file}'  | grep -v ^@HD | grep -v ^@SQ >> new_header.sam
             
-            cat <(cat new_header.sam) <(samtools view ~{in_bam_file}) | \
+            cat <(cat new_header.sam) <(samtools view '~{in_bam_file}') | \
                 sed -e "s/~{in_prefix_to_strip}//g" | \
-                samtools sort --threads ~{nb_cores} -O BAM > ~{out_prefix}.positionsorted.bam
+                samtools sort --threads ~{nb_cores} -O BAM > '~{out_prefix}'.positionsorted.bam
         else
-            samtools sort --threads ~{nb_cores} ~{in_bam_file} \
-                     -O BAM > ~{out_prefix}.positionsorted.bam
+            samtools sort --threads ~{nb_cores} '~{in_bam_file}' \
+                     -O BAM > '~{out_prefix}'.positionsorted.bam
             
         fi
 
-        samtools index -b ~{out_prefix}.positionsorted.bam ~{out_prefix}.positionsorted.bam.bai
+        samtools index -b '~{out_prefix}'.positionsorted.bam '~{out_prefix}'.positionsorted.bam.bai
     >>>
     output {
         File sorted_bam = "~{out_prefix}.positionsorted.bam"
@@ -305,15 +314,15 @@ task leftShiftBAMFile {
 
         # Reference and its index must be adjacent and not at arbitrary paths
         # the runner gives.
-        ln -f -s ~{in_reference_file} reference.fa
-        ln -f -s ~{in_reference_index_file} reference.fa.fai
+        ln -f -s '~{in_reference_file}' reference.fa
+        ln -f -s '~{in_reference_index_file}' reference.fa.fai
         
         bamleftalign \
-            < ~{in_bam_file} \
-            > ~{out_prefix}.left_shifted.bam \
+            < '~{in_bam_file}' \
+            > '~{out_prefix}'.left_shifted.bam \
             --fasta-reference reference.fa \
             --compressed
-        samtools index -b ~{out_prefix}.left_shifted.bam ~{out_prefix}.left_shifted.bam.bai
+        samtools index -b '~{out_prefix}'.left_shifted.bam '~{out_prefix}'.left_shifted.bam.bai
     >>>
     output {
         File output_bam_file = "~{out_prefix}.left_shifted.bam"
@@ -353,18 +362,18 @@ task runAbraRealigner {
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
 
-        ln -f -s ~{in_bam_file} input_bam_file.bam
-        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai
+        ln -f -s '~{in_bam_file}' input_bam_file.bam
+        ln -f -s '~{in_bam_index_file}' input_bam_file.bam.bai
 
         # Reference and its index must be adjacent and not at arbitrary paths
         # the runner gives.
-        ln -f -s ~{in_reference_file} reference.fa
-        ln -f -s ~{in_reference_index_file} reference.fa.fai
+        ln -f -s '~{in_reference_file}' reference.fa
+        ln -f -s '~{in_reference_index_file}' reference.fa.fai
 
         java -Xmx~{memoryGb}G -jar /opt/abra2/abra2.jar \
-          --targets ~{in_target_bed_file} \
+          --targets '~{in_target_bed_file}' \
           --in input_bam_file.bam \
-          --out ~{out_prefix}.indel_realigned.bam \
+          --out '~{out_prefix}'.indel_realigned.bam \
           --ref reference.fa \
           --index \
           --threads ~{threadCount}
@@ -411,8 +420,8 @@ task prepareRealignTargets {
         set -o xtrace
         #to turn off echo do 'set +o xtrace' 
 
-        ln -f -s ~{in_bam_file} input_bam_file.bam
-        ln -f -s ~{in_bam_index_file} input_bam_file.bam.bai
+        ln -f -s '~{in_bam_file}' input_bam_file.bam
+        ln -f -s '~{in_bam_index_file}' input_bam_file.bam.bai
 
         CONTIG_ID=`head -1 < <(samtools view input_bam_file.bam) | cut -f3`
         
@@ -434,11 +443,11 @@ task prepareRealignTargets {
           -I input_bam_file.bam \
           --out forIndelRealigner.intervals
 
-        awk -F '[:-]' 'BEGIN { OFS = "\t" } { if( $3 == "") { print $1, $2-1, $2 } else { print $1, $2-1, $3}}' forIndelRealigner.intervals > ~{out_prefix}.intervals.bed
+        awk -F '[:-]' 'BEGIN { OFS = "\t" } { if( $3 == "") { print $1, $2-1, $2 } else { print $1, $2-1, $3}}' forIndelRealigner.intervals > '~{out_prefix}'.intervals.bed
 
         if [ ~{in_expansion_bases} -gt 0 ]; then
-            bedtools slop -i ~{out_prefix}.intervals.bed -g "~{in_reference_index_file}" -b "~{in_expansion_bases}" > ~{out_prefix}.intervals.widened.bed
-            mv ~{out_prefix}.intervals.widened.bed ~{out_prefix}.intervals.bed
+            bedtools slop -i '~{out_prefix}'.intervals.bed -g "~{in_reference_index_file}" -b "~{in_expansion_bases}" > '~{out_prefix}'.intervals.widened.bed
+            mv '~{out_prefix}'.intervals.widened.bed '~{out_prefix}'.intervals.bed
         fi
     >>>
     output {
@@ -470,13 +479,13 @@ task splitBAMbyPath {
     command <<<
         set -eux -o pipefail
 
-        ln -s ~{in_merged_bam_file} input_bam_file.bam
-        ln -s ~{in_merged_bam_file_index} input_bam_file.bam.bai
+        ln -s '~{in_merged_bam_file}' input_bam_file.bam
+        ln -s '~{in_merged_bam_file_index}' input_bam_file.bam.bai
 
         if [[ ! -z "~{in_prefix_to_strip}" ]] ; then
-            sed -e "s/~{in_prefix_to_strip}//g" ~{in_path_list_file} > paths.txt
+            sed -e "s/~{in_prefix_to_strip}//g" '~{in_path_list_file}' > paths.txt
         else
-            cp ~{in_path_list_file} paths.txt
+            cp '~{in_path_list_file}' paths.txt
         fi
         
         while read -r CONTIG; do
@@ -504,7 +513,7 @@ task splitBAMbyPath {
             fi
             
             samtools index "~{in_sample_name}.${PROCESSED_CONTIG}.bam"
-        done < ~{in_path_list_file}
+        done < '~{in_path_list_file}'
 
         ## get unmapped reads
         mkdir unmapped
@@ -559,12 +568,21 @@ task mergeAlignmentBAMChunks {
         # echo each line of the script to stdout so we can see what is happening
         set -o xtrace
         #to turn off echo do 'set +o xtrace'
+
+        # We need to support BAM filenames with [] in them, but WDL 1.0 doesn't
+        # let us quote or escape an array of them at all. See
+        # <https://github.com/openwdl/wdl/pull/362>.
+        cat >file_list.txt <<'EOF'
+        ~{sep="\n" in_alignment_bam_chunk_files}
+        EOF
+        readarray -t FILE_LIST < file_list.txt
+
         samtools merge \
           -f -p -c --threads ~{in_cores} \
-          ~{in_sample_name}_merged.positionsorted.bam \
-          ~{sep=" " in_alignment_bam_chunk_files} \
+          '~{in_sample_name}'_merged.positionsorted.bam \
+          "${FILE_LIST[@]}" \
         && samtools index \
-          ~{in_sample_name}_merged.positionsorted.bam
+          '~{in_sample_name}'_merged.positionsorted.bam
     >>>
     output {
         File merged_bam_file = "~{in_sample_name}_merged.positionsorted.bam"
@@ -611,9 +629,9 @@ task convertCRAMtoFASTQ {
 
     if [ ~{in_paired_reads} == true ]
     then
-        samtools collate -@ ~{half_cores} --reference ~{in_ref_file} -Ouf ~{in_cram_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+        samtools collate -@ ~{half_cores} --reference '~{in_ref_file}' -Ouf '~{in_cram_file}' | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
     else
-        samtools fastq -@ ~{in_cores} -0 reads.R1.fastq.gz -o reads.R1.fastq.gz -c 1 --reference ~{in_ref_file} ~{in_cram_file} >/dev/null
+        samtools fastq -@ ~{in_cores} -0 reads.R1.fastq.gz -o reads.R1.fastq.gz -c 1 --reference '~{in_ref_file}' '~{in_cram_file}' >/dev/null
     fi
     >>>
     output {
@@ -652,9 +670,9 @@ task convertBAMtoFASTQ {
 
     if [ ~{in_paired_reads} == true ]
     then
-        samtools collate -@ ~{half_cores} -Ouf ~{in_bam_file} | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
+        samtools collate -@ ~{half_cores} -Ouf '~{in_bam_file}' | samtools fastq -@ ~{half_cores} -1 reads.R1.fastq.gz -2 reads.R2.fastq.gz -0 reads.o.fq.gz -s reads.s.fq.gz -c 1 -N -
     else
-        samtools fastq -@ ~{in_cores} -0 reads.R1.fastq.gz -o reads.R1.fastq.gz -c 1 ~{in_bam_file} >/dev/null
+        samtools fastq -@ ~{in_cores} -0 reads.R1.fastq.gz -o reads.R1.fastq.gz -c 1 '~{in_bam_file}' >/dev/null
     fi
     >>>
     output {
@@ -695,10 +713,10 @@ task kmerCountingKMC {
     set -o xtrace
     #to turn off echo do 'set +o xtrace'
 
-    echo ~{input_read_file_1} > scratch_file.txt
-    ~{if defined(input_read_file_2) then "echo ~{input_read_file_2} >> scratch_file.txt" else ""}
+    echo '~{input_read_file_1}' > scratch_file.txt
+    ~{if defined(input_read_file_2) then "echo '~{input_read_file_2}' >> scratch_file.txt" else ""}
 
-    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt ~{output_file_name} .
+    kmc -k~{kmer_length} -m~{max_ram} -okff -t~{nb_cores} @scratch_file.txt '~{output_file_name}' .
 
     rm scratch_file.txt
     >>>
