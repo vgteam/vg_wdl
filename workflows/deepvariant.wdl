@@ -4,6 +4,8 @@ import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/deepvariant.wdl" as dv
 import "aardvark_evaluation.wdl" as aardvark
 import "happy_evaluation.wdl" as happy
+import "../tasks/vg_map_hts.wdl" as map
+import "./haplotype_sampling.wdl" as hapl
 
 workflow DeepVariant {
 
@@ -45,12 +47,36 @@ workflow DeepVariant {
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
         DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
+        PANGENOME_GBZ: "(OPTIONAL) Path to a pangenome graph in GBZ format"
+        DV_PANGENOME_IMAGE_HEIGHT: "(OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set."
+        DV_PANGENOME_SHARED_MEMORY_SIZE_GB: "(OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set."
+        DV_PANGENOME_REF_CHROM_PREFIX: "(OPTIONAL) The prefix to add to the chromosome name in the pangenome gbz file. It is empty by default. However sometimes we need to add a prefix (like 'GRCh38.') to the chromosome name in the pangenome gbz file to match the chromosome name in the BAM file. It is empty by default."
+        DV_PANGENOME_REF_NAME: "The name of the reference in the pangenome gbz file. It is 'GRCh38' by default."
+        REF_NAME_TO_REMOVE_FROM_PANGENOME: "(OPTIONAL) Name of the reference to remove from the graph before haplotype sampling"
+        DV_PANGENOME_HAPLOTYPE_SAMPLING: "Should haplotype sampling be done on PANGENOME_GBZ? Default is 'false'."
+        READS_FOR_SAMPLING_1: "(OPTIONAL) First input read file for haplotype sampling"
+        READS_FOR_SAMPLING_2: "(OPTIONAL) Second input read file for haplotype sampling (if paired)"    
+        PAIRED_READS_FOR_SAMPLING: "Are the reads for sampling paired-end?, Default is 'false'."
+        DV_PANGENOME_DIPLOID_SAMPLING: "Should haplotype sampling be done in diploid mode? Default is 'false'."
+        DV_PANGENOME_HAPLOTYPE_NUMBER: "Number of haplotypes for haplotype sampling. Default is 32."
+        DV_PANGENOME_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
+        DV_PANGENOME_DIST_FILE: "(OPTIONAL) Path to .dist file used in haplotype sampling"
+        DV_PANGENOME_R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
+        DV_PANGENOME_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
+        INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
+        INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
+        KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
+        HAPLOTYPE_SAMPLE_CORES: "Number of cores to use for haplotype sampling. Default is 16."
+        GIRAFFE_PRESET: "(OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10). It is used for haplotype sampling the input pangenome. Default is 'default'."  
+        CREATE_INDEX_OPTIONS_BEFORE_SAMPLING: "Additional options to pass to vg index before haplotype sampling. It is recommended to set --snarl-limit 1 to speed up index creation."
         DV_KEEP_LEGACY_AC: "Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads."
         DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
         OTHER_MAKEEXAMPLES_ARG: "Additional arguments for the make_examples step of DeepVariant"
         DV_USE_GPUS: "Should DeepVariant use GPUs for calling variants? Default is 'true'."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
+        VG_DOCKER: "Container image to use when running vg (used for pangenome haplotype sampling)"
         BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
         REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
@@ -95,16 +121,40 @@ workflow DeepVariant {
         File? DV_MODEL_DATA
         Array[File] DV_MODEL_FILES = select_all([DV_MODEL_META, DV_MODEL_INDEX, DV_MODEL_DATA])
         Array[File] DV_MODEL_VARIABLES_FILES = []
+        File? PANGENOME_GBZ
+        Int? DV_PANGENOME_IMAGE_HEIGHT
+        Int? DV_PANGENOME_SHARED_MEMORY_SIZE_GB
+        String? REF_NAME_TO_REMOVE_FROM_PANGENOME
+        String? DV_PANGENOME_REF_CHROM_PREFIX
+        String DV_PANGENOME_REF_NAME = "GRCh38"
+        Boolean DV_PANGENOME_HAPLOTYPE_SAMPLING = false
+        File? READS_FOR_SAMPLING_1
+        File? READS_FOR_SAMPLING_2
+        Boolean PAIRED_READS_FOR_SAMPLING = false
+        Boolean DV_PANGENOME_DIPLOID_SAMPLING = false
+        File? DV_PANGENOME_HAPL_FILE
+        File? DV_PANGENOME_DIST_FILE
+        File? DV_PANGENOME_R_INDEX_FILE
+        File? DV_PANGENOME_KFF_FILE
+        Int DV_PANGENOME_HAPLOTYPE_NUMBER = 32
+        Boolean INDEX_MINIMIZER_WEIGHTED = true
+        Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
+        Int KMER_COUNTING_MEM = 64
+        Int HAPLOTYPE_INDEXING_MEM = 120
+        Int HAPLOTYPE_SAMPLE_CORES = 16
+        String GIRAFFE_PRESET = "default"
+        String CREATE_INDEX_OPTIONS_BEFORE_SAMPLING = ""
         Boolean? DV_KEEP_LEGACY_AC
         Boolean? DV_NORM_READS
         String OTHER_MAKEEXAMPLES_ARG = ""
         Boolean DV_USE_GPUS = true
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.68.0"
         Int BAM_PREPROCESS_MEM = 20
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
-        Int CALL_MEM = 50
+        Int CALL_MEM = 50 + (if defined(PANGENOME_GBZ) then CALL_CORES * 2 else 0)
         Int MAKE_EXAMPLES_CORES = CALL_CORES
         Int MAKE_EXAMPLES_MEM = CALL_MEM
         Int EVAL_CORES = 8
@@ -139,6 +189,53 @@ workflow DeepVariant {
         strip_from_bam=REFERENCE_PREFIX_ON_BAM,
         thread_count=CALL_CORES,
         mem_gb=BAM_PREPROCESS_MEM
+    }
+
+    ##
+    ## Haplotype sampling and then remove unnecessary sample (like CHM13 if the analysis is in GRCh38 coordinate space) from GBZ
+    ## 
+
+    if (DV_PANGENOME_HAPLOTYPE_SAMPLING && defined(PANGENOME_GBZ)) {
+        call hapl.HaplotypeSampling {
+        input:
+            GBZ_FILE=select_first([PANGENOME_GBZ]),
+            INPUT_READ_FILE_FIRST=select_first([READS_FOR_SAMPLING_1]),
+            # If we're not doing paired reads the result here is probably null.
+            INPUT_READ_FILE_SECOND=READS_FOR_SAMPLING_2,
+            HAPLOTYPE_NUMBER=DV_PANGENOME_HAPLOTYPE_NUMBER,
+            HAPL_FILE=DV_PANGENOME_HAPL_FILE,
+            DIST_FILE=DV_PANGENOME_DIST_FILE,
+            R_INDEX_FILE=DV_PANGENOME_R_INDEX_FILE,
+            KFF_FILE=DV_PANGENOME_KFF_FILE,
+            DIPLOID=DV_PANGENOME_DIPLOID_SAMPLING,
+            INDEX_MINIMIZER_K = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 29 else 31,
+            INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50,
+            INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
+            CREATE_INDEX_OPTIONS_BEFORE_SAMPLING=CREATE_INDEX_OPTIONS_BEFORE_SAMPLING,
+            CORES=HAPLOTYPE_SAMPLE_CORES,
+            KMER_COUNTING_MEM=KMER_COUNTING_MEM,
+            HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
+            INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
+            SKIP_DIST_GENERATION=true,
+            SKIP_MIN_GENERATION=true,
+            VG_DOCKER=VG_DOCKER
+        }
+
+    }
+
+    # The reason to remove unnecessary reference like CHM13 from the graph is that it's not haplotype sampled, and when we 
+    # run pangenome-aware DV it would be included in pangenome section of the image though it is not relevant to the sample.
+    if (defined(REF_NAME_TO_REMOVE_FROM_PANGENOME) && defined(PANGENOME_GBZ)) {
+        call map.removeSampleFromGraph {
+            input:
+                in_gbz_file=select_first([HaplotypeSampling.sampled_graph, PANGENOME_GBZ]),
+                sample_name=select_first([REF_NAME_TO_REMOVE_FROM_PANGENOME]),
+                docker_image=VG_DOCKER
+        }
+    }
+
+    if (defined(PANGENOME_GBZ)) {
+            File DV_PANGENOME_GBZ = select_first([removeSampleFromGraph.output_graph_gbz,HaplotypeSampling.sampled_graph, PANGENOME_GBZ])
     }
 
     ##
@@ -184,6 +281,11 @@ workflow DeepVariant {
         }
         File calling_bam = select_first([runAbraRealigner.indel_realigned_bam, leftShiftBAMFile.output_bam_file, bam_and_index_for_path.left])
         File calling_bam_index = select_first([runAbraRealigner.indel_realigned_bam_index, leftShiftBAMFile.output_bam_index_file, bam_and_index_for_path.right])
+        # Here the name of the shared memory segment is based on the name of the BAM file. This is just 
+        # to make sure that the shared memory segment name is unique for each contig to avoid memory 
+        # interference between the DV jobs being run in the same file system.
+        String DV_PANGENOME_SHARED_MEMORY_NAME = "SHARED_MEM_GBZ_" + sub(basename(calling_bam), "(left_shifted\\.)?(indel_realigned)?\\.bam$", "")  
+
         ## DeepVariant calling
         call dv.runDeepVariantMakeExamples {
             input:
@@ -195,6 +297,12 @@ workflow DeepVariant {
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
                 in_model_variables_files=DV_MODEL_VARIABLES_FILES,
+                in_pangenome_gbz_file=DV_PANGENOME_GBZ,
+                in_pangenome_height=DV_PANGENOME_IMAGE_HEIGHT,
+                in_pangenome_shared_memory_name=DV_PANGENOME_SHARED_MEMORY_NAME,
+                in_pangenome_shared_memory_size_gb=DV_PANGENOME_SHARED_MEMORY_SIZE_GB,
+                in_pangenome_ref_chrom_prefix=DV_PANGENOME_REF_CHROM_PREFIX,
+                in_pangenome_ref_name=DV_PANGENOME_REF_NAME,
                 in_min_mapq=MIN_MAPQ,
                 in_keep_legacy_ac=DV_KEEP_LEGACY_AC,
                 in_norm_reads=DV_NORM_READS,
@@ -320,3 +428,4 @@ workflow DeepVariant {
     }
 
 }
+

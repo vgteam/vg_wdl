@@ -37,6 +37,10 @@ workflow HaplotypeSampling {
         INDEX_MINIMIZER_K: "K-mer size of minimizer index to produce for sampled graph. Should be 29 for short read mapping and 31 for long read mapping. (Default: 29)"
         INDEX_MINIMIZER_W: "Window size of minimizer index to produce for sampled graph. Should be 11 for short read mapping and 50 for long read mapping. (Default: 11)"
         INDEX_MINIMIZER_WEIGHTED: "Whether to produce a weighted minimizer index for the sampled graph. (Default: true)"
+        CREATE_INDEX_OPTIONS_BEFORE_SAMPLING: "Additional options to pass to vg index when building the distance index before haplotype sampling. Default is ''."
+        SKIP_DIST_GENERATION: "Skip building the distance index for the sampled graph. If set, SKIP_MIN_GENERATION must also be set, since the minimizer index needs the distance index. Default is 'false'."
+        SKIP_MIN_GENERATION: "Skip building the minimizer index for the sampled graph. Default is 'false'."
+        OUTPUT_HAPL: "Whether to output the haplotype index (.hapl) used for sampling. Default is 'false'."
         VG_DOCKER: "Container image to use when running vg."
     }
     input {
@@ -54,6 +58,7 @@ workflow HaplotypeSampling {
         Int HAPLOTYPE_INDEXING_MEM = 120
         Int INDEX_MINIMIZER_MEM = 320
         Int WINDOW_LENGTH = 11
+        String CREATE_INDEX_OPTIONS_BEFORE_SAMPLING = ""
         Int SUBCHAIN_LENGTH = 10000
         Int HAPLOTYPE_NUMBER = 4
         Float PRESENT_DISCOUNT = 0.9
@@ -65,6 +70,9 @@ workflow HaplotypeSampling {
         Int INDEX_MINIMIZER_K = 29
         Int INDEX_MINIMIZER_W = 11
         Boolean INDEX_MINIMIZER_WEIGHTED = true
+        Boolean SKIP_DIST_GENERATION = false
+        Boolean SKIP_MIN_GENERATION = false
+        Boolean OUTPUT_HAPL = false
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
 
 
@@ -80,6 +88,7 @@ workflow HaplotypeSampling {
                     in_gbz_file=GBZ_FILE,
                     nb_cores=CORES,
                     in_extract_mem=HAPLOTYPE_INDEXING_MEM,
+                    options=CREATE_INDEX_OPTIONS_BEFORE_SAMPLING,
                     vg_docker=VG_DOCKER
             }
         }
@@ -151,38 +160,41 @@ workflow HaplotypeSampling {
 
     }
 
-    call index.createDistanceIndex as giraffeDist {
-                input:
-                    in_gbz_file=samplingHaplotypes.output_graph,
-                    nb_cores=CORES,
-                    in_extract_mem=HAPLOTYPE_INDEXING_MEM,
-                    vg_docker=VG_DOCKER
+    if (!SKIP_DIST_GENERATION){
+        call index.createDistanceIndex as giraffeDist {
+                    input:
+                        in_gbz_file=samplingHaplotypes.output_graph,
+                        nb_cores=CORES,
+                        in_extract_mem=HAPLOTYPE_INDEXING_MEM,
+                        vg_docker=VG_DOCKER
+        }
     }
 
-    call index.createMinimizerIndex {
-        input:
-            in_gbz_file=samplingHaplotypes.output_graph,
-            in_dist_index=giraffeDist.output_dist_index,
-            in_minimizer_k = INDEX_MINIMIZER_K,
-            in_minimizer_w = INDEX_MINIMIZER_W,
-            in_minimizer_weighted = INDEX_MINIMIZER_WEIGHTED,
-            out_name=OUTPUT_NAME_PREFIX,
-            nb_cores=CORES,
-            in_extract_mem=INDEX_MINIMIZER_MEM,
-            vg_docker=VG_DOCKER
+    if (!SKIP_MIN_GENERATION){
+        call index.createMinimizerIndex {
+            input:
+                in_gbz_file=samplingHaplotypes.output_graph,
+                in_dist_index=select_first([giraffeDist.output_dist_index]),
+                in_minimizer_k = INDEX_MINIMIZER_K,
+                in_minimizer_w = INDEX_MINIMIZER_W,
+                in_minimizer_weighted = INDEX_MINIMIZER_WEIGHTED,
+                out_name=OUTPUT_NAME_PREFIX,
+                nb_cores=CORES,
+                in_extract_mem=INDEX_MINIMIZER_MEM,
+                vg_docker=VG_DOCKER
+        }
     }
 
+    if (OUTPUT_HAPL) {
+        File haplotype_index_input_gbz_optional = haplotype_index
+    }
     output {
         File sampled_graph = samplingHaplotypes.output_graph
-        File sampled_min = createMinimizerIndex.output_minimizer
-        File sampled_zipcodes = createMinimizerIndex.output_zipcodes
-        File sampled_dist = giraffeDist.output_dist_index
+        File? sampled_min = createMinimizerIndex.output_minimizer
+        File? sampled_zipcodes = createMinimizerIndex.output_zipcodes
+        File? sampled_dist = giraffeDist.output_dist_index
+        File? haplotype_index_input_gbz = haplotype_index_input_gbz_optional
     }
 
 }
-
-
-
-
-
 

@@ -113,6 +113,16 @@ Parameters:
 - *DV_MODEL_DATA*: .data-00000-of-00001 file for a custom DeepVariant calling model
 - *DV_MODEL_FILES*: Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format
 - *DV_MODEL_VARIABLES_FILES*: Array of files that need to go in a 'variables' subdirectory for a DV model
+- *DV_PANGENOME_GBZ*: (OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV.
+- *DV_PANGENOME_IMAGE_HEIGHT*: (OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware DV. It will be used only if DV_PANGENOME_GBZ is set.
+- *DV_PANGENOME_SHARED_MEMORY_SIZE_GB*: (OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set.
+- *REF_NAME_TO_REMOVE_FROM_PANGENOME*: (OPTIONAL) Name of the reference to remove from the graph before haplotype sampling
+- *DV_PANGENOME_REF_CHROM_PREFIX*: (OPTIONAL) The prefix to add to the chromosome name in the pangenome gbz file. It is empty by default. However sometimes we need to add a prefix (like 'GRCh38.') to the chromosome name in the pangenome gbz file to match the chromosome name in the BAM file. It is empty by default.
+- *DV_PANGENOME_REF_NAME*: The name of the reference in the pangenome gbz file. It is 'GRCh38' by default.
+- *DV_PANGENOME_HAPLOTYPE_SAMPLING*: Should haplotype sampling be done? Default is 'false'.
+- *DV_PANGENOME_DIPLOID_SAMPLING*: Should haplotype sampling be done in diploid mode? Default is 'false'.
+- *DV_PANGENOME_HAPLOTYPE_NUMBER*: Number of haplotypes for haplotype sampling. Default is 32.
+- *CREATE_INDEX_OPTIONS_BEFORE_SAMPLING*: Additional options to pass to vg index before haplotype sampling. It is recommended to set --snarl-limit 1 to speed up index creation.
 - *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads.
 - *DV_NORM_READS*: Should DV normalize reads itself? If unspecified this is not done, unless set in the model.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
@@ -128,6 +138,7 @@ Parameters:
 - *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)
 - *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
 - *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)
+- *PANGENOMES_ARE_SAME*: Are the pangenome used for mapping and the one used for DeepVariant the same? It they are the same then the index files (especiallu .hapl) created for giraffe will be reused for DeepVariant. Default is 'false'.
 - *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
 - *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40 or MAP_MEM, whichever is lower.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.
@@ -224,6 +235,8 @@ Parameters:
 - *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)
 - *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
 - *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)
+- *CREATE_INDEX_OPTIONS_BEFORE_SAMPLING*: Additional options to pass to vg index before haplotype sampling. It is recommended to set --snarl-limit 1 to speed up index creation.
+- *OUTPUT_HAPL*: Whether or not to output the haplotype index (.hapl) created before haplotype sampling. This is useful if the same pangenome will be used for DeepVariant calling after mapping. Default is 'false'.
 - *VG_DOCKER*: Container image to use when running vg
 - *VG_GIRAFFE_DOCKER*: Alternate container image to use when running vg giraffe mapping
 - *VG_SURJECT_DOCKER*: Alternate container image to use when running vg surject
@@ -300,6 +313,23 @@ Parameters:
 - *DV_MODEL_DATA*: (OPTIONAL) .data-00000-of-00001 file for a custom DeepVariant calling model
 - *DV_MODEL_FILES*: Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format
 - *DV_MODEL_VARIABLES_FILES*: Array of files that need to go in a 'variables' subdirectory for a DV model
+- *PANGENOME_GBZ*: (OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV.
+- *DV_PANGENOME_IMAGE_HEIGHT*: (OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set.
+- *DV_PANGENOME_SHARED_MEMORY_SIZE_GB*: (OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set.
+- *DV_PANGENOME_REF_CHROM_PREFIX*: (OPTIONAL) The prefix to add to the chromosome name in the pangenome gbz file. It is empty by default. However sometimes we need to add a prefix (like 'GRCh38.') to the chromosome name in the pangenome gbz file to match the chromosome name in the BAM file.
+- *DV_PANGENOME_REF_NAME*: The name of the reference in the pangenome gbz file. It is 'GRCh38' by default.
+- *REF_NAME_TO_REMOVE_FROM_PANGENOME*: (OPTIONAL) Name of the reference to remove from the graph before haplotype sampling
+- *DV_PANGENOME_HAPLOTYPE_SAMPLING*: Should haplotype sampling be done on PANGENOME_GBZ? Default is 'false'.
+- *READS_FOR_SAMPLING_1*: (OPTIONAL) First input read file for haplotype sampling
+- *READS_FOR_SAMPLING_2*: (OPTIONAL) Second input read file for haplotype sampling (if paired)
+- *PAIRED_READS_FOR_SAMPLING*: Are the reads for sampling paired-end? Default is 'false'.
+- *DV_PANGENOME_DIPLOID_SAMPLING*: Should haplotype sampling be done in diploid mode? Default is 'false'.
+- *DV_PANGENOME_HAPLOTYPE_NUMBER*: Number of haplotypes for haplotype sampling. Default is 32.
+- *DV_PANGENOME_HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
+- *DV_PANGENOME_DIST_FILE*: (OPTIONAL) Path to .dist file used in haplotype sampling
+- *CREATE_INDEX_OPTIONS_BEFORE_SAMPLING*: Additional options to pass to vg index before haplotype sampling. It is recommended to set --snarl-limit 1 to speed up index creation.
+- *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)
+- *HAPLOTYPE_SAMPLE_CORES*: Number of cores to use for haplotype sampling. Default is 16.
 - *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads.
 - *DV_NORM_READS*: Should DV normalize reads itself? If unspecified this is not done, unless set in the model.
 - *DV_USE_GPUS*: Should DeepVariant use GPUs for calling variants? Default is 'true'.
@@ -408,12 +438,36 @@ Parameters:
 - *DV_MODEL_DATA*: .data-00000-of-00001 file for a custom DeepVariant calling model
 - *DV_MODEL_FILES*: Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format
 - *DV_MODEL_VARIABLES_FILES*: Array of files that need to go in a 'variables' subdirectory for a DV model
+- *PANGENOME_GBZ*: (OPTIONAL) Path to a pangenome graph in GBZ format
+- *DV_PANGENOME_IMAGE_HEIGHT*: (OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set.
+- *DV_PANGENOME_SHARED_MEMORY_SIZE_GB*: (OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set.
+- *REF_NAME_TO_REMOVE_FROM_PANGENOME*: (OPTIONAL) Name of the reference to remove from the graph before haplotype sampling
+- *DV_PANGENOME_REF_CHROM_PREFIX*: (OPTIONAL) The prefix to add to the chromosome name in the pangenome gbz file. It is empty by default. However sometimes we need to add a prefix (like 'GRCh38.') to the chromosome name in the pangenome gbz file to match the chromosome name in the BAM file. It is empty by default.
+- *DV_PANGENOME_REF_NAME*: The name of the reference in the pangenome gbz file. It is 'GRCh38' by default.
+- *DV_PANGENOME_HAPLOTYPE_SAMPLING*: Should haplotype sampling be done on PANGENOME_GBZ? Default is 'false'.
+- *READS_FOR_SAMPLING_1*: (OPTIONAL) First input read file for haplotype sampling
+- *READS_FOR_SAMPLING_2*: (OPTIONAL) Second input read file for haplotype sampling (if paired)
+- *PAIRED_READS_FOR_SAMPLING*: Are the reads for sampling paired-end?, Default is 'false'.
+- *DV_PANGENOME_DIPLOID_SAMPLING*: Should haplotype sampling be done in diploid mode? Default is 'false'.
+- *DV_PANGENOME_HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
+- *DV_PANGENOME_DIST_FILE*: (OPTIONAL) Path to .dist file used in haplotype sampling
+- *DV_PANGENOME_R_INDEX_FILE*: (OPTIONAL) Path to .ri file used in haplotype sampling
+- *DV_PANGENOME_KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
+- *DV_PANGENOME_HAPLOTYPE_NUMBER*: Number of haplotypes for haplotype sampling. Default is 32.
+- *INDEX_MINIMIZER_WEIGHTED*: Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)
+- *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)
+- *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
+- *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)
+- *HAPLOTYPE_SAMPLE_CORES*: Number of cores to use for haplotype sampling. Default is 16.
+- *GIRAFFE_PRESET*: (OPTIONAL) Name of Giraffe mapper parameter preset to use (default, fast, hifi, or r10). It is used for haplotype sampling the input pangenome. Default is 'default'.
+- *CREATE_INDEX_OPTIONS_BEFORE_SAMPLING*: Additional options to pass to vg index before haplotype sampling. It is recommended to set --snarl-limit 1 to speed up index creation.
 - *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads.
 - *DV_NORM_READS*: Should DV normalize reads itself? If unspecified this is not done, unless set in the model.
 - *OTHER_MAKEEXAMPLES_ARG*: Additional arguments for the make_examples step of DeepVariant
 - *DV_USE_GPUS*: Should DeepVariant use GPUs for calling variants? Default is 'true'.
 - *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+.
 - *DV_GPU_DOCKER*: Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+.
+- *VG_DOCKER*: Container image to use when running vg (used for pangenome haplotype sampling)
 - *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
 - *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.
@@ -646,6 +700,10 @@ Parameters:
 - *INDEX_MINIMIZER_K*: K-mer size of minimizer index to produce for sampled graph. Should be 29 for short read mapping and 31 for long read mapping. (Default: 29)
 - *INDEX_MINIMIZER_W*: Window size of minimizer index to produce for sampled graph. Should be 11 for short read mapping and 50 for long read mapping. (Default: 11)
 - *INDEX_MINIMIZER_WEIGHTED*: Whether to produce a weighted minimizer index for the sampled graph. (Default: true)
+- *CREATE_INDEX_OPTIONS_BEFORE_SAMPLING*: Additional options to pass to vg index when building the distance index before haplotype sampling. Default is ''.
+- *SKIP_DIST_GENERATION*: Skip building the distance index for the sampled graph. If set, SKIP_MIN_GENERATION must also be set, since the minimizer index needs the distance index. Default is 'false'.
+- *SKIP_MIN_GENERATION*: Skip building the minimizer index for the sampled graph. Default is 'false'.
+- *OUTPUT_HAPL*: Whether to output the haplotype index (.hapl) used for sampling. Default is 'false'.
 - *VG_DOCKER*: Container image to use when running vg.
 
 [Test locally](#testing-locally) with:
