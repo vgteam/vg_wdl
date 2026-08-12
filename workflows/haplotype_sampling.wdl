@@ -74,9 +74,8 @@ workflow HaplotypeSampling {
                     in_gbz_file=GBZ_FILE,
                     nb_cores=CORES,
                     in_extract_mem=HAPLOTYPE_INDEXING_MEM,
-                    # A full pangenome's snarl decomposition can be enormous;
-                    # we only need this distance index to build the haplotype
-                    # index below, so limit it to keep sampling tractable.
+                    # This distance index is only used to build the haplotype
+                    # index below, not for mapping.
                     options="--snarl-limit 1",
                     vg_docker=VG_DOCKER
             }
