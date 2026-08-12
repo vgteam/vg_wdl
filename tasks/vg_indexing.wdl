@@ -4,9 +4,10 @@ version 1.0
 task createDistanceIndex {
     input {
         File in_gbz_file
+        String options = ""
         Int nb_cores = 16
         Int in_extract_mem = 120
-        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 512
         String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
@@ -14,7 +15,7 @@ task createDistanceIndex {
     command {
         set -eux -o pipefail
 
-        vg index -t ~{nb_cores} -j "~{output_prefix}.dist" ~{in_gbz_file}
+        vg index ~{options} -t ~{nb_cores} -j "~{output_prefix}.dist" ~{in_gbz_file}
     }
 
     output {
@@ -167,4 +168,5 @@ task createMinimizerIndex {
     }
 
 }
+
 

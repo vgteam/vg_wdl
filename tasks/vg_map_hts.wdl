@@ -262,3 +262,88 @@ task samplingHaplotypes {
 }
 
 
+# List the sample names of the reference-sense paths in a graph (the part
+# before the first "#" in their PanSN-style path names).
+task listReferenceSampleNames {
+    input {
+        File in_gbz_file
+        Int in_extract_mem = 16
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
+    }
+    command <<<
+        set -eux -o pipefail
+
+        vg paths --list --reference-paths -x ~{in_gbz_file} | cut -f1 -d'#' | sort -u > sample_names.txt
+    >>>
+    output {
+        Array[String] sample_names = read_lines("sample_names.txt")
+    }
+    runtime {
+        preemptible: 2
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: vg_docker
+    }
+}
+
+task removeSampleFromGraph {
+    input {
+        File in_gbz_file
+        Array[String] sample_names
+        # runtime configurations
+        Int memSize=128
+        Int threadCount=8
+        Int diskSize=128
+        String docker_image="quay.io/vgteam/vg:v1.64.0"
+        Int preemptible=2
+    }
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        # to turn off echo do 'set +o xtrace'
+        set -o xtrace
+
+        INPUT_FILE=~{in_gbz_file}
+        INPUT_PREFIX=$(basename ${INPUT_FILE%%.gbz})
+        OUTPUT_PREFIX="${INPUT_PREFIX}.samples_removed"
+
+        # create gbwt from input gbz
+        vg gbwt \
+            -Z ~{in_gbz_file} \
+            -o ${INPUT_PREFIX}.gbwt
+
+        # remove the given samples from the gbwt and create a new gbwt
+        vg gbwt \
+            ${INPUT_PREFIX}.gbwt \
+            ~{sep=" " prefix("--remove-sample ", sample_names)} \
+            -o ${OUTPUT_PREFIX}.gbwt
+
+        mkdir output
+        # make a new gbz file using the new gbwt
+        vg gbwt \
+            ${OUTPUT_PREFIX}.gbwt \
+            -x ~{in_gbz_file} \
+            --gbz-format  \
+            --graph-name output/${OUTPUT_PREFIX}.gbz
+
+    >>>
+    runtime {
+        docker: docker_image
+        memory: memSize + " GB"
+        cpu: threadCount
+        disks: "local-disk " + diskSize + " SSD"
+        preemptible : preemptible
+    }
+    output {
+        File output_graph_gbz = glob("output/*.gbz")[0]
+    }
+}
+
+

@@ -72,55 +72,52 @@ workflow IndexForGiraffe {
             HAPLOTYPE_NUMBER=HAPLOTYPE_NUMBER,
             DIPLOID=DIPLOID,
             SET_REFERENCE=SET_REFERENCE,
-            INDEX_MINIMIZER_K=minimizer_k,
-            INDEX_MINIMIZER_W=minimizer_w,
-            INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
             CORES=CORES,
             KMER_COUNTING_MEM=KMER_COUNTING_MEM,
             HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
-            INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
             VG_DOCKER=VG_DOCKER
         }
     }
 
-    if (!HAPLOTYPE_SAMPLING) {
-        # We map against the graph as given, so we only need to fill in whatever
-        # mapping indexes for it are missing.
-        if (!defined(DIST_FILE)) {
-            call index.createDistanceIndex {
-                input:
-                    in_gbz_file=GBZ_FILE,
-                    nb_cores=CORES,
-                    in_extract_mem=HAPLOTYPE_INDEXING_MEM,
-                    vg_docker=VG_DOCKER
-            }
-        }
-        File unsampled_dist = select_first([DIST_FILE, createDistanceIndex.output_dist_index])
+    File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
 
-        if (!defined(MIN_FILE)) {
-            # A minimizer index and its zipcodes are made together and only make
-            # sense together, so any provided zipcodes are dropped here.
-            call index.createMinimizerIndex {
-                input:
-                    in_gbz_file=GBZ_FILE,
-                    in_dist_index=unsampled_dist,
-                    in_minimizer_k=minimizer_k,
-                    in_minimizer_w=minimizer_w,
-                    in_minimizer_weighted=INDEX_MINIMIZER_WEIGHTED,
-                    out_name=sub(basename(GBZ_FILE), "\\.gbz$", ""),
-                    nb_cores=CORES,
-                    in_extract_mem=INDEX_MINIMIZER_MEM,
-                    vg_docker=VG_DOCKER
-            }
+    # DIST_FILE and MIN_FILE (if given) are indexes of GBZ_FILE. If haplotype
+    # sampling ran, file_gbz is a different graph, so they can't be reused
+    # and have to be rebuilt.
+    if (HAPLOTYPE_SAMPLING || !defined(DIST_FILE)) {
+        call index.createDistanceIndex {
+            input:
+                in_gbz_file=file_gbz,
+                nb_cores=CORES,
+                in_extract_mem=HAPLOTYPE_INDEXING_MEM,
+                vg_docker=VG_DOCKER
         }
-        File unsampled_min = select_first([MIN_FILE, createMinimizerIndex.output_minimizer])
     }
+    File file_dist = select_first([createDistanceIndex.output_dist_index, DIST_FILE])
+
+    if (HAPLOTYPE_SAMPLING || !defined(MIN_FILE)) {
+        # A minimizer index and its zipcodes are made together and only make
+        # sense together, so any provided zipcodes are dropped here.
+        call index.createMinimizerIndex {
+            input:
+                in_gbz_file=file_gbz,
+                in_dist_index=file_dist,
+                in_minimizer_k=minimizer_k,
+                in_minimizer_w=minimizer_w,
+                in_minimizer_weighted=INDEX_MINIMIZER_WEIGHTED,
+                out_name=sub(basename(GBZ_FILE), "\\.gbz$", ""),
+                nb_cores=CORES,
+                in_extract_mem=INDEX_MINIMIZER_MEM,
+                vg_docker=VG_DOCKER
+        }
+    }
+    File file_min = select_first([createMinimizerIndex.output_minimizer, MIN_FILE])
 
     # The zipcodes are optional all the way through, so we can't select_first on
     # them; every candidate might be null.
     # The zipcodes might be missing if we got MIN_FILE but no ZIPCODES_FILE.
     # This is an increasingly bad idea, but still allowed for now.
-    Array[File] possible_zipcode_files = select_all([HaplotypeSampling.sampled_zipcodes, createMinimizerIndex.output_zipcodes, ZIPCODES_FILE])
+    Array[File] possible_zipcode_files = select_all([createMinimizerIndex.output_zipcodes, ZIPCODES_FILE])
     # WDL 1.0 has no None literal, so we make a File? that is never assigned.
     if (false) {
         Array[File] no_files = []
@@ -129,9 +126,9 @@ workflow IndexForGiraffe {
     }
 
     output {
-        File gbz_file = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
-        File dist_file = select_first([HaplotypeSampling.sampled_dist, unsampled_dist])
-        File min_file = select_first([HaplotypeSampling.sampled_min, unsampled_min])
+        File gbz_file = file_gbz
+        File dist_file = file_dist
+        File min_file = file_min
         File? zipcodes_file = if length(possible_zipcode_files) > 0 then possible_zipcode_files[0] else NULL_FILE
     }
 }

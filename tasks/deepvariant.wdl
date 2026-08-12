@@ -8,6 +8,11 @@ task runDeepVariantMakeExamples {
         File in_bam_file_index
         File in_reference_file
         File in_reference_index_file
+        File? in_pangenome_gbz_file
+        Int? in_pangenome_height
+        Int? in_pangenome_shared_memory_size_gb
+        String? in_pangenome_ref_chrom_prefix = ""
+        String? in_pangenome_ref_name = "GRCh38"
         String in_model_type = "WGS"
         Array[File] in_model_files = []
         Array[File] in_model_variables_files = []
@@ -44,7 +49,13 @@ task runDeepVariantMakeExamples {
         # the runner gives.
         ln -f -s '~{in_reference_file}' reference.fa
         ln -f -s '~{in_reference_index_file}' reference.fa.fai
-                
+
+        # Name for the pangenome's shared memory segment. Only this task's own
+        # processes need to agree on it, so it just needs to be unique among
+        # whatever else is running on the same machine. The kernel hands out
+        # real UUIDs here without needing uuidgen installed in the container.
+        GBZ_SHARED_MEMORY_NAME="gbz_shared_memory_$(cat /proc/sys/kernel/random/uuid)"
+
         MODEL_TYPE=~{in_model_type}
 
         # Set up the model so DV can read the channels out of it
@@ -94,6 +105,45 @@ task runDeepVariantMakeExamples {
                     if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
                         # Add our min MAPQ override
                         MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
+                    fi
+                    if [[ "~{defined(in_pangenome_gbz_file)}" == "true" ]]; then
+                        # These arguments are specific to pangenome-aware models and taken from DV-1.9
+                        # https://github.com/google/deepvariant/blob/be7ee2c6f36dd6fc6a07ed48979a6f1e82d307f7/scripts/run_pangenome_aware_deepvariant.py#L480C1-L486C49
+                        MODEL_TYPE_ARGS+=(--keep_legacy_allele_counter_behavior)
+                        MODEL_TYPE_ARGS+=(--keep_only_window_spanning_haplotypes)
+                        MODEL_TYPE_ARGS+=(--keep_supplementary_alignments)
+                        MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
+                        MODEL_TYPE_ARGS+=(--normalize_reads)
+                        MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
+                        MODEL_TYPE_ARGS+=(--pangenome ~{in_pangenome_gbz_file})
+
+                        # Flag for the shared memory segment name
+                        MODEL_TYPE_ARGS+=(--gbz_shared_memory_name ${GBZ_SHARED_MEMORY_NAME})
+                        MODEL_TYPE_ARGS+=(--use_loaded_gbz_shared_memory)
+
+                        if [[ "~{defined(in_pangenome_ref_chrom_prefix)}" == "true" ]] ; then
+                            MODEL_TYPE_ARGS+=(--ref_chrom_prefix ~{in_pangenome_ref_chrom_prefix})
+                        fi
+
+                        if [[ "~{defined(in_pangenome_ref_name)}" == "true" ]] ; then
+                            MODEL_TYPE_ARGS+=(--ref_name_pangenome ~{in_pangenome_ref_name})
+                        fi
+
+                        # If HPRC graph-v1.1 is used we can leave the pangenome height undefined and 
+                        # and let the program use the DV's default value.
+                        # For haplotype-sampled graphs it has to be set explicitly.
+                        # Based on DV-1.9's convention the pangenome height 
+                        # should be (5 + the number of haplotypes)
+                        # For example for a graph with 32 haplotypes it should be 37.
+                        if [[ "~{defined(in_pangenome_height)}" == "true" ]] ; then
+                            MODEL_TYPE_ARGS+=(--pileup_image_height_pangenome ~{in_pangenome_height})
+                        fi
+                        # For pangenome-aware models, we set min_mapping_quality to 0 by default
+                        # and normalize reads unless explicitly disabled.
+                        MODEL_TYPE_ARGS+=(--min_mapping_quality ~{select_first([in_min_mapq, 0])})
+                        if [[ "~{defined(in_norm_reads)}" == "false" ]] ; then
+                            MODEL_TYPE_ARGS+=(--normalize_reads)
+                        fi
                     fi
                     ;;
 
@@ -186,14 +236,37 @@ task runDeepVariantMakeExamples {
             fi
         fi
 
+        MAKE_EXAMPLES_BIN="/opt/deepvariant/bin/make_examples"
+
+        if [[ "~{defined(in_pangenome_gbz_file)}" == "true" ]] ; then
+            # Use the pangenome-aware version of make_examples binary
+            MAKE_EXAMPLES_BIN="/opt/deepvariant/bin/make_examples_pangenome_aware_dv"
+
+            # Load the pangenome graph into shared memory
+            # The number of shards should be the same as the number of cores that will be 
+            # used for making examples since all DV threads will use the same shared memory and once 
+            # all threads are done with making examples (counted by an internal counter) they will 
+            # release the shared memory.
+            # TODO: (Might not be neccessary) Check if there is anyway to speficy "--shm-size 15gb", which is
+            # a flag for "docker run" that specifies the size of the shared memory usable by Docker.
+            /opt/deepvariant/bin/load_gbz_into_shared_memory \
+            --pangenome_gbz ~{in_pangenome_gbz_file} \
+            --shared_memory_name ${GBZ_SHARED_MEMORY_NAME} \
+            --shared_memory_size_gb ~{select_first([in_pangenome_shared_memory_size_gb, 15])} \
+            --num_shards ~{in_call_cores}
+
+            MODEL_TYPE_ARGS+=(--sample_name_reads ~{in_sample_name})
+        else
+            MODEL_TYPE_ARGS+=(--sample_name ~{in_sample_name})
+        fi
+
         seq 0 $((~{in_call_cores}-1)) | \
-        parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples \
+        parallel -q --halt 2 --line-buffer ${MAKE_EXAMPLES_BIN} \
         --mode calling \
         "${CHECKPOINT_ARGS[@]}" \
         --ref reference.fa \
         --reads input_bam_file.bam \
         --examples ./make_examples.tfrecord@~{in_call_cores}.gz \
-        --sample_name '~{in_sample_name}' \
         --gvcf ./gvcf.tfrecord@~{in_call_cores}.gz \
         ${KEEP_LEGACY_AC_ARG} ${NORM_READS_ARG} "${MODEL_TYPE_ARGS[@]}" ~{in_other_makeexamples_arg} \
         --regions ${CONTIG_ID} \
@@ -323,5 +396,6 @@ task runDeepVariantCallVariants {
         docker: in_dv_gpu_container
     }
 }
+
 
 

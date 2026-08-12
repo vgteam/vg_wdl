@@ -4,6 +4,7 @@ import "../tasks/validation.wdl" as validation
 import "../tasks/bioinfo_utils.wdl" as utils
 import "../tasks/gam_gaf_utils.wdl" as gautils
 import "../tasks/vg_map_hts.wdl" as map
+import "../tasks/vg_indexing.wdl" as index
 import "./haplotype_sampling.wdl" as hapl
 import "./internal/prepare_reference.wdl" as reference_wf
 import "./internal/split_reads.wdl" as reads_wf
@@ -23,8 +24,8 @@ workflow Giraffe {
         READ_CHUNKS_1: "(OPTIONAL) Input reads to map (either all reads or read 1), already split. When used, INPUT_READ_FILE_1 is still used for haplotype sampling."
         READ_CHUNKS_2: "(OPTIONAL) Input reads to map (read 2), in the same order as READ_CHUNKS_1. Only used with READ_CHUNKS_1, when the reads are paired and not interleaved."
         GBZ_FILE: "Path to .gbz index file"
-        DIST_FILE: "Path to .dist index file. Optional if using haplotype sampling."
-        MIN_FILE: "Path to .min index file. Optional if using haplotype sampling."
+        DIST_FILE: "(OPTIONAL) Path to .dist index file for the graph that will actually be mapped against (the haplotype-sampled graph, if HAPLOTYPE_SAMPLING is used). Generated from that graph if not given."
+        MIN_FILE: "(OPTIONAL) Path to .min index file for the graph that will actually be mapped against (the haplotype-sampled graph, if HAPLOTYPE_SAMPLING is used). Generated from that graph if not given."
         ZIPCODES_FILE: "(OPTIONAL) For chaining-based alignment, path to .zipcodes index file"
         SAMPLE_NAME: "The sample name"
         OUTPUT_SINGLE_BAM: "Should a single merged BAM file be saved? Default is 'true'."
@@ -64,7 +65,7 @@ workflow Giraffe {
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
         KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
         HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
-
+        OUTPUT_HAPL: "Whether or not to output the haplotype index (.hapl) created before haplotype sampling. This is useful if the same pangenome will be used for DeepVariant calling after mapping. Default is 'false'."
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
         VG_SURJECT_DOCKER: "Alternate container image to use when running vg surject"
@@ -120,6 +121,7 @@ workflow Giraffe {
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
         Int KMER_COUNTING_MEM = 64
         Int HAPLOTYPE_INDEXING_MEM = 120
+        Boolean OUTPUT_HAPL = false
 
         String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
         String? VG_GIRAFFE_DOCKER
@@ -204,23 +206,50 @@ workflow Giraffe {
             HAPLOTYPE_NUMBER=HAPLOTYPE_NUMBER,
             DIPLOID=DIPLOID,
             SET_REFERENCE=SET_REFERENCE,
-            INDEX_MINIMIZER_K = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 29 else 31,
-            INDEX_MINIMIZER_W = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50,
-            INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
             CORES=MAP_CORES,
             KMER_COUNTING_MEM=KMER_COUNTING_MEM,
             HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
-            INDEX_MINIMIZER_MEM=INDEX_MINIMIZER_MEM,
+            OUTPUT_HAPL=OUTPUT_HAPL,
             VG_DOCKER=VG_DOCKER
         }
 
     }
 
     File file_gbz = select_first([HaplotypeSampling.sampled_graph, GBZ_FILE])
-    File file_min = select_first([HaplotypeSampling.sampled_min, MIN_FILE])
+
+    # DIST_FILE and MIN_FILE are indexes of the graph that will actually be
+    # mapped against. If haplotype sampling ran, that's a different graph than
+    # GBZ_FILE, so any DIST_FILE/MIN_FILE given by the caller (which can only
+    # be indexes of GBZ_FILE) can't be reused and we have to rebuild them.
+    if (HAPLOTYPE_SAMPLING || !defined(DIST_FILE)) {
+        call index.createDistanceIndex as createGiraffeDist {
+            input:
+                in_gbz_file=file_gbz,
+                nb_cores=MAP_CORES,
+                in_extract_mem=HAPLOTYPE_INDEXING_MEM,
+                vg_docker=VG_DOCKER
+        }
+    }
+    File file_dist = select_first([createGiraffeDist.output_dist_index, DIST_FILE])
+
+    if (HAPLOTYPE_SAMPLING || !defined(MIN_FILE)) {
+        call index.createMinimizerIndex as createGiraffeMin {
+            input:
+                in_gbz_file=file_gbz,
+                in_dist_index=file_dist,
+                in_minimizer_k = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 29 else 31,
+                in_minimizer_w = if GIRAFFE_PRESET == "default" || GIRAFFE_PRESET == "fast" then 11 else 50,
+                in_minimizer_weighted = INDEX_MINIMIZER_WEIGHTED,
+                out_name=SAMPLE_NAME,
+                nb_cores=MAP_CORES,
+                in_extract_mem=INDEX_MINIMIZER_MEM,
+                vg_docker=VG_DOCKER
+        }
+    }
+    File file_min = select_first([createGiraffeMin.output_minimizer, MIN_FILE])
     # The zipcode file is optional but we still have a priority list of places to get it from.
     # But we can't select_first since they all might be null.
-    Array[File] possible_zipcode_files = select_all([HaplotypeSampling.sampled_zipcodes, ZIPCODES_FILE])
+    Array[File] possible_zipcode_files = select_all([createGiraffeMin.output_zipcodes, ZIPCODES_FILE])
     # We can't actually use None in WDL 1.0 so we need to use a nonexistent null file.
     if (false) {
         Array[File] no_files = []
@@ -228,7 +257,6 @@ workflow Giraffe {
         File NULL_FILE = select_first(no_files)
     }
     File? file_zipcodes = if length(possible_zipcode_files) > 0 then possible_zipcode_files[0] else NULL_FILE
-    File file_dist = select_first([HaplotypeSampling.sampled_dist, DIST_FILE])
 
 
     # Which path names to work on, and what reference to surject against? These
@@ -434,7 +462,8 @@ workflow Giraffe {
         Array[File]? output_gaf_chunks = wanted_gaf_chunks
         Array[File]? output_calling_bams = calling_bams
         Array[File]? output_calling_bam_indexes = calling_bam_indexes
-
+        File? output_hapl_file = HaplotypeSampling.output_hapl_file
     }
 }
+
 
