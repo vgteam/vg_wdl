@@ -10,7 +10,6 @@ task runDeepVariantMakeExamples {
         File in_reference_index_file
         File? in_pangenome_gbz_file
         Int? in_pangenome_height
-        File? in_pangenome_shared_memory_name
         Int? in_pangenome_shared_memory_size_gb
         String? in_pangenome_ref_chrom_prefix = ""
         String? in_pangenome_ref_name = "GRCh38"
@@ -50,7 +49,13 @@ task runDeepVariantMakeExamples {
         # the runner gives.
         ln -f -s '~{in_reference_file}' reference.fa
         ln -f -s '~{in_reference_index_file}' reference.fa.fai
-                
+
+        # Name for the pangenome's shared memory segment. Only this task's own
+        # processes need to agree on it, so it just needs to be unique among
+        # whatever else is running on the same machine. The kernel hands out
+        # real UUIDs here without needing uuidgen installed in the container.
+        GBZ_SHARED_MEMORY_NAME="gbz_shared_memory_$(cat /proc/sys/kernel/random/uuid)"
+
         MODEL_TYPE=~{in_model_type}
 
         # Set up the model so DV can read the channels out of it
@@ -112,8 +117,7 @@ task runDeepVariantMakeExamples {
                         MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
                         MODEL_TYPE_ARGS+=(--pangenome ~{in_pangenome_gbz_file})
 
-                        # Flags and variables related to shared memory size and name
-                        GBZ_SHARED_MEMORY_NAME=~{select_first([in_pangenome_shared_memory_name, "gbz_shared_memory"])}
+                        # Flag for the shared memory segment name
                         MODEL_TYPE_ARGS+=(--gbz_shared_memory_name ${GBZ_SHARED_MEMORY_NAME})
                         MODEL_TYPE_ARGS+=(--use_loaded_gbz_shared_memory)
 

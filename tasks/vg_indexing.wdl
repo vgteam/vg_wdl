@@ -7,6 +7,10 @@ task createDistanceIndex {
         String options = ""
         Int nb_cores = 16
         Int in_extract_mem = 120
+        # Without a snarl limit in `options`, vg index -j can build very large
+        # temporary snarl decompositions on a full (non-haplotype-sampled)
+        # pangenome, so this needs much more headroom than the other indexing
+        # tasks in this file.
         Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 512
         String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }

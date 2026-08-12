@@ -51,23 +51,20 @@ workflow GiraffeDeepVariantFromGAF {
         DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
         DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
-        PANGENOME_GBZ: "(OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV."
-        DV_PANGENOME_IMAGE_HEIGHT: "(OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set."
+        PANGENOME_GBZ: "(OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV. All reference-sense paths in it other than DV_PANGENOME_REF_NAME are removed before calling, since they are not part of this sample and would otherwise show up as uninformative extra tracks in the pileup images."
+        DV_PANGENOME_IMAGE_HEIGHT: "(OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set. If DV_PANGENOME_HAPLOTYPE_SAMPLING is done by this workflow and this is not set, it defaults to DV_PANGENOME_HAPLOTYPE_NUMBER + 5, DeepVariant's convention for a graph with that many haplotypes. If passing in an already-sampled PANGENOME_GBZ instead, set this explicitly to (haplotype count + 5); leaving it unset then gets DeepVariant's own default, which is tuned for the un-sampled reference pangenome."
         DV_PANGENOME_SHARED_MEMORY_SIZE_GB: "(OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set."
-        DV_PANGENOME_REF_CHROM_PREFIX: "(OPTIONAL) The prefix to add to the chromosome name in the pangenome gbz file. It is empty by default. However sometimes we need to add a prefix (like 'GRCh38.') to the chromosome name in the pangenome gbz file to match the chromosome name in the BAM file."
-        DV_PANGENOME_REF_NAME: "The name of the reference in the pangenome gbz file. It is 'GRCh38' by default."
-        REF_NAME_TO_REMOVE_FROM_PANGENOME: "(OPTIONAL) Name of the reference to remove from the graph before haplotype sampling"
-        DV_PANGENOME_HAPLOTYPE_SAMPLING: "Should haplotype sampling be done on PANGENOME_GBZ? Default is 'false'."
-        READS_FOR_SAMPLING_1: "(OPTIONAL) First input read file for haplotype sampling"
-        READS_FOR_SAMPLING_2: "(OPTIONAL) Second input read file for haplotype sampling (if paired)"
-        PAIRED_READS_FOR_SAMPLING: "Are the reads for sampling paired-end? Default is 'false'."
+        DV_PANGENOME_REFERENCE_PREFIX: "(OPTIONAL) Prefix on chromosome names in the pangenome GBZ (like 'GRCh38.') that isn't on the corresponding names in the BAM, analogous to REFERENCE_PREFIX but for the pangenome reference instead of the calling reference. Empty by default."
+        DV_PANGENOME_REF_NAME: "(OPTIONAL) The name of the reference to keep in the pangenome gbz file for pangenome-aware DV; all other reference-sense paths are removed before calling. Required if PANGENOME_GBZ is set."
+        DV_PANGENOME_HAPLOTYPE_SAMPLING: "Should haplotype sampling of PANGENOME_GBZ be done before pangenome-aware DV calling? Default is 'false'."
+        DV_PANGENOME_READS_FOR_SAMPLING_1: "(OPTIONAL) First input read file for haplotype sampling"
+        DV_PANGENOME_READS_FOR_SAMPLING_2: "(OPTIONAL) Second input read file for haplotype sampling (if paired)"
         DV_PANGENOME_DIPLOID_SAMPLING: "Should haplotype sampling be done in diploid mode? Default is 'false'."
-        DV_PANGENOME_HAPLOTYPE_NUMBER: "Number of haplotypes for haplotype sampling. Default is 32."
+        DV_PANGENOME_HAPLOTYPE_NUMBER: "Number of haplotypes to sample for haplotype sampling. Also used, if DV_PANGENOME_IMAGE_HEIGHT is not set, to size the pangenome-aware DV pileup images, so set it to the actual haplotype count even when passing in an already-sampled PANGENOME_GBZ. Default is 32."
         DV_PANGENOME_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         DV_PANGENOME_DIST_FILE: "(OPTIONAL) Path to .dist file used in haplotype sampling"
-        CREATE_INDEX_OPTIONS_BEFORE_SAMPLING: "Additional options to pass to vg index before haplotype sampling. It is recommended to set --snarl-limit 1 to speed up index creation."
-        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
-        HAPLOTYPE_SAMPLE_CORES: "Number of cores to use for haplotype sampling. Default is 16."
+        DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES: "Number of cores to use for haplotype sampling. Default is 16."
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling). (Default: 120)"
         DV_USE_GPUS: "Should DeepVariant use GPUs for calling variants? Default is 'true'."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
@@ -130,20 +127,17 @@ workflow GiraffeDeepVariantFromGAF {
         File? PANGENOME_GBZ
         Int? DV_PANGENOME_IMAGE_HEIGHT
         Int? DV_PANGENOME_SHARED_MEMORY_SIZE_GB
-        String? DV_PANGENOME_REF_CHROM_PREFIX
-        String DV_PANGENOME_REF_NAME = "GRCh38"
-        String? REF_NAME_TO_REMOVE_FROM_PANGENOME
+        String? DV_PANGENOME_REFERENCE_PREFIX
+        String? DV_PANGENOME_REF_NAME
         Boolean DV_PANGENOME_HAPLOTYPE_SAMPLING = false
-        File? READS_FOR_SAMPLING_1
-        File? READS_FOR_SAMPLING_2
-        Boolean PAIRED_READS_FOR_SAMPLING = false
+        File? DV_PANGENOME_READS_FOR_SAMPLING_1
+        File? DV_PANGENOME_READS_FOR_SAMPLING_2
         Boolean DV_PANGENOME_DIPLOID_SAMPLING = false
         Int DV_PANGENOME_HAPLOTYPE_NUMBER = 32
         File? DV_PANGENOME_HAPL_FILE
         File? DV_PANGENOME_DIST_FILE
-        String CREATE_INDEX_OPTIONS_BEFORE_SAMPLING = ""
+        Int DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES = 16
         Int HAPLOTYPE_INDEXING_MEM = 120
-        Int HAPLOTYPE_SAMPLE_CORES = 16
         Boolean DV_USE_GPUS = true
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
@@ -242,27 +236,24 @@ workflow GiraffeDeepVariantFromGAF {
         PANGENOME_GBZ=PANGENOME_GBZ,
         DV_PANGENOME_IMAGE_HEIGHT=DV_PANGENOME_IMAGE_HEIGHT,
         DV_PANGENOME_SHARED_MEMORY_SIZE_GB=DV_PANGENOME_SHARED_MEMORY_SIZE_GB,
-        DV_PANGENOME_REF_CHROM_PREFIX=DV_PANGENOME_REF_CHROM_PREFIX,
+        DV_PANGENOME_REFERENCE_PREFIX=DV_PANGENOME_REFERENCE_PREFIX,
         DV_PANGENOME_REF_NAME=DV_PANGENOME_REF_NAME,
-        REF_NAME_TO_REMOVE_FROM_PANGENOME=REF_NAME_TO_REMOVE_FROM_PANGENOME,
         DV_PANGENOME_HAPLOTYPE_SAMPLING=DV_PANGENOME_HAPLOTYPE_SAMPLING,
-        READS_FOR_SAMPLING_1=READS_FOR_SAMPLING_1,
-        READS_FOR_SAMPLING_2=READS_FOR_SAMPLING_2,
-        PAIRED_READS_FOR_SAMPLING=PAIRED_READS_FOR_SAMPLING,
+        DV_PANGENOME_READS_FOR_SAMPLING_1=DV_PANGENOME_READS_FOR_SAMPLING_1,
+        DV_PANGENOME_READS_FOR_SAMPLING_2=DV_PANGENOME_READS_FOR_SAMPLING_2,
         DV_PANGENOME_DIPLOID_SAMPLING=DV_PANGENOME_DIPLOID_SAMPLING,
         DV_PANGENOME_HAPLOTYPE_NUMBER=DV_PANGENOME_HAPLOTYPE_NUMBER,
         DV_PANGENOME_HAPL_FILE=DV_PANGENOME_HAPL_FILE,
         DV_PANGENOME_DIST_FILE=DV_PANGENOME_DIST_FILE,
-        CREATE_INDEX_OPTIONS_BEFORE_SAMPLING=CREATE_INDEX_OPTIONS_BEFORE_SAMPLING,
+        DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES=DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES,
         HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
-        HAPLOTYPE_SAMPLE_CORES=HAPLOTYPE_SAMPLE_CORES,
-        VG_DOCKER=VG_DOCKER,
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
         DV_NORM_READS=DV_NORM_READS,
         OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
         DV_USE_GPUS=DV_USE_GPUS,
         DV_NO_GPU_DOCKER=DV_NO_GPU_DOCKER,
         DV_GPU_DOCKER=DV_GPU_DOCKER,
+        VG_DOCKER=VG_DOCKER,
         BAM_PREPROCESS_MEM=BAM_PREPROCESS_MEM,
         REALIGN_MEM=REALIGN_MEM,
         CALL_CORES=CALL_CORES,

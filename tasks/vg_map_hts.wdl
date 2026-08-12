@@ -262,10 +262,35 @@ task samplingHaplotypes {
 }
 
 
+# List the sample names of the reference-sense paths in a graph (the part
+# before the first "#" in their PanSN-style path names).
+task listReferenceSampleNames {
+    input {
+        File in_gbz_file
+        Int in_extract_mem = 16
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
+    }
+    command <<<
+        set -eux -o pipefail
+
+        vg paths --list --reference-paths -x ~{in_gbz_file} | cut -f1 -d'#' | sort -u > sample_names.txt
+    >>>
+    output {
+        Array[String] sample_names = read_lines("sample_names.txt")
+    }
+    runtime {
+        preemptible: 2
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: vg_docker
+    }
+}
+
 task removeSampleFromGraph {
     input {
         File in_gbz_file
-        String sample_name
+        Array[String] sample_names
         # runtime configurations
         Int memSize=128
         Int threadCount=8
@@ -284,20 +309,20 @@ task removeSampleFromGraph {
         # echo each line of the script to stdout so we can see what is happening
         # to turn off echo do 'set +o xtrace'
         set -o xtrace
-       
+
         INPUT_FILE=~{in_gbz_file}
         INPUT_PREFIX=$(basename ${INPUT_FILE%%.gbz})
-        OUTPUT_PREFIX="${INPUT_PREFIX}.~{sample_name}_removed"
+        OUTPUT_PREFIX="${INPUT_PREFIX}.samples_removed"
 
         # create gbwt from input gbz
         vg gbwt \
             -Z ~{in_gbz_file} \
             -o ${INPUT_PREFIX}.gbwt
 
-        # remove sample from gbwt and create a new gbwt
+        # remove the given samples from the gbwt and create a new gbwt
         vg gbwt \
             ${INPUT_PREFIX}.gbwt \
-            --remove-sample ~{sample_name}  \
+            ~{sep=" " prefix("--remove-sample ", sample_names)} \
             -o ${OUTPUT_PREFIX}.gbwt
 
         mkdir output
@@ -307,8 +332,8 @@ task removeSampleFromGraph {
             -x ~{in_gbz_file} \
             --gbz-format  \
             --graph-name output/${OUTPUT_PREFIX}.gbz
- 
-    >>> 
+
+    >>>
     runtime {
         docker: docker_image
         memory: memSize + " GB"
