@@ -296,7 +296,7 @@ task leftShiftBAMFile {
         File in_bam_file
         File in_reference_file
         File in_reference_index_file
-        Int disk_size = round(3 * size(in_bam_file, 'G')) + 50
+        Int disk_size = round(3 * size(in_bam_file, 'G')) + 100
         Int mem_gb = 20
     }
     String out_prefix = basename(in_bam_file, ".bam")
