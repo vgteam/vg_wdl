@@ -64,7 +64,8 @@ workflow GiraffeDeepVariant {
         DV_PANGENOME_IMAGE_HEIGHT: "(OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware DV. It will be used only if DV_PANGENOME_GBZ is set. If DV_PANGENOME_HAPLOTYPE_SAMPLING is done by this workflow and this is not set, it defaults to DV_PANGENOME_HAPLOTYPE_NUMBER + 5, DeepVariant's convention for a graph with that many haplotypes. If passing in an already-sampled DV_PANGENOME_GBZ instead, set this explicitly to (haplotype count + 5); leaving it unset then gets DeepVariant's own default, which is tuned for the un-sampled reference pangenome."
         DV_PANGENOME_SHARED_MEMORY_SIZE_GB: "(OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set."
         DV_PANGENOME_REFERENCE_PREFIX: "(OPTIONAL) Prefix on chromosome names in the pangenome GBZ (like 'GRCh38.') that isn't on the corresponding names in the BAM, analogous to REFERENCE_PREFIX but for the pangenome reference instead of the calling reference. Empty by default."
-        DV_PANGENOME_REF_NAME: "(OPTIONAL) The name of the reference to keep in the pangenome gbz file for pangenome-aware DV; all other reference-sense paths are removed before calling. Required if DV_PANGENOME_GBZ is set."
+        DV_PANGENOME_REF_NAME: "(OPTIONAL) The name of the reference to keep in the pangenome gbz file for pangenome-aware DV; all other reference-sense paths are removed before calling if DV_PANGENOME_REMOVE_OTHER_REFERENCES is true. Required if DV_PANGENOME_GBZ is set."
+        DV_PANGENOME_REMOVE_OTHER_REFERENCES: "Should all reference-sense paths in the pangenome other than DV_PANGENOME_REF_NAME be removed before pangenome-aware DV calling? Default is 'false'."
         DV_PANGENOME_HAPLOTYPE_SAMPLING: "Should haplotype sampling of DV_PANGENOME_GBZ be done before pangenome-aware DV calling? This is a separate round of sampling from HAPLOTYPE_SAMPLING, which (if used) samples GBZ_FILE before mapping. Default is 'false'."
         DV_PANGENOME_DIPLOID_SAMPLING: "Should the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling be done in diploid mode? Default is 'false'."
         DV_PANGENOME_HAPLOTYPE_NUMBER: "Number of haplotypes to sample for DV_PANGENOME_HAPLOTYPE_SAMPLING. Also used, if DV_PANGENOME_IMAGE_HEIGHT is not set, to size the pangenome-aware DV pileup images, so set it to the actual haplotype count even when passing in an already-sampled DV_PANGENOME_GBZ. Default is 32."
@@ -150,6 +151,7 @@ workflow GiraffeDeepVariant {
         Int? DV_PANGENOME_SHARED_MEMORY_SIZE_GB
         String? DV_PANGENOME_REFERENCE_PREFIX
         String? DV_PANGENOME_REF_NAME
+        Boolean DV_PANGENOME_REMOVE_OTHER_REFERENCES = false
         Boolean DV_PANGENOME_HAPLOTYPE_SAMPLING = false
         Boolean DV_PANGENOME_DIPLOID_SAMPLING = false
         Int DV_PANGENOME_HAPLOTYPE_NUMBER = 32
@@ -294,6 +296,7 @@ workflow GiraffeDeepVariant {
         DV_PANGENOME_SHARED_MEMORY_SIZE_GB=DV_PANGENOME_SHARED_MEMORY_SIZE_GB,
         DV_PANGENOME_REFERENCE_PREFIX=DV_PANGENOME_REFERENCE_PREFIX,
         DV_PANGENOME_REF_NAME=DV_PANGENOME_REF_NAME,
+        DV_PANGENOME_REMOVE_OTHER_REFERENCES=DV_PANGENOME_REMOVE_OTHER_REFERENCES,
         DV_PANGENOME_HAPLOTYPE_SAMPLING=DV_PANGENOME_HAPLOTYPE_SAMPLING,
         DV_PANGENOME_DIPLOID_SAMPLING=DV_PANGENOME_DIPLOID_SAMPLING,
         DV_PANGENOME_HAPLOTYPE_NUMBER=DV_PANGENOME_HAPLOTYPE_NUMBER,

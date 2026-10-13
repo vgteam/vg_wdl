@@ -47,11 +47,12 @@ workflow DeepVariant {
         DV_MODEL_DATA: ".data-00000-of-00001 file for a custom DeepVariant calling model"
         DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
-        PANGENOME_GBZ: "(OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV. All reference-sense paths in it other than DV_PANGENOME_REF_NAME are removed before calling, since they are not part of this sample and would otherwise show up as uninformative extra tracks in the pileup images."
+        PANGENOME_GBZ: "(OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV. If DV_PANGENOME_REMOVE_OTHER_REFERENCES is true, all reference-sense paths in it other than DV_PANGENOME_REF_NAME are removed before calling, since they are not part of this sample and would otherwise show up as uninformative extra tracks in the pileup images."
         DV_PANGENOME_IMAGE_HEIGHT: "(OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set. If DV_PANGENOME_HAPLOTYPE_SAMPLING is done by this workflow and this is not set, it defaults to DV_PANGENOME_HAPLOTYPE_NUMBER + 5, DeepVariant's convention for a graph with that many haplotypes. If passing in an already-sampled PANGENOME_GBZ instead, set this explicitly to (haplotype count + 5); leaving it unset then gets DeepVariant's own default, which is tuned for the un-sampled reference pangenome."
         DV_PANGENOME_SHARED_MEMORY_SIZE_GB: "(OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set."
         DV_PANGENOME_REFERENCE_PREFIX: "(OPTIONAL) Prefix on chromosome names in the pangenome GBZ (like 'GRCh38.') that isn't on the corresponding names in the BAM, analogous to REFERENCE_PREFIX but for the pangenome reference instead of the calling reference. Empty by default."
-        DV_PANGENOME_REF_NAME: "(OPTIONAL) The name of the reference to keep in the pangenome gbz file for pangenome-aware DV; all other reference-sense paths are removed before calling. Required if PANGENOME_GBZ is set."
+        DV_PANGENOME_REF_NAME: "(OPTIONAL) The name of the reference to keep in the pangenome gbz file for pangenome-aware DV; all other reference-sense paths are removed before calling if DV_PANGENOME_REMOVE_OTHER_REFERENCES is true. Required if PANGENOME_GBZ is set."
+        DV_PANGENOME_REMOVE_OTHER_REFERENCES: "Should all reference-sense paths in the pangenome other than DV_PANGENOME_REF_NAME be removed before pangenome-aware DV calling? Default is 'false'."
         DV_PANGENOME_HAPLOTYPE_SAMPLING: "Should haplotype sampling of PANGENOME_GBZ be done before pangenome-aware DV calling? Default is 'false'."
         DV_PANGENOME_READS_FOR_SAMPLING_1: "(OPTIONAL) First input read file for haplotype sampling"
         DV_PANGENOME_READS_FOR_SAMPLING_2: "(OPTIONAL) Second input read file for haplotype sampling (if paired)"
@@ -120,6 +121,7 @@ workflow DeepVariant {
         Int? DV_PANGENOME_SHARED_MEMORY_SIZE_GB
         String? DV_PANGENOME_REFERENCE_PREFIX
         String? DV_PANGENOME_REF_NAME
+        Boolean DV_PANGENOME_REMOVE_OTHER_REFERENCES = false
         Boolean DV_PANGENOME_HAPLOTYPE_SAMPLING = false
         File? DV_PANGENOME_READS_FOR_SAMPLING_1
         File? DV_PANGENOME_READS_FOR_SAMPLING_2
@@ -180,15 +182,17 @@ workflow DeepVariant {
     }
 
     ##
-    ## Haplotype sample the pangenome (if requested), then remove every
-    ## reference-sense path from it except DV_PANGENOME_REF_NAME.
+    ## Haplotype sample the pangenome (if requested), then (if
+    ## DV_PANGENOME_REMOVE_OTHER_REFERENCES) remove every reference-sense path
+    ## from it except DV_PANGENOME_REF_NAME.
     ##
     ## Pangenome-aware DeepVariant embeds every reference-sense path from the
     ## graph in its pileup images. Any reference other than the one the BAM
     ## was called against (e.g. a second assembly used to build the
     ## pangenome, like CHM13 alongside GRCh38) is not part of this sample and
-    ## would just show up as an uninformative extra track, so we detect and
-    ## remove all such non-target reference paths before calling.
+    ## would just show up as an uninformative extra track, so
+    ## DV_PANGENOME_REMOVE_OTHER_REFERENCES can be set to detect and remove all
+    ## such non-target reference paths before calling.
     ##
 
     if (DV_PANGENOME_HAPLOTYPE_SAMPLING && defined(PANGENOME_GBZ)) {
@@ -215,18 +219,20 @@ workflow DeepVariant {
     if (defined(PANGENOME_GBZ)) {
         File pangenome_before_ref_removal = select_first([HaplotypeSampling.sampled_graph, PANGENOME_GBZ])
 
-        call map.listReferenceSampleNames {
-            input:
-                in_gbz_file=pangenome_before_ref_removal,
-                vg_docker=VG_DOCKER
-        }
-
-        scatter (reference_sample_name in listReferenceSampleNames.sample_names) {
-            if (reference_sample_name != select_first([DV_PANGENOME_REF_NAME])) {
-                String extra_reference_sample_name = reference_sample_name
+        if (DV_PANGENOME_REMOVE_OTHER_REFERENCES) {
+            call map.listReferenceSampleNames {
+                input:
+                    in_gbz_file=pangenome_before_ref_removal,
+                    vg_docker=VG_DOCKER
             }
+
+            scatter (reference_sample_name in listReferenceSampleNames.sample_names) {
+                if (reference_sample_name != select_first([DV_PANGENOME_REF_NAME])) {
+                    String extra_reference_sample_name = reference_sample_name
+                }
+            }
+            Array[String] extra_reference_sample_names = select_all(extra_reference_sample_name)
         }
-        Array[String] extra_reference_sample_names = select_all(extra_reference_sample_name)
     }
 
     if (length(select_first([extra_reference_sample_names, []])) > 0) {
