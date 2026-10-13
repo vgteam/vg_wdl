@@ -138,7 +138,7 @@ workflow DeepVariant {
         Boolean DV_USE_GPUS = true
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
-        String VG_DOCKER = "quay.io/vgteam/vg:v1.68.0"
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
         Int BAM_PREPROCESS_MEM = 20
         Int REALIGN_MEM = 40
         Int CALL_CORES = 8
