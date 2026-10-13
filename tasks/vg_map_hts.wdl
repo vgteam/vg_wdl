@@ -347,3 +347,68 @@ task removeSampleFromGraph {
 }
 
 
+
+# Report the version stored in the GBZ header of a graph (e.g. "1" or "2").
+# Requires a vg version that understands GBZ versions (v1.77.0 or later).
+task getGBZVersion {
+    input {
+        File in_gbz_file
+        Int in_mem = 8
+        Int in_disk = round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.77.0"
+    }
+    command <<<
+        set -eux -o pipefail
+
+        vg describe ~{in_gbz_file} > describe.txt
+        awk '/^GBZ header:/{f=1; next} f && $1 == "Version" {print $2; exit}' describe.txt > gbz_version.txt
+
+        if [ ! -s gbz_version.txt ] ; then
+            echo "Could not find the GBZ header version in the output of vg describe" >&2
+            exit 1
+        fi
+    >>>
+    output {
+        String gbz_version = read_string("gbz_version.txt")
+    }
+    runtime {
+        preemptible: 2
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
+        docker: vg_docker
+    }
+}
+
+# Rewrite a GBZ graph so that its header has the requested GBZ version.
+# Requires a vg version that supports --gbz-version (v1.77.0 or later).
+task convertGBZVersion {
+    input {
+        File in_gbz_file
+        Int out_gbz_version
+        String? out_file_name
+        Int in_mem = 128
+        Int in_cores = 32
+        Int in_disk = 3 * round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.77.0"
+    }
+    String default_out_file_name = "~{basename(in_gbz_file, '.gbz')}.v~{out_gbz_version}.gbz"
+    String final_out_file_name = select_first([out_file_name, default_out_file_name])
+    command <<<
+        set -eux -o pipefail
+
+        vg gbwt \
+            --gbz-input ~{in_gbz_file} \
+            --gbz-version ~{out_gbz_version} \
+            --graph-name ~{final_out_file_name}
+    >>>
+    output {
+        File output_gbz = final_out_file_name
+    }
+    runtime {
+        preemptible: 2
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
+        docker: vg_docker
+    }
+}
