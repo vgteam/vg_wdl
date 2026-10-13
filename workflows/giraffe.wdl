@@ -123,7 +123,7 @@ workflow Giraffe {
         Int HAPLOTYPE_INDEXING_MEM = 120
         Boolean OUTPUT_HAPL = false
 
-        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
         String? VG_GIRAFFE_DOCKER
         String? VG_SURJECT_DOCKER
     }

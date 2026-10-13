@@ -152,7 +152,7 @@ workflow GiraffeDeepVariantFromGAF {
         Int MAKE_EXAMPLES_MEM = CALL_MEM
         Int EVAL_CORES = 8
         Int EVAL_MEM = 60
-        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
         String? VG_SURJECT_DOCKER
     }
 
