@@ -349,7 +349,7 @@ task removeSampleFromGraph {
 
 
 # Report the version stored in the GBZ header of a graph (e.g. "1" or "2").
-# Requires a vg version that understands GBZ versions (v1.77.0 or later).
+# Requires vg v1.70.0 or later, the first release with `vg describe`.
 task getGBZVersion {
     input {
         File in_gbz_file
@@ -380,7 +380,7 @@ task getGBZVersion {
 }
 
 # Rewrite a GBZ graph so that its header has the requested GBZ version.
-# Requires a vg version that supports --gbz-version (v1.77.0 or later).
+# Requires vg v1.77.0 or later, the first release with `vg gbwt --gbz-version`.
 task convertGBZVersion {
     input {
         File in_gbz_file

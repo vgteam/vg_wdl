@@ -461,7 +461,7 @@ Parameters:
 - *DV_USE_GPUS*: Should DeepVariant use GPUs for calling variants? Default is 'true'.
 - *DV_NO_GPU_DOCKER*: Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+.
 - *DV_GPU_DOCKER*: Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+.
-- *VG_DOCKER*: Container image to use when running vg. Only used for pangenome-aware DV's haplotype sampling and reference-removal steps.
+- *VG_DOCKER*: Container image to use when running vg. Only used for pangenome-aware DV's haplotype sampling, reference-removal, and GBZ version check/conversion steps; the GBZ version check needs vg v1.70.0 or later and the conversion needs v1.77.0 or later.
 - *BAM_PREPROCESS_MEM*: Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20.
 - *REALIGN_MEM*: Memory, in GB, to use for Abra indel realignment. Default is 40.
 - *CALL_CORES*: Number of cores to use when calling variants. Default is 8.

@@ -70,7 +70,7 @@ workflow DeepVariant {
         DV_USE_GPUS: "Should DeepVariant use GPUs for calling variants? Default is 'true'."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
-        VG_DOCKER: "Container image to use when running vg. Only used for pangenome-aware DV's haplotype sampling and reference-removal steps."
+        VG_DOCKER: "Container image to use when running vg. Only used for pangenome-aware DV's haplotype sampling, reference-removal, and GBZ version check/conversion steps; the GBZ version check needs vg v1.70.0 or later and the conversion needs v1.77.0 or later."
         BAM_PREPROCESS_MEM: "Memory, in GB, to use when preprocessing BAMs (left-shifting and preparing realignment targets). Default is 20."
         REALIGN_MEM: "Memory, in GB, to use for Abra indel realignment. Default is 40."
         CALL_CORES: "Number of cores to use when calling variants. Default is 8."
@@ -240,6 +240,25 @@ workflow DeepVariant {
 
     if (defined(PANGENOME_GBZ)) {
             File DV_PANGENOME_GBZ = select_first([removeSampleFromGraph.output_graph_gbz, pangenome_before_ref_removal])
+
+        # Make sure the graph passed to DeepVariant is a version 1 GBZ,
+        # converting it if it is in any other version.
+        call map.getGBZVersion {
+            input:
+                in_gbz_file=DV_PANGENOME_GBZ,
+                vg_docker=VG_DOCKER
+        }
+
+        if (getGBZVersion.gbz_version != "1") {
+            call map.convertGBZVersion {
+                input:
+                    in_gbz_file=DV_PANGENOME_GBZ,
+                    out_gbz_version=1,
+                    vg_docker=VG_DOCKER
+            }
+        }
+
+        File DV_PANGENOME_GBZ_V1 = select_first([convertGBZVersion.output_gbz, DV_PANGENOME_GBZ])
     }
 
     ##
@@ -297,7 +316,7 @@ workflow DeepVariant {
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
                 in_model_variables_files=DV_MODEL_VARIABLES_FILES,
-                in_pangenome_gbz_file=DV_PANGENOME_GBZ,
+                in_pangenome_gbz_file=DV_PANGENOME_GBZ_V1,
                 # We only know the true haplotype count when we did the
                 # sampling ourselves; otherwise leave the height alone (even
                 # if unset) rather than guess from a default that may not
