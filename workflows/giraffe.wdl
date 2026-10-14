@@ -64,7 +64,7 @@ workflow Giraffe {
         INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
         KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
-        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 120)"
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling, and giraffe distance index). (Default: 200)"
         OUTPUT_HAPL: "Whether or not to output the haplotype index (.hapl) created before haplotype sampling. This is useful if the same pangenome will be used for DeepVariant calling after mapping. Default is 'false'."
         VG_DOCKER: "Container image to use when running vg"
         VG_GIRAFFE_DOCKER: "Alternate container image to use when running vg giraffe mapping"
@@ -120,7 +120,7 @@ workflow Giraffe {
         Boolean INDEX_MINIMIZER_WEIGHTED = true
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
         Int KMER_COUNTING_MEM = 64
-        Int HAPLOTYPE_INDEXING_MEM = 120
+        Int HAPLOTYPE_INDEXING_MEM = 200
         Boolean OUTPUT_HAPL = false
 
         String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
