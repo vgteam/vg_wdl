@@ -115,19 +115,6 @@ task runDeepVariantMakeExamples {
                         MODEL_TYPE_ARGS+=(--sort_by_haplotypes)
                         MODEL_TYPE_ARGS+=(--normalize_reads)
                         MODEL_TYPE_ARGS+=(--trim_reads_for_pileup)
-                        MODEL_TYPE_ARGS+=(--pangenome ~{in_pangenome_gbz_file})
-
-                        # Flag for the shared memory segment name
-                        MODEL_TYPE_ARGS+=(--gbz_shared_memory_name ${GBZ_SHARED_MEMORY_NAME})
-                        MODEL_TYPE_ARGS+=(--use_loaded_gbz_shared_memory)
-
-                        if [[ "~{defined(in_pangenome_ref_chrom_prefix)}" == "true" ]] ; then
-                            MODEL_TYPE_ARGS+=(--ref_chrom_prefix ~{in_pangenome_ref_chrom_prefix})
-                        fi
-
-                        if [[ "~{defined(in_pangenome_ref_name)}" == "true" ]] ; then
-                            MODEL_TYPE_ARGS+=(--ref_name_pangenome ~{in_pangenome_ref_name})
-                        fi
 
                         # If HPRC graph-v1.1 is used we can leave the pangenome height undefined and 
                         # and let the program use the DV's default value.
@@ -209,12 +196,15 @@ task runDeepVariantMakeExamples {
                     MODEL_TYPE_ARGS+=(--max_reads_for_dynamic_bases_per_region 1500)
                     ;;
             esac
-        else
+        elif [[ "~{defined(in_pangenome_gbz_file)}" == "false" ]] ; then
             if [[ "~{defined(in_min_mapq)}" == "true" ]]; then
                 # Add our min MAPQ override
                 MODEL_TYPE_ARGS+=(--min_mapping_quality ~{in_min_mapq})
             fi
         fi
+        # Otherwise this is a pangenome-aware model with a
+        # model.example_info.json, and DeepVariant takes the calling flags
+        # (min MAPQ, pileup heights, read normalization, etc.) from that file.
 
         NORM_READS_ARG=""
         if [[ "~{defined(in_norm_reads)}" == "true" ]] ; then
@@ -254,6 +244,22 @@ task runDeepVariantMakeExamples {
             --shared_memory_name ${GBZ_SHARED_MEMORY_NAME} \
             --shared_memory_size_gb ~{select_first([in_pangenome_shared_memory_size_gb, 15])} \
             --num_shards ~{in_call_cores}
+
+            # These arguments describe the pangenome input and are not in
+            # model.example_info.json, so they are needed for every model.
+            MODEL_TYPE_ARGS+=(--pangenome ~{in_pangenome_gbz_file})
+
+            # Flag for the shared memory segment name
+            MODEL_TYPE_ARGS+=(--gbz_shared_memory_name ${GBZ_SHARED_MEMORY_NAME})
+            MODEL_TYPE_ARGS+=(--use_loaded_gbz_shared_memory)
+
+            if [[ "~{defined(in_pangenome_ref_chrom_prefix)}" == "true" ]] ; then
+                MODEL_TYPE_ARGS+=(--ref_chrom_prefix ~{in_pangenome_ref_chrom_prefix})
+            fi
+
+            if [[ "~{defined(in_pangenome_ref_name)}" == "true" ]] ; then
+                MODEL_TYPE_ARGS+=(--ref_name_pangenome ~{in_pangenome_ref_name})
+            fi
 
             MODEL_TYPE_ARGS+=(--sample_name_reads '~{in_sample_name}')
         else
