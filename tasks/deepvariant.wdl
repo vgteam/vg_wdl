@@ -71,6 +71,9 @@ task runDeepVariantMakeExamples {
                 mkdir model_dir/variables
                 ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
             fi
+        elif [[ "~{defined(in_pangenome_gbz_file)}" == "true" ]] ; then
+            # Use default pangenome-aware models for type
+            ln -s /opt/models/pangenome_aware_deepvariant/${MODEL_TYPE,,} model_dir
         else
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir
@@ -305,6 +308,8 @@ task runDeepVariantCallVariants {
         String in_model_type = "WGS"
         Array[File] in_model_files = []
         Array[File] in_model_variables_files = []
+        # Use the image's default pangenome-aware model when no model files are given
+        Boolean in_pangenome_aware = false
         # Not available on DV1.5
         Array[String] in_haploid_contigs = []
         # Not available on DV1.5
@@ -348,6 +353,9 @@ task runDeepVariantCallVariants {
                 mkdir model_dir/variables
                 ln -s ~{sep=" " in_model_variables_files} model_dir/variables/
             fi
+        elif [[ "~{in_pangenome_aware}" == "true" ]] ; then
+            # Use default pangenome-aware models for type
+            ln -s /opt/models/pangenome_aware_deepvariant/${MODEL_TYPE,,} model_dir
         else
             # Use default models for type
             ln -s /opt/models/${MODEL_TYPE,,} model_dir

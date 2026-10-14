@@ -349,6 +349,7 @@ workflow DeepVariant {
                 in_model_type=DV_MODEL_TYPE,
                 in_model_files=DV_MODEL_FILES,
                 in_model_variables_files=DV_MODEL_VARIABLES_FILES,
+                in_pangenome_aware=defined(DV_PANGENOME_GBZ_V1),
                 in_haploid_contigs=HAPLOID_CONTIGS,
                 in_par_regions_bed_file=PAR_REGIONS_BED_FILE,
                 in_use_gpus=DV_USE_GPUS,
