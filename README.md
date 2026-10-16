@@ -133,6 +133,7 @@ Parameters:
 - *MAP_CORES*: Number of cores to use when mapping the reads. Default is 16.
 - *MAP_MEM*: Memory, in GB, to use when mapping the reads. Default is 120.
 - *HAPLOTYPE_SAMPLING*: Whether or not to use haplotype sampling before running giraffe. Default is 'true'.
+- *BACKBONE_REFERENCE_FOR_DIST_INDEX*: (OPTIONAL) Name of the reference to use as the backbone when building the distance indexes for haplotype sampling (both the HAPLOTYPE_SAMPLING and DV_PANGENOME_HAPLOTYPE_SAMPLING rounds), passed to vg index with -P. Not used for a round whose .dist or .hapl file is provided.
 - *INDEX_MINIMIZER_WEIGHTED*: Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)
 - *INDEX_MINIMIZER_MEM*: Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)
 - *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
@@ -232,6 +233,7 @@ Parameters:
 - *HAPLOTYPE_SAMPLING*: Whether or not to use haplotype sampling before running giraffe. Default is 'true'
 - *DIPLOID*:Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'
 - *SET_REFERENCE*: (OPTIONAL) Name of the single reference to keep for haplotype sampling.
+- *BACKBONE_REFERENCE_FOR_DIST_INDEX*: (OPTIONAL) Name of the reference to use as the backbone when building the distance index for haplotype sampling, passed to vg index with -P. Not used if HAPL_FILE is provided.
 - *HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
 - *R_INDEX_FILE*: (OPTIONAL) Path to .ri file used in haplotype sampling
 - *KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
@@ -330,6 +332,7 @@ Parameters:
 - *DV_PANGENOME_HAPLOTYPE_NUMBER*: Number of haplotypes to sample for haplotype sampling. Also used, if DV_PANGENOME_IMAGE_HEIGHT is not set, to size the pangenome-aware DV pileup images, so set it to the actual haplotype count even when passing in an already-sampled PANGENOME_GBZ. This image sizing does not apply if the DeepVariant model (custom or the container's built-in pangenome-aware model) has a model.example_info.json, since DeepVariant then takes the height from that file. Default is 32.
 - *DV_PANGENOME_HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
 - *DV_PANGENOME_DIST_FILE*: (OPTIONAL) Path to .dist file used in haplotype sampling
+- *DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX*: (OPTIONAL) Name of the reference to use as the backbone when building the distance index for the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg index with -P. Not used if DV_PANGENOME_DIST_FILE or DV_PANGENOME_HAPL_FILE is provided.
 - *DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES*: Number of cores to use for haplotype sampling. Default is 16.
 - *HAPLOTYPE_INDEXING_MEM*: Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling). (Default: 120)
 - *DV_KEEP_LEGACY_AC*: Should DV use the legacy allele counter behavior? If unspecified this is not done, unless set in the model. Might want to be on for short reads.
@@ -453,6 +456,7 @@ Parameters:
 - *DV_PANGENOME_HAPLOTYPE_NUMBER*: Number of haplotypes to sample for haplotype sampling. Also used, if DV_PANGENOME_IMAGE_HEIGHT is not set, to size the pangenome-aware DV pileup images, so set it to the actual haplotype count even when passing in an already-sampled PANGENOME_GBZ. This image sizing does not apply if the DeepVariant model (custom or the container's built-in pangenome-aware model) has a model.example_info.json, since DeepVariant then takes the height from that file. Default is 32.
 - *DV_PANGENOME_HAPL_FILE*: (OPTIONAL) Path to .hapl file used in haplotype sampling
 - *DV_PANGENOME_DIST_FILE*: (OPTIONAL) Path to .dist file used in haplotype sampling
+- *DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX*: (OPTIONAL) Name of the reference to use as the backbone when building the distance index for the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg index with -P. Not used if DV_PANGENOME_DIST_FILE or DV_PANGENOME_HAPL_FILE is provided.
 - *DV_PANGENOME_R_INDEX_FILE*: (OPTIONAL) Path to .ri file used in haplotype sampling
 - *DV_PANGENOME_KFF_FILE*: (OPTIONAL) Path to .kff file used in haplotype sampling
 - *KMER_COUNTING_MEM*: Memory, in GB, to use when counting kmers. (Default: 64)
@@ -693,6 +697,7 @@ Parameters:
 - *INCLUDE_REFERENCE*: Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)
 - *SET_REFERENCE*: Name of single reference to include in sampled graph. (Default: all references)
 - *DIPLOID*: Activate diploid sampling. (Default: true)
+- *BACKBONE_REFERENCE_FOR_DIST_INDEX*: (OPTIONAL) Name of the reference to use as the backbone when building the distance index for haplotype sampling, passed to vg index with -P. Not used if DIST_FILE or HAPL_FILE is provided.
 - *OUTPUT_HAPL*: Whether or not to output the .hapl haplotype information file computed before sampling, so a caller mapping and calling against the same pangenome can reuse it instead of recomputing it. Default is 'false'.
 - *VG_DOCKER*: Container image to use when running vg.
 

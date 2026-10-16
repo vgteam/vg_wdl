@@ -57,6 +57,7 @@ workflow Giraffe {
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'"
         DIPLOID:"Whether or not to use diploid sampling while doing haplotype sampling. Has to use with Haplotype_sampling=true. Default is 'true'"
         SET_REFERENCE:"(OPTIONAL) Name of the single reference to keep for haplotype sampling."
+        BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance index for haplotype sampling, passed to vg index with -P. Not used if HAPL_FILE is provided."
         HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
@@ -113,6 +114,7 @@ workflow Giraffe {
         Boolean HAPLOTYPE_SAMPLING = true
         Boolean DIPLOID = true
         String? SET_REFERENCE
+        String? BACKBONE_REFERENCE_FOR_DIST_INDEX
         File? HAPL_FILE
         File? R_INDEX_FILE
         File? KFF_FILE
@@ -206,6 +208,7 @@ workflow Giraffe {
             HAPLOTYPE_NUMBER=HAPLOTYPE_NUMBER,
             DIPLOID=DIPLOID,
             SET_REFERENCE=SET_REFERENCE,
+            BACKBONE_REFERENCE_FOR_DIST_INDEX=BACKBONE_REFERENCE_FOR_DIST_INDEX,
             CORES=MAP_CORES,
             KMER_COUNTING_MEM=KMER_COUNTING_MEM,
             HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,

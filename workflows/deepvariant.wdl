@@ -60,6 +60,7 @@ workflow DeepVariant {
         DV_PANGENOME_HAPLOTYPE_NUMBER: "Number of haplotypes to sample for haplotype sampling. Also used, if DV_PANGENOME_IMAGE_HEIGHT is not set, to size the pangenome-aware DV pileup images, so set it to the actual haplotype count even when passing in an already-sampled PANGENOME_GBZ. This image sizing does not apply if the DeepVariant model (custom or the container's built-in pangenome-aware model) has a model.example_info.json, since DeepVariant then takes the height from that file. Default is 32."
         DV_PANGENOME_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         DV_PANGENOME_DIST_FILE: "(OPTIONAL) Path to .dist file used in haplotype sampling"
+        DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance index for the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg index with -P. Not used if DV_PANGENOME_DIST_FILE or DV_PANGENOME_HAPL_FILE is provided."
         DV_PANGENOME_R_INDEX_FILE: "(OPTIONAL) Path to .ri file used in haplotype sampling"
         DV_PANGENOME_KFF_FILE: "(OPTIONAL) Path to .kff file used in haplotype sampling"
         KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
@@ -128,6 +129,7 @@ workflow DeepVariant {
         Boolean DV_PANGENOME_DIPLOID_SAMPLING = false
         File? DV_PANGENOME_HAPL_FILE
         File? DV_PANGENOME_DIST_FILE
+        String? DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX
         File? DV_PANGENOME_R_INDEX_FILE
         File? DV_PANGENOME_KFF_FILE
         Int DV_PANGENOME_HAPLOTYPE_NUMBER = 32
@@ -205,6 +207,7 @@ workflow DeepVariant {
             HAPLOTYPE_NUMBER=DV_PANGENOME_HAPLOTYPE_NUMBER,
             HAPL_FILE=DV_PANGENOME_HAPL_FILE,
             DIST_FILE=DV_PANGENOME_DIST_FILE,
+            BACKBONE_REFERENCE_FOR_DIST_INDEX=DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX,
             R_INDEX_FILE=DV_PANGENOME_R_INDEX_FILE,
             KFF_FILE=DV_PANGENOME_KFF_FILE,
             DIPLOID=DV_PANGENOME_DIPLOID_SAMPLING,

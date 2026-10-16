@@ -80,6 +80,7 @@ workflow GiraffeDeepVariant {
         MAP_CORES: "Number of cores to use when mapping the reads. Default is 16."
         MAP_MEM: "Memory, in GB, to use when mapping the reads. Default is 120."
         HAPLOTYPE_SAMPLING: "Whether or not to use haplotype sampling before running giraffe. Default is 'true'."
+        BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance indexes for haplotype sampling (both the HAPLOTYPE_SAMPLING and DV_PANGENOME_HAPLOTYPE_SAMPLING rounds), passed to vg index with -P. Not used for a round whose .dist or .hapl file is provided."
         INDEX_MINIMIZER_WEIGHTED: "Whether to use weighted minimizer indexing with haplotype sampling. (Default: true)"
         INDEX_MINIMIZER_MEM: "Memory, in GB, to use when making the minimizer index. (Default: 320 if weighted, 120 otherwise)"
         KMER_COUNTING_MEM: "Memory, in GB, to use when counting kmers. (Default: 64)"
@@ -166,6 +167,7 @@ workflow GiraffeDeepVariant {
         Int MAP_CORES = 16
         Int MAP_MEM = 120
         Boolean HAPLOTYPE_SAMPLING = true
+        String? BACKBONE_REFERENCE_FOR_DIST_INDEX
         Boolean INDEX_MINIMIZER_WEIGHTED = true
         Int INDEX_MINIMIZER_MEM = if INDEX_MINIMIZER_WEIGHTED then 320 else 120
         Int KMER_COUNTING_MEM = 64
@@ -245,6 +247,7 @@ workflow GiraffeDeepVariant {
         MAP_CORES=MAP_CORES,
         MAP_MEM=MAP_MEM,
         HAPLOTYPE_SAMPLING=HAPLOTYPE_SAMPLING,
+        BACKBONE_REFERENCE_FOR_DIST_INDEX=BACKBONE_REFERENCE_FOR_DIST_INDEX,
         OUTPUT_HAPL=pangenomes_are_same,
         BAM_PREPROCESS_MEM=BAM_PREPROCESS_MEM,
         INDEX_MINIMIZER_WEIGHTED=INDEX_MINIMIZER_WEIGHTED,
@@ -304,6 +307,7 @@ workflow GiraffeDeepVariant {
         DV_PANGENOME_READS_FOR_SAMPLING_2=INPUT_READ_FILE_2,
         DV_PANGENOME_HAPL_FILE=select_first([Giraffe.output_hapl_file, HAPL_FILE]),
         DV_PANGENOME_DIST_FILE=DIST_FILE,
+        DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX=BACKBONE_REFERENCE_FOR_DIST_INDEX,
         DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES=MAP_CORES,
         HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,

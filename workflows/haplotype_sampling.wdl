@@ -33,6 +33,7 @@ workflow HaplotypeSampling {
         INCLUDE_REFERENCE: "Include reference paths and generic paths from the full graph in the sampled graph. (Default: true)"
         SET_REFERENCE: "Name of single reference to include in sampled graph. (Default: all references)"
         DIPLOID: "Activate diploid sampling. (Default: true)"
+        BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance index for haplotype sampling, passed to vg index with -P. Not used if DIST_FILE or HAPL_FILE is provided."
         OUTPUT_HAPL: "Whether or not to output the .hapl haplotype information file computed before sampling, so a caller mapping and calling against the same pangenome can reuse it instead of recomputing it. Default is 'false'."
         VG_DOCKER: "Container image to use when running vg."
     }
@@ -58,6 +59,7 @@ workflow HaplotypeSampling {
         Boolean INCLUDE_REFERENCE = true
         String? SET_REFERENCE
         Boolean DIPLOID = true
+        String? BACKBONE_REFERENCE_FOR_DIST_INDEX
         Boolean OUTPUT_HAPL = false
         String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
 
@@ -77,6 +79,7 @@ workflow HaplotypeSampling {
                     # This distance index is only used to build the haplotype
                     # index below, not for mapping.
                     options="--snarl-limit 1",
+                    backbone_reference=BACKBONE_REFERENCE_FOR_DIST_INDEX,
                     vg_docker=VG_DOCKER
             }
         }
