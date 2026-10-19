@@ -34,6 +34,7 @@ workflow HaplotypeSampling {
         SET_REFERENCE: "Name of single reference to include in sampled graph. (Default: all references)"
         DIPLOID: "Activate diploid sampling. (Default: true)"
         BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance index for haplotype sampling, passed to vg index with -P. Not used if DIST_FILE or HAPL_FILE is provided."
+        BAN_SAMPLE: "(OPTIONAL) Name of a sample whose haplotypes should be excluded from haplotype sampling, passed to vg haplotypes with --ban-sample."
         OUTPUT_HAPL: "Whether or not to output the .hapl haplotype information file computed before sampling, so a caller mapping and calling against the same pangenome can reuse it instead of recomputing it. Default is 'false'."
         VG_DOCKER: "Container image to use when running vg."
     }
@@ -60,6 +61,7 @@ workflow HaplotypeSampling {
         String? SET_REFERENCE
         Boolean DIPLOID = true
         String? BACKBONE_REFERENCE_FOR_DIST_INDEX
+        String? BAN_SAMPLE
         Boolean OUTPUT_HAPL = false
         String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
 
@@ -143,6 +145,7 @@ workflow HaplotypeSampling {
             absent_score = ABSENT_SCORE,
             include_reference = INCLUDE_REFERENCE,
             set_reference = SET_REFERENCE,
+            ban_sample = BAN_SAMPLE,
             nb_cores=CORES,
             in_extract_mem=HAPLOTYPE_INDEXING_MEM,
             use_diploid_sampling=DIPLOID,

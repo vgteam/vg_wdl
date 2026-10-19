@@ -203,6 +203,7 @@ task samplingHaplotypes {
         Float absent_score
         Boolean include_reference
         String? set_reference
+        String? ban_sample
         Boolean use_diploid_sampling
         Int nb_cores = 16
         Int in_extract_mem = 120
@@ -241,6 +242,7 @@ task samplingHaplotypes {
         --absent-score ~{absent_score} \
         ${INCLUDE_REF} \
         ~{"--set-reference " + set_reference} \
+        ~{"--ban-sample " + ban_sample} \
         ${INCLUDE_DIPL} \
         -i ~{in_hap_index} \
         -k ~{in_kmer_info} \

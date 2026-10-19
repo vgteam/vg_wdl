@@ -65,6 +65,7 @@ workflow GiraffeDeepVariantFromGAF {
         DV_PANGENOME_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
         DV_PANGENOME_DIST_FILE: "(OPTIONAL) Path to .dist file used in haplotype sampling"
         DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance index for the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg index with -P. Not used if DV_PANGENOME_DIST_FILE or DV_PANGENOME_HAPL_FILE is provided."
+        DV_PANGENOME_BAN_SAMPLE: "(OPTIONAL) Name of a sample whose haplotypes should be excluded from the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg haplotypes with --ban-sample."
         DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES: "Number of cores to use for haplotype sampling. Default is 16."
         HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling). (Default: 120)"
         DV_USE_GPUS: "Should DeepVariant use GPUs for calling variants? Default is 'true'."
@@ -140,6 +141,7 @@ workflow GiraffeDeepVariantFromGAF {
         File? DV_PANGENOME_HAPL_FILE
         File? DV_PANGENOME_DIST_FILE
         String? DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX
+        String? DV_PANGENOME_BAN_SAMPLE
         Int DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES = 16
         Int HAPLOTYPE_INDEXING_MEM = 120
         Boolean DV_USE_GPUS = true
@@ -251,6 +253,7 @@ workflow GiraffeDeepVariantFromGAF {
         DV_PANGENOME_HAPL_FILE=DV_PANGENOME_HAPL_FILE,
         DV_PANGENOME_DIST_FILE=DV_PANGENOME_DIST_FILE,
         DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX=DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX,
+        DV_PANGENOME_BAN_SAMPLE=DV_PANGENOME_BAN_SAMPLE,
         DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES=DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES,
         HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
