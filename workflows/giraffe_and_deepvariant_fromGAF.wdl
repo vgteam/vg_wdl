@@ -51,6 +51,23 @@ workflow GiraffeDeepVariantFromGAF {
         DV_NORM_READS: "Should DV normalize reads itself? If unspecified this is not done, unless set in the model."
         DV_MODEL_FILES: "Array of all files in the root directory of the DV model, if not using DV_MODEL_META/DV_MODEL_INDEX/DV_MODEL_DATA format"
         DV_MODEL_VARIABLES_FILES: "Array of files that need to go in a 'variables' subdirectory for a DV model"
+        PANGENOME_GBZ: "(OPTIONAL) Path to a pangenome graph in GBZ format for pangenome-aware DV. If DV_PANGENOME_REMOVE_OTHER_REFERENCES is true, all reference-sense paths in it other than DV_PANGENOME_REF_NAME are removed before calling, since they are not part of this sample and would otherwise show up as uninformative extra tracks in the pileup images."
+        DV_PANGENOME_IMAGE_HEIGHT: "(OPTIONAL) Height of the pangenome part of the pileup images for pangenome-aware models. It will be used only if PANGENOME_GBZ is set. If DV_PANGENOME_HAPLOTYPE_SAMPLING is done by this workflow and this is not set, it defaults to DV_PANGENOME_HAPLOTYPE_NUMBER + 5, DeepVariant's convention for a graph with that many haplotypes. If passing in an already-sampled PANGENOME_GBZ instead, set this explicitly to (haplotype count + 5); leaving it unset then gets DeepVariant's own default, which is tuned for the un-sampled reference pangenome. Ignored if the DeepVariant model (custom or the container's built-in pangenome-aware model) has a model.example_info.json, since DeepVariant then takes the height from that file."
+        DV_PANGENOME_SHARED_MEMORY_SIZE_GB: "(OPTIONAL) Size of the shared memory segment in GB for loading pangenome in DeepVariant. It will be used only if PANGENOME_GBZ is set."
+        DV_PANGENOME_REFERENCE_PREFIX: "(OPTIONAL) Prefix on chromosome names in the pangenome GBZ (like 'GRCh38.') that isn't on the corresponding names in the BAM, analogous to REFERENCE_PREFIX but for the pangenome reference instead of the calling reference. Empty by default."
+        DV_PANGENOME_REF_NAME: "(OPTIONAL) The name of the reference to keep in the pangenome gbz file for pangenome-aware DV; all other reference-sense paths are removed before calling if DV_PANGENOME_REMOVE_OTHER_REFERENCES is true. Required if PANGENOME_GBZ is set."
+        DV_PANGENOME_REMOVE_OTHER_REFERENCES: "Should all reference-sense paths in the pangenome other than DV_PANGENOME_REF_NAME be removed before pangenome-aware DV calling? Default is 'false'."
+        DV_PANGENOME_HAPLOTYPE_SAMPLING: "Should haplotype sampling of PANGENOME_GBZ be done before pangenome-aware DV calling? Default is 'false'."
+        DV_PANGENOME_READS_FOR_SAMPLING_1: "(OPTIONAL) First input read file for haplotype sampling"
+        DV_PANGENOME_READS_FOR_SAMPLING_2: "(OPTIONAL) Second input read file for haplotype sampling (if paired)"
+        DV_PANGENOME_DIPLOID_SAMPLING: "Should haplotype sampling be done in diploid mode? Default is 'false'."
+        DV_PANGENOME_HAPLOTYPE_NUMBER: "Number of haplotypes to sample for haplotype sampling. Also used, if DV_PANGENOME_IMAGE_HEIGHT is not set, to size the pangenome-aware DV pileup images, so set it to the actual haplotype count even when passing in an already-sampled PANGENOME_GBZ. This image sizing does not apply if the DeepVariant model (custom or the container's built-in pangenome-aware model) has a model.example_info.json, since DeepVariant then takes the height from that file. Default is 32."
+        DV_PANGENOME_HAPL_FILE: "(OPTIONAL) Path to .hapl file used in haplotype sampling"
+        DV_PANGENOME_DIST_FILE: "(OPTIONAL) Path to .dist file used in haplotype sampling"
+        DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX: "(OPTIONAL) Name of the reference to use as the backbone when building the distance index for the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg index with -P. Not used if DV_PANGENOME_DIST_FILE or DV_PANGENOME_HAPL_FILE is provided."
+        DV_PANGENOME_BAN_SAMPLE: "(OPTIONAL) Name of a sample whose haplotypes should be excluded from the DV_PANGENOME_HAPLOTYPE_SAMPLING round of haplotype sampling, passed to vg haplotypes with --ban-sample."
+        DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES: "Number of cores to use for haplotype sampling. Default is 16."
+        HAPLOTYPE_INDEXING_MEM: "Memory, in GB, to use for haplotype sampling indexing tasks (distance index, r-index, haplotype index, sampling). (Default: 120)"
         DV_USE_GPUS: "Should DeepVariant use GPUs for calling variants? Default is 'true'."
         DV_NO_GPU_DOCKER: "Container image to use when running DeepVariant for steps that don't benefit from GPUs. Must be DeepVariant 1.8+."
         DV_GPU_DOCKER: "Container image to use when running DeepVariant for steps that benefit from GPUs. Must be DeepVariant 1.8+."
@@ -110,6 +127,23 @@ workflow GiraffeDeepVariantFromGAF {
         Boolean? DV_NORM_READS
         Array[File]? DV_MODEL_FILES
         Array[File]? DV_MODEL_VARIABLES_FILES
+        File? PANGENOME_GBZ
+        Int? DV_PANGENOME_IMAGE_HEIGHT
+        Int? DV_PANGENOME_SHARED_MEMORY_SIZE_GB
+        String? DV_PANGENOME_REFERENCE_PREFIX
+        String? DV_PANGENOME_REF_NAME
+        Boolean DV_PANGENOME_REMOVE_OTHER_REFERENCES = false
+        Boolean DV_PANGENOME_HAPLOTYPE_SAMPLING = false
+        File? DV_PANGENOME_READS_FOR_SAMPLING_1
+        File? DV_PANGENOME_READS_FOR_SAMPLING_2
+        Boolean DV_PANGENOME_DIPLOID_SAMPLING = false
+        Int DV_PANGENOME_HAPLOTYPE_NUMBER = 32
+        File? DV_PANGENOME_HAPL_FILE
+        File? DV_PANGENOME_DIST_FILE
+        String? DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX
+        String? DV_PANGENOME_BAN_SAMPLE
+        Int DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES = 16
+        Int HAPLOTYPE_INDEXING_MEM = 120
         Boolean DV_USE_GPUS = true
         String? DV_NO_GPU_DOCKER
         String? DV_GPU_DOCKER
@@ -124,7 +158,7 @@ workflow GiraffeDeepVariantFromGAF {
         Int MAKE_EXAMPLES_MEM = CALL_MEM
         Int EVAL_CORES = 8
         Int EVAL_MEM = 60
-        String VG_DOCKER = "quay.io/vgteam/vg:v1.64.0"
+        String VG_DOCKER = "quay.io/vgteam/vg:v1.77.0"
         String? VG_SURJECT_DOCKER
     }
 
@@ -205,12 +239,30 @@ workflow GiraffeDeepVariantFromGAF {
         DV_MODEL_DATA=DV_MODEL_DATA,
         DV_MODEL_FILES=DV_MODEL_FILES,
         DV_MODEL_VARIABLES_FILES=DV_MODEL_VARIABLES_FILES,
+        PANGENOME_GBZ=PANGENOME_GBZ,
+        DV_PANGENOME_IMAGE_HEIGHT=DV_PANGENOME_IMAGE_HEIGHT,
+        DV_PANGENOME_SHARED_MEMORY_SIZE_GB=DV_PANGENOME_SHARED_MEMORY_SIZE_GB,
+        DV_PANGENOME_REFERENCE_PREFIX=DV_PANGENOME_REFERENCE_PREFIX,
+        DV_PANGENOME_REF_NAME=DV_PANGENOME_REF_NAME,
+        DV_PANGENOME_REMOVE_OTHER_REFERENCES=DV_PANGENOME_REMOVE_OTHER_REFERENCES,
+        DV_PANGENOME_HAPLOTYPE_SAMPLING=DV_PANGENOME_HAPLOTYPE_SAMPLING,
+        DV_PANGENOME_READS_FOR_SAMPLING_1=DV_PANGENOME_READS_FOR_SAMPLING_1,
+        DV_PANGENOME_READS_FOR_SAMPLING_2=DV_PANGENOME_READS_FOR_SAMPLING_2,
+        DV_PANGENOME_DIPLOID_SAMPLING=DV_PANGENOME_DIPLOID_SAMPLING,
+        DV_PANGENOME_HAPLOTYPE_NUMBER=DV_PANGENOME_HAPLOTYPE_NUMBER,
+        DV_PANGENOME_HAPL_FILE=DV_PANGENOME_HAPL_FILE,
+        DV_PANGENOME_DIST_FILE=DV_PANGENOME_DIST_FILE,
+        DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX=DV_PANGENOME_BACKBONE_REFERENCE_FOR_DIST_INDEX,
+        DV_PANGENOME_BAN_SAMPLE=DV_PANGENOME_BAN_SAMPLE,
+        DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES=DV_PANGENOME_HAPLOTYPE_SAMPLE_CORES,
+        HAPLOTYPE_INDEXING_MEM=HAPLOTYPE_INDEXING_MEM,
         DV_KEEP_LEGACY_AC=DV_KEEP_LEGACY_AC,
         DV_NORM_READS=DV_NORM_READS,
         OTHER_MAKEEXAMPLES_ARG=OTHER_MAKEEXAMPLES_ARG,
         DV_USE_GPUS=DV_USE_GPUS,
         DV_NO_GPU_DOCKER=DV_NO_GPU_DOCKER,
         DV_GPU_DOCKER=DV_GPU_DOCKER,
+        VG_DOCKER=VG_DOCKER,
         BAM_PREPROCESS_MEM=BAM_PREPROCESS_MEM,
         REALIGN_MEM=REALIGN_MEM,
         CALL_CORES=CALL_CORES,

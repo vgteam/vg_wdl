@@ -21,6 +21,7 @@ workflows:
     primaryDescriptorPath: /workflows/giraffe_and_deepvariant.wdl
     testParameterFiles:
       - /params/giraffe_and_deepvariant.json
+      - /params/giraffe_and_deepvariant_pangenome.json
     authors:
       - name: Jean Monlong
         email: jmonlong@ucsc.edu

@@ -203,6 +203,7 @@ task samplingHaplotypes {
         Float absent_score
         Boolean include_reference
         String? set_reference
+        String? ban_sample
         Boolean use_diploid_sampling
         Int nb_cores = 16
         Int in_extract_mem = 120
@@ -241,6 +242,7 @@ task samplingHaplotypes {
         --absent-score ~{absent_score} \
         ${INCLUDE_REF} \
         ~{"--set-reference " + set_reference} \
+        ~{"--ban-sample " + ban_sample} \
         ${INCLUDE_DIPL} \
         -i ~{in_hap_index} \
         -k ~{in_kmer_info} \
@@ -262,3 +264,153 @@ task samplingHaplotypes {
 }
 
 
+# List the sample names of the reference-sense paths in a graph (the part
+# before the first "#" in their PanSN-style path names).
+task listReferenceSampleNames {
+    input {
+        File in_gbz_file
+        Int in_extract_mem = 16
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.64.0"
+    }
+    command <<<
+        set -eux -o pipefail
+
+        vg paths --list --reference-paths -x ~{in_gbz_file} | cut -f1 -d'#' | sort -u > sample_names.txt
+    >>>
+    output {
+        Array[String] sample_names = read_lines("sample_names.txt")
+    }
+    runtime {
+        preemptible: 2
+        memory: in_extract_mem + " GB"
+        disks: "local-disk " + in_extract_disk + " SSD"
+        docker: vg_docker
+    }
+}
+
+task removeSampleFromGraph {
+    input {
+        File in_gbz_file
+        Array[String] sample_names
+        # runtime configurations
+        Int memSize=128
+        Int threadCount=8
+        Int diskSize=128
+        String docker_image="quay.io/vgteam/vg:v1.64.0"
+        Int preemptible=2
+    }
+    command <<<
+        # Set the exit code of a pipeline to that of the rightmost command
+        # to exit with a non-zero status, or zero if all commands of the pipeline exit
+        set -o pipefail
+        # cause a bash script to exit immediately when a command fails
+        set -e
+        # cause the bash shell to treat unset variables as an error and exit immediately
+        set -u
+        # echo each line of the script to stdout so we can see what is happening
+        # to turn off echo do 'set +o xtrace'
+        set -o xtrace
+
+        INPUT_FILE=~{in_gbz_file}
+        INPUT_PREFIX=$(basename ${INPUT_FILE%%.gbz})
+        OUTPUT_PREFIX="${INPUT_PREFIX}.samples_removed"
+
+        # create gbwt from input gbz
+        vg gbwt \
+            -Z ~{in_gbz_file} \
+            -o ${INPUT_PREFIX}.gbwt
+
+        # remove the given samples from the gbwt and create a new gbwt
+        vg gbwt \
+            ${INPUT_PREFIX}.gbwt \
+            ~{sep=" " prefix("--remove-sample ", sample_names)} \
+            -o ${OUTPUT_PREFIX}.gbwt
+
+        mkdir output
+        # make a new gbz file using the new gbwt
+        vg gbwt \
+            ${OUTPUT_PREFIX}.gbwt \
+            -x ~{in_gbz_file} \
+            --gbz-format  \
+            --graph-name output/${OUTPUT_PREFIX}.gbz
+
+    >>>
+    runtime {
+        docker: docker_image
+        memory: memSize + " GB"
+        cpu: threadCount
+        disks: "local-disk " + diskSize + " SSD"
+        preemptible : preemptible
+    }
+    output {
+        File output_graph_gbz = glob("output/*.gbz")[0]
+    }
+}
+
+
+
+# Report the version stored in the GBZ header of a graph (e.g. "1" or "2").
+# Requires vg v1.70.0 or later, the first release with `vg describe`.
+task getGBZVersion {
+    input {
+        File in_gbz_file
+        Int in_mem = 8
+        Int in_disk = round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.77.0"
+    }
+    command <<<
+        set -eux -o pipefail
+
+        vg describe ~{in_gbz_file} > describe.txt
+        awk '/^GBZ header:/{f=1; next} f && $1 == "Version" {print $2; exit}' describe.txt > gbz_version.txt
+
+        if [ ! -s gbz_version.txt ] ; then
+            echo "Could not find the GBZ header version in the output of vg describe" >&2
+            exit 1
+        fi
+    >>>
+    output {
+        String gbz_version = read_string("gbz_version.txt")
+    }
+    runtime {
+        preemptible: 2
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
+        docker: vg_docker
+    }
+}
+
+# Rewrite a GBZ graph so that its header has the requested GBZ version.
+# Requires vg v1.77.0 or later, the first release with `vg gbwt --gbz-version`.
+task convertGBZVersion {
+    input {
+        File in_gbz_file
+        Int out_gbz_version
+        String? out_file_name
+        Int in_mem = 128
+        Int in_cores = 32
+        Int in_disk = 3 * round(size(in_gbz_file, "G")) + 20
+        String vg_docker = "quay.io/vgteam/vg:v1.77.0"
+    }
+    String default_out_file_name = "~{basename(in_gbz_file, '.gbz')}.v~{out_gbz_version}.gbz"
+    String final_out_file_name = select_first([out_file_name, default_out_file_name])
+    command <<<
+        set -eux -o pipefail
+
+        vg gbwt \
+            --gbz-input ~{in_gbz_file} \
+            --gbz-version ~{out_gbz_version} \
+            --graph-name ~{final_out_file_name}
+    >>>
+    output {
+        File output_gbz = final_out_file_name
+    }
+    runtime {
+        preemptible: 2
+        cpu: in_cores
+        memory: in_mem + " GB"
+        disks: "local-disk " + in_disk + " SSD"
+        docker: vg_docker
+    }
+}

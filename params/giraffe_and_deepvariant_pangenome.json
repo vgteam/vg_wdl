@@ -1,0 +1,19 @@
+{
+  "GiraffeDeepVariant.INPUT_READ_FILE_1": "tests/small_graph_fake_grch38/reads_1.fastq.gz",
+  "GiraffeDeepVariant.INPUT_READ_FILE_2": "tests/small_graph_fake_grch38/reads_2.fastq.gz",
+  "GiraffeDeepVariant.GBZ_FILE": "tests/small_graph_fake_grch38/graph.fake_grch38.gbz",
+  "GiraffeDeepVariant.SAMPLE_NAME": "s0",
+  "GiraffeDeepVariant.REFERENCE_PREFIX": "GRCh38#0#",
+  "GiraffeDeepVariant.BACKBONE_REFERENCE_FOR_DIST_INDEX": "GRCh38",
+  "GiraffeDeepVariant.DV_PANGENOME_GBZ": "tests/small_graph_fake_grch38/graph.fake_grch38.gbz",
+  "GiraffeDeepVariant.DV_PANGENOME_REF_NAME": "GRCh38",
+  "GiraffeDeepVariant.DV_PANGENOME_HAPLOTYPE_SAMPLING": false,
+  "GiraffeDeepVariant.DV_NO_GPU_DOCKER": "google/deepvariant:pangenome_aware_deepvariant-1.10.0",
+  "GiraffeDeepVariant.DV_USE_GPUS": false,
+  "GiraffeDeepVariant.DV_GPU_DOCKER": "google/deepvariant:pangenome_aware_deepvariant-1.10.0",
+  "GiraffeDeepVariant.VG_DOCKER": "quay.io/vgteam/vg:v1.77.0",
+  "GiraffeDeepVariant.TRUTH_VCF": "tests/small_graph_fake_grch38/truth.vcf.gz",
+  "GiraffeDeepVariant.TRUTH_VCF_INDEX": "tests/small_graph_fake_grch38/truth.vcf.gz.tbi",
+  "GiraffeDeepVariant.EVALUATION_REGIONS_BED": "tests/small_graph_fake_grch38/eval_regions.bed",
+  "GiraffeDeepVariant.EVALUATE_WITH_AARDVARK": true
+}
