@@ -7,8 +7,8 @@ task createDistanceIndex {
         String options = ""
         String? backbone_reference
         Int nb_cores = 16
-        Int in_extract_mem = 120
-        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 512
+        Int in_extract_mem = 200
+        Int in_extract_disk = 2 * round(size(in_gbz_file, "G")) + 20
         String vg_docker = "quay.io/vgteam/vg:v1.64.0"
     }
     String output_prefix = sub(basename(in_gbz_file), "\\.gbz$", "")
